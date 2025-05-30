@@ -1,13 +1,12 @@
 # standard python libraries
 import numpy as np
 import torch
-import torch.nn as nn
 import os, time
 import warnings
 from torch.utils.data import DataLoader
 import os
-import sys
 import h5py
+from hydra.utils import instantiate
 
 # Other functions of project
 from experiments.logger import LOGGER
@@ -391,13 +390,14 @@ class CaloChallenge(BaseExperiment):
 
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
-            # load energy model
-            # energy_model = self.load_other(self.params['energy_model'])
 
             if self.cfg.sample_us:  # TODO
+                # load energy model
+                self.load_energy_model()
+                
                 # sample us
                 u_samples = torch.vstack(
-                    [energy_model.sample_batch(c) for c in transformed_cond_loader]
+                    [self.energy_model.sample_batch(c) for c in transformed_cond_loader]
                 )
 
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
@@ -492,9 +492,30 @@ class CaloChallenge(BaseExperiment):
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
         save_file = h5py.File(self.cfg.base_dir + f"samples{name}.hdf5", "w")
-        save_file.create_dataset("incident_energies", data=energies)
-        save_file.create_dataset("showers", data=sample)
+        save_file.create_dataset("incident_energies", data=energies, compression="gzip")
+        save_file.create_dataset("showers", data=sample, compression="gzip")
         save_file.close()
+
+    def load_energy_model(self):
+        # initialize model
+        self.energy_model = instantiate(self.cfg.energy_model)
+        num_parameters = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        LOGGER.info(
+            f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
+        )
+        model_path = os.path.join(
+            self.cfg.energy_model.run_dir, "models", f"model_run0.pt"
+        )
+        try:
+            state_dict = torch.load(model_path, map_location="cpu")["model"]
+            LOGGER.info(f"Loading energy model from {model_path}")
+            self.energy_model.load_state_dict(state_dict)
+        except FileNotFoundError:
+            raise ValueError(f"Cannot load model from {model_path}")
+
+        self.energy_model.to(self.device, dtype=self.dtype)
 
     # def save(self, epoch=""):
     #     """ Save the model, and more if needed"""
