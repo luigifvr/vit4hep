@@ -15,6 +15,7 @@ from experiments.base_experiment import BaseExperiment
 from experiments.calochallenge.datasets import CaloChallengeDataset
 import experiments.calochallenge.transforms as transforms
 from challenge_files import evaluate
+
 # from Util.util import *
 # from datasets import *
 # from documenter import Documenter
@@ -24,6 +25,7 @@ from challenge_files import evaluate
 # from challenge_files import evaluate # avoid NameError: 'evaluate' is not defined
 # import models
 # from models import *
+
 
 class CaloChallenge(BaseExperiment):
     """
@@ -59,59 +61,60 @@ class CaloChallenge(BaseExperiment):
                             This is meant to be used during training if intermediate plots are wanted
 
     """
+
     # def __init__(self, cfg):
     #     """
     #     :param params: file with all relevant model parameters
     #     """
     #     super(BaseExperiment).__init__(cfg)
-        # self.doc = doc
-        # self.params = params
-        # self.device = device
-        # self.shape = self.params['shape']#get(self.params,'shape')
-        # self.conditional = get(self.params,'conditional',False)
-        # self.single_energy = get(self.params, 'single_energy', None) # Train on a single energy
-        # self.eval_mode = get(self.params, 'eval_mode', 'all')
+    # self.doc = doc
+    # self.params = params
+    # self.device = device
+    # self.shape = self.params['shape']#get(self.params,'shape')
+    # self.conditional = get(self.params,'conditional',False)
+    # self.single_energy = get(self.params, 'single_energy', None) # Train on a single energy
+    # self.eval_mode = get(self.params, 'eval_mode', 'all')
 
-        # self.batch_size = self.params["batch_size"]
-        # self.batch_size_sample = get(self.params, "batch_size_sample", 10_000)
+    # self.batch_size = self.params["batch_size"]
+    # self.batch_size_sample = get(self.params, "batch_size_sample", 10_000)
 
-        # self.net = self.build_net()
-        # print(self.net)
-        # param_count = sum(p.numel() for p in self.net.parameters() if p.requires_grad)
-        # print(f'init model: Model has {param_count} parameters')
-        # self.params['parameter_count'] = param_count
+    # self.net = self.build_net()
+    # print(self.net)
+    # param_count = sum(p.numel() for p in self.net.parameters() if p.requires_grad)
+    # print(f'init model: Model has {param_count} parameters')
+    # self.params['parameter_count'] = param_count
 
-        # self.epoch = get(self.params, "total_epochs", 0)
-        # self.iterations = get(self.params,"iterations", 1)
-        # self.regular_loss = []
-        # self.kl_loss = []
+    # self.epoch = get(self.params, "total_epochs", 0)
+    # self.iterations = get(self.params,"iterations", 1)
+    # self.regular_loss = []
+    # self.kl_loss = []
 
-        # self.runs = get(self.params, "runs", 0)
-        # self.iterate_periodically = get(self.params, "iterate_periodically", False)
-        # self.validate_every = get(self.params, "validate_every", 50)
-        
-        # # augment data
-        # self.aug_transforms = get(self.params, "augment_batch", False)
+    # self.runs = get(self.params, "runs", 0)
+    # self.iterate_periodically = get(self.params, "iterate_periodically", False)
+    # self.validate_every = get(self.params, "validate_every", 50)
 
-        # # load autoencoder for latent modelling
-        # #self.ae_dir = get(self.params, "autoencoder", None)
-        # #if self.ae_dir is None:
-        # self.transforms = get_transformations(
-        #     params.get('transforms', None), doc=self.doc
-        # )
-        # self.latent = False
-        #else:
-        #    self.ae = self.load_other(self.ae_dir)# model_class='AE'
-        #    self.transforms = self.ae.transforms
-        #    self.latent = True
+    # # augment data
+    # self.aug_transforms = get(self.params, "augment_batch", False)
+
+    # # load autoencoder for latent modelling
+    # #self.ae_dir = get(self.params, "autoencoder", None)
+    # #if self.ae_dir is None:
+    # self.transforms = get_transformations(
+    #     params.get('transforms', None), doc=self.doc
+    # )
+    # self.latent = False
+    # else:
+    #    self.ae = self.load_other(self.ae_dir)# model_class='AE'
+    #    self.transforms = self.ae.transforms
+    #    self.latent = True
     def init_data(self):
         self.hdf5_train = self.cfg.data.training_file
         self.hdf5_test = self.cfg.data.test_file
-        self.particle_type = self.cfg.data.particle_type 
+        self.particle_type = self.cfg.data.particle_type
         self.xml_filename = self.cfg.data.xml_filename
         self.val_frac = self.cfg.data.val_frac
-        self.transforms = []    
-        
+        self.transforms = []
+
         for name, kwargs in self.cfg.data.transforms.items():
             if name == "StandardizeFromFile":
                 kwargs["model_dir"] = self.cfg.run_dir
@@ -120,13 +123,29 @@ class CaloChallenge(BaseExperiment):
         LOGGER.info("init_data: preparing model training")
         LOGGER.info("init_data: list of preprocessing steps ")
         LOGGER.info(self.transforms)
-        
-        self.train_dataset = CaloChallengeDataset(self.hdf5_train, self.particle_type, self.xml_filename, 
-                    val_frac=self.val_frac, transform=self.transforms, split="training", device=self.device, dtype=self.dtype)
 
-        self.val_dataset = CaloChallengeDataset(self.hdf5_train, self.particle_type, self.xml_filename,
-                    val_frac=self.val_frac, transform=self.transforms, split="validation", device=self.device, dtype=self.dtype)
-        
+        self.train_dataset = CaloChallengeDataset(
+            self.hdf5_train,
+            self.particle_type,
+            self.xml_filename,
+            val_frac=self.val_frac,
+            transform=self.transforms,
+            split="training",
+            device=self.device,
+            dtype=self.dtype,
+        )
+
+        self.val_dataset = CaloChallengeDataset(
+            self.hdf5_train,
+            self.particle_type,
+            self.xml_filename,
+            val_frac=self.val_frac,
+            transform=self.transforms,
+            split="validation",
+            device=self.device,
+            dtype=self.dtype,
+        )
+
         self.layer_boundaries = self.train_dataset.layer_boundaries
 
     def init_physics(self):
@@ -134,11 +153,19 @@ class CaloChallenge(BaseExperiment):
 
     def _init_dataloader(self):
         self.batch_size = self.cfg.training.batchsize
-        self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True) 
-        self.val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=True)
+        self.train_loader = DataLoader(
+            self.train_dataset, batch_size=self.batch_size, shuffle=True
+        )
+        self.val_loader = DataLoader(
+            self.val_dataset, batch_size=self.batch_size, shuffle=True
+        )
 
-        LOGGER.info(f"init_dataloader: created training dataloader with {len(self.train_loader)} batches")
-        LOGGER.info(f"init_dataloader: created validation dataloader with {len(self.val_loader)} batches")
+        LOGGER.info(
+            f"init_dataloader: created training dataloader with {len(self.train_loader)} batches"
+        )
+        LOGGER.info(
+            f"init_dataloader: created validation dataloader with {len(self.val_loader)} batches"
+        )
 
     def _init_loss(self):
         pass
@@ -151,7 +178,7 @@ class CaloChallenge(BaseExperiment):
 
     def evaluate(self):
         pass
-    
+
     # def run_training(self):
 
     #     self.prepare_training()
@@ -210,7 +237,7 @@ class CaloChallenge(BaseExperiment):
     #     self.params['train_time'] = traintime
     #     print(
     #         f"train_model: Finished training {n_epochs} epochs after {traintime:.2f} s = {traintime / 60:.2f} min = {traintime / 60 ** 2:.2f} h.", flush=True)
-        
+
     #     #save final model
     #     print("train_model: Saving final model: ", flush=True)
     #     self.save()
@@ -240,13 +267,13 @@ class CaloChallenge(BaseExperiment):
     #             clip = self.params.get('clip_gradients_to', None)
     #             if clip:
     #                 nn.utils.clip_grad_norm_(self.net.parameters(), clip)
-                
+
     #             grad_norm = (
     #                     torch.nn.utils.clip_grad_norm(
     #                         self.model.parameters(), float("inf")
     #                         ).cpu().item()
     #                     )
-                
+
     #             self.optimizer.step()
     #             train_losses = np.append(train_losses, loss.item())
     #             grad_norms = np.append(grad_norms, grad_norm)
@@ -271,11 +298,11 @@ class CaloChallenge(BaseExperiment):
     #         if self.use_scheduler:
     #             self.logger.add_scalar("learning_rate_epoch", self.scheduler.get_last_lr()[0],
     #                                    self.epoch)
-    
+
     # @torch.inference_mode()
     # def latent_samples(self, epoch=None):
     #     """
-    #         Plot latent space distribution. 
+    #         Plot latent space distribution.
 
     #         Parameters:
     #         epoch (int): current epoch
@@ -293,7 +320,7 @@ class CaloChallenge(BaseExperiment):
 
     # @torch.inference_mode()
     # def validate_one_epoch(self):
-        
+
     #     val_losses = np.array([])
     #     # iterate batch wise over input
     #     for batch_id, x in enumerate(self.val_loader):
@@ -314,15 +341,22 @@ class CaloChallenge(BaseExperiment):
     #     pass
 
     def generate_Einc_ds1(self, sample_multiplier=1000):
-        """ generate the incident energy distribution of CaloChallenge ds1
-            sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
-            and 5, 3, 2, 1 times sample multiplier for the highest energies
+        """generate the incident energy distribution of CaloChallenge ds1
+        sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
+        and 5, 3, 2, 1 times sample multiplier for the highest energies
 
         """
         ret = np.logspace(8, 18, 11, base=2)
         ret = np.tile(ret, 10)
         ret = np.array(
-            [*ret, *np.tile(2. ** 19, 5), *np.tile(2. ** 20, 3), *np.tile(2. ** 21, 2), *np.tile(2. ** 22, 1)])
+            [
+                *ret,
+                *np.tile(2.0**19, 5),
+                *np.tile(2.0**20, 3),
+                *np.tile(2.0**21, 2),
+                *np.tile(2.0**22, 1),
+            ]
+        )
         ret = np.tile(ret, sample_multiplier)
         np.random.shuffle(ret)
         return ret
@@ -335,51 +369,55 @@ class CaloChallenge(BaseExperiment):
         t_0 = time.time()
 
         Einc = torch.tensor(
-            10**np.random.uniform(3, 6, size=self.cfg.n_samples) 
-            if self.cfg.eval_dataset in ["2", "3"] else
-            self.generate_Einc_ds1(),
+            (
+                10 ** np.random.uniform(3, 6, size=self.cfg.n_samples)
+                if self.cfg.eval_dataset in ["2", "3"]
+                else self.generate_Einc_ds1()
+            ),
             dtype=self.dtype,
             device=self.device,
         ).unsqueeze(1)
-        
+
         # transform Einc to basis used in training
         dummy, transformed_cond = None, Einc
         for fn in self.transforms:
-            if hasattr(fn, 'cond_transform'):
+            if hasattr(fn, "cond_transform"):
                 dummy, transformed_cond = fn(dummy, transformed_cond)
 
         batchsize_sample = self.cfg.training.batchsize_sample
         transformed_cond_loader = DataLoader(
             dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
         )
-        
-        # sample u_i's if self is a shape model
-        if self.cfg.model_type == 'shape': 
-            # load energy model
-            #energy_model = self.load_other(self.params['energy_model'])
 
-            if self.cfg.sample_us: #TODO
+        # sample u_i's if self is a shape model
+        if self.cfg.model_type == "shape":
+            # load energy model
+            # energy_model = self.load_other(self.params['energy_model'])
+
+            if self.cfg.sample_us:  # TODO
                 # sample us
-                u_samples = torch.vstack([
-                    energy_model.sample_batch(c) for c in transformed_cond_loader
-                ])
-    
+                u_samples = torch.vstack(
+                    [energy_model.sample_batch(c) for c in transformed_cond_loader]
+                )
+
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
-            else: # optionally use truth us
+            else:  # optionally use truth us
                 transformed_cond = CaloChallengeDataset(
-                self.hdf5_test,
-                self.particle_type,
-                self.xml_filename,
-                transform=self.transforms,
-                device=self.device,
+                    self.hdf5_test,
+                    self.particle_type,
+                    self.xml_filename,
+                    transform=self.transforms,
+                    device=self.device,
                 ).energy
-            
+
             # concatenate with Einc
             transformed_cond_loader = DataLoader(
                 dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
             )
-             
-        sample = torch.vstack([self.model.sample_batch(c).cpu() for c in transformed_cond_loader])
+
+        sample = torch.vstack(
+            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
+        )
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
@@ -389,7 +427,7 @@ class CaloChallenge(BaseExperiment):
         )
 
         return sample, transformed_cond.cpu()
-    
+
     # def sample_batch(self, batch):
     #     pass
 
@@ -397,30 +435,30 @@ class CaloChallenge(BaseExperiment):
         LOGGER.info("plot: generating samples")
         samples, conditions = self.sample_n()
 
-        if self.cfg.model_type == 'energy':
+        if self.cfg.model_type == "energy":
             reference = CaloChallengeDataset(
                 self.hdf5_test,
                 self.particle_type,
                 self.xml_filename,
-                transform=self.transforms, # TODO: Or, apply NormalizeEByLayer popped from model transforms
+                transform=self.transforms,  # TODO: Or, apply NormalizeEByLayer popped from model transforms
                 device=self.device,
             ).layers
-            
+
             # postprocess
             for fn in self.transforms[::-1]:
-                if fn.__class__.__name__ == 'NormalizeByElayer':
-                    break # this might break plotting
+                if fn.__class__.__name__ == "NormalizeByElayer":
+                    break  # this might break plotting
                 samples, _ = fn(samples, conditions, rev=True)
                 reference, _ = fn(reference, conditions, rev=True)
 
-            # clip u_i's (except u_0) to [0,1] 
-            samples[:,1:] = torch.clip(samples[:,1:], min=0., max=1.)
-            reference[:,1:] = torch.clip(reference[:,1:], min=0., max=1.)
-            
+            # clip u_i's (except u_0) to [0,1]
+            samples[:, 1:] = torch.clip(samples[:, 1:], min=0.0, max=1.0)
+            reference[:, 1:] = torch.clip(reference[:, 1:], min=0.0, max=1.0)
+
             plot_ui_dists(
                 samples.detach().cpu().numpy(),
                 reference.detach().cpu().numpy(),
-                documenter=doc
+                documenter=doc,
             )
             evaluate.eval_ui_dists(
                 samples.detach().cpu().numpy(),
@@ -432,7 +470,7 @@ class CaloChallenge(BaseExperiment):
             # postprocess
             for fn in self.transforms[::-1]:
                 samples, conditions = fn(samples, conditions, rev=True)
-            
+
             samples = samples.detach().cpu().numpy()
             conditions = conditions.detach().cpu().numpy()
 
@@ -453,11 +491,11 @@ class CaloChallenge(BaseExperiment):
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
-        save_file = h5py.File(self.cfg.base_dir+f"samples{name}.hdf5", "w")
-        save_file.create_dataset('incident_energies', data=energies)
-        save_file.create_dataset('showers', data=sample)
-        save_file.close()            
- 
+        save_file = h5py.File(self.cfg.base_dir + f"samples{name}.hdf5", "w")
+        save_file.create_dataset("incident_energies", data=energies)
+        save_file.create_dataset("showers", data=sample)
+        save_file.close()
+
     # def save(self, epoch=""):
     #     """ Save the model, and more if needed"""
     #     torch.save({"opt": self.optimizer.state_dict(),
@@ -472,7 +510,7 @@ class CaloChallenge(BaseExperiment):
     #     name = self.doc.get_file(f"model{epoch}.pt")
     #     state_dicts = torch.load(name, map_location=self.device)
     #     self.net.load_state_dict(state_dicts["net"])
-        
+
     #     if "losses" in state_dicts:
     #         self.train_losses_epoch = state_dicts.get("losses", {})
     #     if "epoch" in state_dicts:
@@ -485,7 +523,7 @@ class CaloChallenge(BaseExperiment):
 
     # def load_other(self, model_dir):
     #     """ Load a different model (e.g. to sample u_i's)"""
-        
+
     #     with open(os.path.join(model_dir, 'params.yaml')) as f:
     #         params = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -507,7 +545,7 @@ class CaloChallenge(BaseExperiment):
     #         os.path.join(model_dir, 'model.pt'), map_location=self.device
     #     )
     #     other.net.load_state_dict(state_dicts["net"])
-        
+
     #     # use eval mode and freeze weights
     #     other.eval()
     #     for p in other.parameters():

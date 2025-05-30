@@ -9,16 +9,16 @@ import torch.nn.functional as F
 
 
 class PermuteRandomS1(InvertibleModule):
-    '''Constructs a random permutation, that stays fixed during training.
-    Permutes along the first (channel-) dimension for multi-dimenional tensors.'''
+    """Constructs a random permutation, that stays fixed during training.
+    Permutes along the first (channel-) dimension for multi-dimenional tensors."""
 
     def __init__(self, dims_in, dims_c=None, seed: Union[int, None] = None):
-        '''Additional args in docstring of base class FrEIA.modules.InvertibleModule.
+        """Additional args in docstring of base class FrEIA.modules.InvertibleModule.
 
         Args:
           seed: Int seed for the permutation (numpy is used for RNG). If seed is
             None, do not reseed RNG.
-        '''
+        """
         super().__init__(dims_in, dims_c)
 
         self.in_channels = dims_in[0][1]
@@ -32,30 +32,33 @@ class PermuteRandomS1(InvertibleModule):
             self.perm_inv[p] = i
 
         self.perm = nn.Parameter(torch.LongTensor(self.perm), requires_grad=False)
-        self.perm_inv = nn.Parameter(torch.LongTensor(self.perm_inv), requires_grad=False)
+        self.perm_inv = nn.Parameter(
+            torch.LongTensor(self.perm_inv), requires_grad=False
+        )
 
     def forward(self, x, rev=False, jac=True):
         if not rev:
-            return [x[0][:, :, self.perm]], 0.
+            return [x[0][:, :, self.perm]], 0.0
         else:
-            return [x[0][:, :, self.perm_inv]], 0.
+            return [x[0][:, :, self.perm_inv]], 0.0
 
     def output_dims(self, input_dims):
         if len(input_dims) != 1:
             raise ValueError(f"{self.__class__.__name__} can only use 1 input")
         return input_dims
-    
+
+
 class PermuteRandomS2(InvertibleModule):
-    '''Constructs a random permutation, that stays fixed during training.
-    Permutes along the first (channel-) dimension for multi-dimenional tensors.'''
+    """Constructs a random permutation, that stays fixed during training.
+    Permutes along the first (channel-) dimension for multi-dimenional tensors."""
 
     def __init__(self, dims_in, dims_c=None, seed: Union[int, None] = None):
-        '''Additional args in docstring of base class FrEIA.modules.InvertibleModule.
+        """Additional args in docstring of base class FrEIA.modules.InvertibleModule.
 
         Args:
           seed: Int seed for the permutation (numpy is used for RNG). If seed is
             None, do not reseed RNG.
-        '''
+        """
         super().__init__(dims_in, dims_c)
 
         self.in_channels = dims_in[0][2]
@@ -69,13 +72,15 @@ class PermuteRandomS2(InvertibleModule):
             self.perm_inv[p] = i
 
         self.perm = nn.Parameter(torch.LongTensor(self.perm), requires_grad=False)
-        self.perm_inv = nn.Parameter(torch.LongTensor(self.perm_inv), requires_grad=False)
+        self.perm_inv = nn.Parameter(
+            torch.LongTensor(self.perm_inv), requires_grad=False
+        )
 
     def forward(self, x, rev=False, jac=True):
         if not rev:
-            return [x[0][:, :, :, self.perm]], 0.
+            return [x[0][:, :, :, self.perm]], 0.0
         else:
-            return [x[0][:, :, :, self.perm_inv]], 0.
+            return [x[0][:, :, :, self.perm_inv]], 0.0
 
     def output_dims(self, input_dims):
         if len(input_dims) != 1:

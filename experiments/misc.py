@@ -11,6 +11,7 @@ def get_device() -> torch.device:
     """Gets CUDA if available, CPU else."""
     return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
+
 def get_dtype(dtype) -> torch.dtype:
     """Get float32 or float64"""
     if dtype == "float32":
@@ -18,7 +19,8 @@ def get_dtype(dtype) -> torch.dtype:
     elif dtype == "float64":
         return torch.float64
     else:
-        raise ValueError (f"Unknown dtype {dtype}")
+        raise ValueError(f"Unknown dtype {dtype}")
+
 
 def flatten_dict(d, parent_key="", sep="."):
     """Flattens a nested dictionary with str keys."""

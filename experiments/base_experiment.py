@@ -548,9 +548,11 @@ class BaseExperiment:
         grad_norm = (
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
-                self.cfg.training.clip_grad_norm
-                if self.cfg.training.clip_grad_norm is not None
-                else float("inf"),
+                (
+                    self.cfg.training.clip_grad_norm
+                    if self.cfg.training.clip_grad_norm is not None
+                    else float("inf")
+                ),
                 error_if_nonfinite=True,
             )
             .cpu()
@@ -639,9 +641,9 @@ class BaseExperiment:
             {
                 "model": self.model.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
-                "scheduler": self.scheduler.state_dict()
-                if self.scheduler is not None
-                else None,
+                "scheduler": (
+                    self.scheduler.state_dict() if self.scheduler is not None else None
+                ),
                 "ema": self.ema.state_dict() if self.ema is not None else None,
             },
             model_path,
