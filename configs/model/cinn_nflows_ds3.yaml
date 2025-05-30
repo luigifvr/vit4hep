@@ -1,0 +1,32 @@
+_target_: experiments.calochallenge.model.CaloChallengeCINN
+in_channels: 1
+shape: [45, 50, 18]
+patch_shape: [3, 10, 3]
+
+coupling_block: CaloRQSplineNFlows
+nblocks: 5
+is_spatial: [False, True, False, True, False]
+spatial_factor: [1,2,1]
+cinn_kwargs: 
+  num_bins: 10
+  bounds_init: 15 # (left, right, bottom, top)
+
+vit_kwargs:
+  dim: 3
+  x1_channels: 23
+  condition_dim: 46
+  out_channels: 2
+  final_layer_channels: 23
+  hidden_dim: 648
+  depth: 2
+  num_heads: 6
+  mlp_ratio: 4.0
+  attn_drop: 0
+  proj_drop: 0
+  pos_embedding_coords: 'cartesian'
+  learn_pos_embed: True
+  causal_attn: False
+  cos_attn: False
+  final_conv: False
+  checkpoint_grads: False
+  use_torch_sdpa: False  # use xformers instead

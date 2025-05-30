@@ -1,0 +1,13 @@
+h5py
+numpy
+einops
+FrEIA
+
+torch==2.7.0
+torch_ema
+pytorch_optimizer
+timm
+
+hydra-core
+mlflow
+xformers
