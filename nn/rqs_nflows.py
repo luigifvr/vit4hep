@@ -224,16 +224,19 @@ class SimpleRationalQuadraticSplineBlock(BaseCouplingBlock):
         # i.e. 1D, 2D, 3D tensor, etc.
         self.ndims = len(dims_in[0])
 
-        self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
-        self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
-        # self.indices1 = [int(k) for k in range(self.channels // 2)]
-        # self.indices2 = [
-        #    int(k + self.channels // 2) for k in range(self.channels // 2)
-        # ]
+        # self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
+        # self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
+        self.indices1 = [int(k) for k in range(self.channels // 2)]
+        self.indices2 = [
+            int(k + self.channels // 2)
+            for k in range(self.channels - self.channels // 2)
+        ]
+        len_splits = [len(self.indices1), len(self.indices2)]
 
         self._spline1 = SimpleRationalQuadraticSpline(
             dims_in,
             dims_c,
+            list(reversed(len_splits)),
             subnet_constructor=subnet_constructor,
             num_bins=num_bins,
             bounds_init=bounds_init,
@@ -245,6 +248,7 @@ class SimpleRationalQuadraticSplineBlock(BaseCouplingBlock):
         self._spline2 = SimpleRationalQuadraticSpline(
             dims_in,
             dims_c,
+            len_splits,
             subnet_constructor=subnet_constructor,
             num_bins=num_bins,
             bounds_init=bounds_init,
@@ -273,11 +277,8 @@ class SimpleRationalQuadraticSplineBlock(BaseCouplingBlock):
 
         # always the last vector is transformed
         y1, y2, j = super().forward(x1, x2, c)
+        y = torch.cat((y1, y2), 1)
 
-        y = x[0].clone()
-        y[:, ::2] = y1
-        y[:, 1::2] = y2
-        # y = torch.cat((y1, y2), 1)
         return (y,), j
 
 
@@ -289,7 +290,8 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
     def __init__(
         self,
         dims_in,
-        dims_c=[],
+        dims_c,
+        len_splits,
         subnet_constructor: Callable = None,
         num_bins: int = 10,
         bounds_init: float = 1.0,
@@ -316,9 +318,7 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
             self.conditional = True
             self.condition_channels = sum(dc[0] for dc in dims_c)
 
-        split_len1 = channels - channels // 2
-        split_len2 = channels // 2
-        self.splits = [split_len1, split_len2]
+        self.splits = len_splits
         self.num_bins = num_bins
         if self.DEFAULT_MIN_BIN_WIDTH * self.num_bins > 1.0:
             raise ValueError("Minimal bin width too large for the number of bins")
@@ -353,8 +353,9 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
                 "function or object (see docstring)"
             )
         self.subnet = subnet_constructor(
-            self.splits[0], (3 * self.num_bins - 1)
-        )  # * self.splits[1])
+            self.splits[0] + self.condition_channels,
+            (3 * self.num_bins - 1) * self.splits[1],
+        )
 
     def _unconstrained_rational_quadratic_spline(self, inputs, theta, rev=False):
 
@@ -543,6 +544,39 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
 
 
 class CaloRationalQuadraticSpline(SimpleRationalQuadraticSpline):
+    def __init__(
+        self,
+        dims_in,
+        dims_c,
+        len_splits,
+        subnet_constructor: Callable = None,
+        num_bins: int = 10,
+        bounds_init: float = 1.0,
+        tails="linear",
+        bounds_type="SOFTPLUS",
+        spatial=False,
+    ):
+
+        super().__init__(
+            dims_in,
+            dims_c,
+            len_splits,
+            subnet_constructor,
+            num_bins,
+            bounds_init,
+            tails,
+            bounds_type,
+        )
+
+        self.spatial = spatial
+        if spatial:
+            channels = dims_in[0][1]
+        else:
+            channels = dims_in[0][0]
+        self.in_channels = channels
+
+        self.subnet = subnet_constructor(self.splits[0], (3 * self.num_bins - 1))
+
     def forward(self, x1, x2, c=[], rev=False):
         """See base class docstring"""
         self.bounds = self.bounds.to(x1[0].device)

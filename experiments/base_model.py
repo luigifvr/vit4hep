@@ -50,7 +50,7 @@ class BaseModel(nn.Module):
         c = batch
         x, _ = self.forward(z, c, rev=True)
         return x
-    
+
     def from_patches(self):
         raise NotImplementedError
 
