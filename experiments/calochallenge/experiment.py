@@ -394,7 +394,7 @@ class CaloChallenge(BaseExperiment):
             if self.cfg.sample_us:  # TODO
                 # load energy model
                 self.load_energy_model()
-                
+
                 # sample us
                 u_samples = torch.vstack(
                     [self.energy_model.sample_batch(c) for c in transformed_cond_loader]

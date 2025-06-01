@@ -17,20 +17,17 @@ class BaseModel(nn.Module):
                 s % p == 0
             ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
 
-    def from_patches(
-        self,
-    ):
+    def from_patches(self):
         raise NotImplementedError
 
-    def to_patches(
-        self,
-    ):
+    def to_patches(self):
         raise NotImplementedError
 
 
 class CINN(BaseModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.net = None
 
     def forward(self, x, c, rev=False, jac=True):
         x = self.to_patches(x)
@@ -82,3 +79,6 @@ class CINN(BaseModel):
         c = batch
         x, _ = self.forward(z, c, rev=True)
         return x.reshape(z.shape[0], self.in_channels, *self.shape)
+
+    def build_net(self):
+        raise NotImplementedError

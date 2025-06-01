@@ -318,14 +318,12 @@ class RegularizeLargeLogit(object):
             if self.cut:
                 transformed[mask] = 1.0
         else:
-            transformed = shower.clone()
-            mask = shower == 1.0
+            transformed = shower
+            mask = shower >= 1.0
             noise = self.func.sample(shower.shape) * self.noise_width
             if self.exclusions:
                 noise[:, self.exclusions] = 0.0
             transformed[mask] = (shower - noise.to(shower.device))[mask]
-        if self.exclusions is not None:
-            transformed[..., self.exclusions] = shower[..., self.exclusions]
         return transformed, energy
 
 

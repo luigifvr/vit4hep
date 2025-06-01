@@ -6,12 +6,12 @@ from scipy.stats import special_ortho_group
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from nn.base_calo2 import BaseCalo2CouplingBlock
+from nn.base_coupling import BaseCouplingBlock, OneSidedBaseCouplingBlock
 from FrEIA.modules import InvertibleModule
 from FrEIA import utils
 
 
-class RationalQuadraticSplineBlock(BaseCalo2CouplingBlock):
+class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):
     def __init__(
         self,
         dims_in,
@@ -24,9 +24,38 @@ class RationalQuadraticSplineBlock(BaseCalo2CouplingBlock):
         spatial=False,
         *args
     ):
-        super().__init__(dims_in, dims_c, spatial=spatial, *args)
+        super().__init__(dims_in, dims_c, *args)
 
-        self._spline1 = RationalQuadraticSpline(
+        self.spatial = spatial
+        if spatial:
+            self.channels = dims_in[0][1]
+            self.patch_dim = self.channels // 2
+            self.num_patches = dims_in[0][0]
+        else:
+            self.channels = dims_in[0][0]
+            self.patch_dim = dims_in[0][1]
+            self.num_patches = self.channels // 2
+
+        # ndims means the rank of tensor strictly speaking.
+        # i.e. 1D, 2D, 3D tensor, etc.
+        self.ndims = len(dims_in[0])
+
+        if self.spatial:
+            # self.indices1 = [int(k) for k in range(self.channels // 2)]
+            # self.indices2 = [
+            #    int(k + self.channels // 2) for k in range(self.channels // 2)
+            # ]
+            self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
+            self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
+        else:
+            self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
+            self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
+            # self.indices1 = [int(k) for k in range(self.channels // 2)]
+            # self.indices2 = [
+            #    int(k + self.channels // 2) for k in range(self.channels // 2)
+            # ]
+
+        self._spline1 = CaloRationalQuadraticSpline(
             dims_in,
             dims_c,
             subnet_constructor=subnet_constructor,
@@ -37,7 +66,7 @@ class RationalQuadraticSplineBlock(BaseCalo2CouplingBlock):
             spatial=spatial,
         )
 
-        self._spline2 = RationalQuadraticSpline(
+        self._spline2 = CaloRationalQuadraticSpline(
             dims_in,
             dims_c,
             subnet_constructor=subnet_constructor,
@@ -56,8 +85,203 @@ class RationalQuadraticSplineBlock(BaseCalo2CouplingBlock):
         y2, j2 = self._spline2(u1, x2, c, rev=rev)
         return y2, j2
 
+    def forward(self, x, c=[], rev=False, jac=True):
+        """See base class docstring"""
+        # TODO update notation
+        # notation:
+        # x1, x2: two halves of the input
+        # y1, y2: two halves of the output
+        # *_c: variable with condition concatenated
+        # j1, j2: Jacobians of the two coupling operations
+        if self.spatial:
+            x1, x2 = x[0][:, :, self.indices1], x[0][:, :, self.indices2]
+        else:
+            x1, x2 = x[0][:, self.indices1], x[0][:, self.indices2]
 
-class RationalQuadraticSpline(InvertibleModule):
+        # always the last vector is transformed
+        y1, y2, j = super().forward(x1, x2, c)
+
+        if self.spatial:
+            y = x[0].clone()
+            y[:, :, ::2] = y1
+            y[:, :, 1::2] = y2
+            # y = torch.cat((y1, y2), 2)
+        else:
+            y = x[0].clone()
+            y[:, ::2] = y1
+            y[:, 1::2] = y2
+            # y = torch.cat((y1, y2), 1)
+        return (y,), j
+
+
+class OneSidedCaloRationalQuadraticSplineBlock(OneSidedBaseCouplingBlock):
+    def __init__(
+        self,
+        dims_in,
+        dims_c,
+        subnet_constructor,
+        num_bins=10,
+        bounds_init=1.0,
+        tails="linear",
+        bounds_type="SOFTPLUS",
+        spatial=False,
+        *args
+    ):
+        super().__init__(dims_in, dims_c, *args)
+
+        self.spatial = spatial
+        if spatial:
+            self.channels = dims_in[0][1]
+            self.patch_dim = self.channels // 2
+            self.num_patches = dims_in[0][0]
+        else:
+            self.channels = dims_in[0][0]
+            self.patch_dim = dims_in[0][1]
+            self.num_patches = self.channels // 2
+
+        # ndims means the rank of tensor strictly speaking.
+        # i.e. 1D, 2D, 3D tensor, etc.
+        self.ndims = len(dims_in[0])
+
+        if self.spatial:
+            # self.indices1 = [int(k) for k in range(self.channels // 2)]
+            # self.indices2 = [
+            #    int(k + self.channels // 2) for k in range(self.channels // 2)
+            # ]
+            self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
+            self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
+        else:
+            self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
+            self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
+            # self.indices1 = [int(k) for k in range(self.channels // 2)]
+            # self.indices2 = [
+            #    int(k + self.channels // 2) for k in range(self.channels // 2)
+            # ]
+
+        self._spline = RationalQuadraticSpline(
+            dims_in,
+            dims_c,
+            subnet_constructor=subnet_constructor,
+            num_bins=num_bins,
+            bounds_init=bounds_init,
+            tails=tails,
+            bounds_type=bounds_type,
+            spatial=spatial,
+        )
+
+    def _coupling(self, x1, u2, c, rev=False):
+        y1, j1 = self._spline(u2, x1, c, rev=rev)
+        return y1, j1
+
+    def forward(self, x, c=[], rev=False, jac=True):
+        """See base class docstring"""
+        # TODO update notation
+        # notation:
+        # x1, x2: two halves of the input
+        # y1, y2: two halves of the output
+        # *_c: variable with condition concatenated
+        # j1, j2: Jacobians of the two coupling operations
+        if self.spatial:
+            x1, x2 = x[0][:, :, self.indices1], x[0][:, :, self.indices2]
+        else:
+            x1, x2 = x[0][:, self.indices1], x[0][:, self.indices2]
+
+        # always the last vector is transformed
+        y2, j = super().forward(x2, x1, c)
+
+        if self.spatial:
+            y = x[0].clone()
+            y[:, :, ::2] = x1
+            y[:, :, 1::2] = y2
+            # y = torch.cat((y1, y2), 2)
+        else:
+            y = x[0].clone()
+            y[:, ::2] = x1
+            y[:, 1::2] = y2
+            # y = torch.cat((y1, y2), 1)
+        return (y,), j
+
+
+class SimpleRationalQuadraticSplineBlock(BaseCouplingBlock):
+    def __init__(
+        self,
+        dims_in,
+        dims_c,
+        subnet_constructor,
+        num_bins=10,
+        bounds_init=1.0,
+        tails="linear",
+        bounds_type="SOFTPLUS",
+        spatial=False,
+        *args
+    ):
+        super().__init__(dims_in, dims_c, *args)
+
+        self.spatial = spatial
+        self.channels = dims_in[0][0]
+
+        # ndims means the rank of tensor strictly speaking.
+        # i.e. 1D, 2D, 3D tensor, etc.
+        self.ndims = len(dims_in[0])
+
+        self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
+        self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
+        # self.indices1 = [int(k) for k in range(self.channels // 2)]
+        # self.indices2 = [
+        #    int(k + self.channels // 2) for k in range(self.channels // 2)
+        # ]
+
+        self._spline1 = SimpleRationalQuadraticSpline(
+            dims_in,
+            dims_c,
+            subnet_constructor=subnet_constructor,
+            num_bins=num_bins,
+            bounds_init=bounds_init,
+            tails=tails,
+            bounds_type=bounds_type,
+            spatial=spatial,
+        )
+
+        self._spline2 = SimpleRationalQuadraticSpline(
+            dims_in,
+            dims_c,
+            subnet_constructor=subnet_constructor,
+            num_bins=num_bins,
+            bounds_init=bounds_init,
+            tails=tails,
+            bounds_type=bounds_type,
+            spatial=spatial,
+        )
+
+    def _coupling1(self, x1, u2, c, rev=False):
+        y1, j1 = self._spline1(u2, x1, c, rev=rev)
+        return y1, j1
+
+    def _coupling2(self, x2, u1, c, rev=False):
+        y2, j2 = self._spline2(u1, x2, c, rev=rev)
+        return y2, j2
+
+    def forward(self, x, c=[], rev=False, jac=True):
+        """See base class docstring"""
+        # TODO update notation
+        # notation:
+        # x1, x2: two halves of the input
+        # y1, y2: two halves of the output
+        # *_c: variable with condition concatenated
+        # j1, j2: Jacobians of the two coupling operations
+        x1, x2 = x[0][:, self.indices1], x[0][:, self.indices2]
+
+        # always the last vector is transformed
+        y1, y2, j = super().forward(x1, x2, c)
+
+        y = x[0].clone()
+        y[:, ::2] = y1
+        y[:, 1::2] = y2
+        # y = torch.cat((y1, y2), 1)
+        return (y,), j
+
+
+class SimpleRationalQuadraticSpline(InvertibleModule):
     DEFAULT_MIN_BIN_WIDTH = 1e-6
     DEFAULT_MIN_BIN_HEIGHT = 1e-6
     DEFAULT_MIN_DERIVATIVE = 1e-6
@@ -297,6 +521,32 @@ class RationalQuadraticSpline(InvertibleModule):
         """See base class docstring"""
         self.bounds = self.bounds.to(x1[0].device)
 
+        x1c = torch.cat([x1, *c], 1)
+        if not rev:
+            theta = self.subnet(x1c).reshape(
+                x1c.shape[0], self.splits[1], 3 * self.num_bins - 1
+            )
+            x2, j2 = self._unconstrained_rational_quadratic_spline(x2, theta, rev=False)
+        else:
+            theta = self.subnet(x1c).reshape(
+                x1c.shape[0], self.splits[1], 3 * self.num_bins - 1
+            )
+            x2, j2 = self._unconstrained_rational_quadratic_spline(x2, theta, rev=True)
+
+        log_jac_det = j2
+        x_out = x2
+
+        return x_out, log_jac_det
+
+    def output_dims(self, input_dims):
+        return input_dims
+
+
+class CaloRationalQuadraticSpline(SimpleRationalQuadraticSpline):
+    def forward(self, x1, x2, c=[], rev=False):
+        """See base class docstring"""
+        self.bounds = self.bounds.to(x1[0].device)
+
         x1c = x1  # always conditional
         if not rev:
             theta = self.subnet(x1c, c).reshape(
@@ -320,6 +570,3 @@ class RationalQuadraticSpline(InvertibleModule):
         x_out = x2  # torch.cat((x1, x2), 1)
 
         return x_out, log_jac_det
-
-    def output_dims(self, input_dims):
-        return input_dims

@@ -62,7 +62,13 @@ class CaloChallengeDataset(Dataset):
         self.layers = self.layers.to(device)
         self.energy = self.energy.to(device)
 
+        self.min_bounds = self.layers.min()
+        self.max_bounds = self.layers.max()
+
         LOGGER.info(f"datasets: loaded {split} data with shape {*self.layers.shape,}")
+        LOGGER.info(
+            f"datasets: boundaries of dataset are ({self.min_bounds}, {self.max_bounds})"
+        )
 
     def __len__(self):
         return len(self.energy)
