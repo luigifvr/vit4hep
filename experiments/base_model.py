@@ -11,7 +11,6 @@ class BaseModel(nn.Module):
 
     def forward(self, x, c, rev=False, jac=True):
         z, log_jac = self.net.forward(x, c, rev=rev, jac=jac)
-        z = self.from_patches(z)
         return z, log_jac
 
     def _batch_loss(self, x):
