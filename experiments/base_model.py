@@ -4,33 +4,12 @@ import torch.nn as nn
 
 
 class BaseModel(nn.Module):
-    def __init__(self, shape, patch_shape, in_channels=1):
+    def __init__(self, shape):
         super().__init__()
 
         self.shape = shape
-        self.patch_shape = patch_shape
-        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape)]
-        self.in_channels = in_channels
-
-        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape)):
-            assert (
-                s % p == 0
-            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
-
-    def from_patches(self):
-        raise NotImplementedError
-
-    def to_patches(self):
-        raise NotImplementedError
-
-
-class CINN(BaseModel):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.net = None
 
     def forward(self, x, c, rev=False, jac=True):
-        x = self.to_patches(x)
         z, log_jac = self.net.forward(x, c, rev=rev, jac=jac)
         z = self.from_patches(z)
         return z, log_jac
@@ -58,6 +37,49 @@ class CINN(BaseModel):
         )
         return log_prob.mean()
 
+    def sample_batch(self, z, batch):
+        """
+        sample from the learned distribution
+
+        Parameters:
+        num_pts (int): Number of samples to generate for each given condition
+        condition (tensor): Conditions
+
+        Returns:
+        tensor[len(condition), num_pts, dims]: Samples
+        """
+        c = batch
+        x, _ = self.forward(z, c, rev=True)
+        return x
+    
+    def from_patches(self):
+        raise NotImplementedError
+
+    def to_patches(self):
+        raise NotImplementedError
+
+
+class CINN(BaseModel):
+    def __init__(self, patch_shape, in_channels=1, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.patch_shape = patch_shape
+        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape)]
+        self.in_channels = in_channels
+
+        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape)):
+            assert (
+                s % p == 0
+            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
+
+        self.net = None
+
+    def forward(self, x, c, rev=False, jac=True):
+        x = self.to_patches(x)
+        z, log_jac = super().forward(x, c, rev=rev, jac=jac)
+        z = self.from_patches(z)
+        return z, log_jac
+
     def sample_batch(self, batch):
         """
         sample from the learned distribution
@@ -76,8 +98,7 @@ class CINN(BaseModel):
             device=batch.device,
             dtype=batch.dtype,
         )
-        c = batch
-        x, _ = self.forward(z, c, rev=True)
+        x = super().sample_batch(z, batch)
         return x.reshape(z.shape[0], self.in_channels, *self.shape)
 
     def build_net(self):
