@@ -1,0 +1,39 @@
+exp_type: calochallenge
+exp_name: CaloChallenge
+dtype: float32
+
+distribute_parallel: false
+
+model_type: energy
+sample_us: False
+n_samples: 100000
+data:
+  training_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_1.hdf5
+  test_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5
+  particle_type: electron
+  xml_filename: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_2.xml
+  val_frac: 0.2
+  transforms:
+    NormalizeByElayer:
+        ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_2.xml
+        xml_file: electron
+    ScaleTotalEnergy: 
+        factor: 0.35
+    SelectDims:
+        start: -45
+        end: 0
+    ExclusiveLogitTransform:
+        delta: 1.0e-6
+        rescale: True
+    StandardizeFromFile: {model_dir: null}
+    LogEnergy: {}
+    ScaleEnergy:
+        e_min: 6.907755
+        e_max: 13.815510
+    Reshape:
+        shape: [45]
+
+defaults:
+ - default
+ - training: default
+ - model: cinn_energy
