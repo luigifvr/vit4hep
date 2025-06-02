@@ -102,7 +102,7 @@ class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):
             x1, x2 = x[0][:, self.indices1], x[0][:, self.indices2]
 
         # always the last vector is transformed
-        y1, y2, j = super().forward(x1, x2, c)
+        y1, y2, j = super().forward(x1, x2, c, rev=rev, jac=jac)
 
         if self.spatial:
             y = x[0].clone()
@@ -192,7 +192,7 @@ class OneSidedCaloRationalQuadraticSplineBlock(OneSidedBaseCouplingBlock):
             x1, x2 = x[0][:, self.indices1], x[0][:, self.indices2]
 
         # always the last vector is transformed
-        y2, j = super().forward(x2, x1, c)
+        y2, j = super().forward(x2, x1, c, rev=rev, jac=jac)
 
         if self.spatial:
             y = x[0].clone()
@@ -281,7 +281,7 @@ class SimpleRationalQuadraticSplineBlock(BaseCouplingBlock):
         x1, x2 = x[0][:, self.indices1], x[0][:, self.indices2]
 
         # always the last vector is transformed
-        y1, y2, j = super().forward(x1, x2, c)
+        y1, y2, j = super().forward(x1, x2, c, rev=rev, jac=jac)
         y = torch.cat((y1, y2), 1)
 
         return (y,), j
