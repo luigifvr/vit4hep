@@ -54,10 +54,12 @@ class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):
             # self.indices2 = [
             #    int(k + self.channels // 2) for k in range(self.channels // 2)
             # ]
+        len_splits = [len(self.indices1), len(self.indices2)]
 
         self._spline1 = CaloRationalQuadraticSpline(
             dims_in,
             dims_c,
+            list(reversed(len_splits)),
             subnet_constructor=subnet_constructor,
             num_bins=num_bins,
             bounds_init=bounds_init,
@@ -69,6 +71,7 @@ class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):
         self._spline2 = CaloRationalQuadraticSpline(
             dims_in,
             dims_c,
+            len_splits,
             subnet_constructor=subnet_constructor,
             num_bins=num_bins,
             bounds_init=bounds_init,
@@ -157,10 +160,12 @@ class OneSidedCaloRationalQuadraticSplineBlock(OneSidedBaseCouplingBlock):
             # self.indices2 = [
             #    int(k + self.channels // 2) for k in range(self.channels // 2)
             # ]
+        len_splits = [len(self.indices1), len(self.indices2)]
 
-        self._spline = RationalQuadraticSpline(
+        self._spline = CaloRationalQuadraticSpline(
             dims_in,
             dims_c,
+            len_splits,
             subnet_constructor=subnet_constructor,
             num_bins=num_bins,
             bounds_init=bounds_init,

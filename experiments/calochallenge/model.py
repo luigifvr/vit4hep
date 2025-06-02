@@ -1,5 +1,6 @@
 import math
 from einops import rearrange
+import torch
 
 from FrEIA.framework import InputNode, Node, OutputNode, GraphINN, ConditionNode
 from FrEIA.modules import ActNorm

@@ -303,15 +303,18 @@ class ExclusiveLogitTransform(object):
 
 
 class RegularizeLargeLogit(object):
-    def __init__(self, noise_width, exclusions=None, cut=False):
-        self.func = torch.distributions.Uniform(torch.tensor(0.0), torch.tensor(1.0))
-        self.noise_width = noise_width
+    def __init__(self, a, b, exclusions=None, cut=False):
+        self.a = a
+        self.b = b
+        self.func = torch.distributions.Uniform(
+            torch.tensor(self.a), torch.tensor(self.b)
+        )
         self.exclusions = exclusions
         self.cut = cut
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            mask = shower > 1 - self.noise_width
+            mask = shower > 1 - self.b
             if self.exclusions:
                 mask[:, self.exclusions] = False
             transformed = shower
@@ -320,7 +323,7 @@ class RegularizeLargeLogit(object):
         else:
             transformed = shower
             mask = shower >= 1.0
-            noise = self.func.sample(shower.shape) * self.noise_width
+            noise = self.func.sample(shower.shape).to(shower.dtype)
             if self.exclusions:
                 noise[:, self.exclusions] = 0.0
             transformed[mask] = (shower - noise.to(shower.device))[mask]
@@ -397,26 +400,31 @@ class SelectiveUniformNoise(object):
         exclusions: list of indices for features that should not be transformed
     """
 
-    def __init__(self, noise_width, exclusions=None, cut=False):
+    def __init__(self, a, b, exclusions=None, cut=False):
         # self.func = func
-        self.func = torch.distributions.Uniform(torch.tensor(0.0), torch.tensor(1.0))
-        self.noise_width = noise_width
+        self.a = a
+        self.b = b
+        self.func = torch.distributions.Uniform(
+            torch.tensor(self.a), torch.tensor(self.b)
+        )
         self.exclusions = exclusions
         self.cut = cut  # apply cut if True
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            mask = shower < self.noise_width
+            mask = shower < self.b
             if self.exclusions:
                 mask[:, self.exclusions] = False
             transformed = shower
             if self.cut:
                 transformed[mask] = 0.0
         else:
-            noise = self.func.sample(shower.shape) * self.noise_width
+            noise = self.func.sample(shower.shape).to(shower.dtype)
+            mask = shower != 1
             if self.exclusions:
                 noise[:, self.exclusions] = 0.0
-            transformed = shower + noise.reshape(shower.shape).to(shower.device)
+            transformed = shower
+            transformed[mask] = (shower + noise.to(shower.device))[mask]
         return transformed, energy
 
 

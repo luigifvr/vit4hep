@@ -14,16 +14,7 @@ from experiments.base_experiment import BaseExperiment
 from experiments.calochallenge.datasets import CaloChallengeDataset
 import experiments.calochallenge.transforms as transforms
 from challenge_files import evaluate
-
-# from Util.util import *
-# from datasets import *
-# from documenter import Documenter
-# from plotting_util import *
-# from transforms import *
-# from challenge_files import *
-# from challenge_files import evaluate # avoid NameError: 'evaluate' is not defined
-# import models
-# from models import *
+from experiments.calochallenge.plots import plot_ui_dists
 
 
 class CaloChallenge(BaseExperiment):
@@ -178,126 +169,6 @@ class CaloChallenge(BaseExperiment):
     def evaluate(self):
         pass
 
-    # def run_training(self):
-
-    #     self.prepare_training()
-    #     samples = []
-    #     n_epochs = get(self.params, "n_epochs", 100)
-    #     past_epochs = get(self.params, "total_epochs", 0)
-    #     if past_epochs != 0:
-    #         self.load(epoch=past_epochs)
-    #         self.scheduler = set_scheduler(self.optimizer, self.params, self.n_trainbatches, last_epoch=self.params.get("total_epochs", -1)*self.n_trainbatches)
-    #     print(f"train_model: Model has been trained for {past_epochs} epochs before.")
-    #     print(f"train_model: Beginning training. n_epochs set to {n_epochs}", flush=True)
-
-    #     self.latent_samples(epoch=0)
-    #     t_0 = time.time()
-    #     for e in range(n_epochs):
-    #         t0 = time.time()
-
-    #         self.epoch = past_epochs + e
-    #         self.net.train()
-    #         self.train_one_epoch()
-
-    #         if (self.epoch + 1) % self.validate_every == 0:
-    #             self.eval()
-    #             self.validate_one_epoch()
-
-    #         if self.sample_periodically:
-    #             if (self.epoch + 1) % self.sample_every == 0:
-    #                 self.eval()
-
-    #                 # # if true then i * bayesian samples will be drawn, else just 1
-    #                 # iterations = self.iterations if self.iterate_periodically else 1
-    #                 # bay_samples = []
-    #                 # for i in range(0, iterations):
-    #                 #     sample, c = self.sample_n()
-    #                 #     bay_samples.append(sample)
-    #                 # samples = np.concatenate(bay_samples)
-    #                 if get(self.params, "reconstruct", False):
-    #                     samples, c = self.reconstruct_n()
-    #                 else:
-    #                     samples, c = self.sample_n()
-    #                 self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.single_energy, mode=self.eval_mode)
-
-    #         # save model periodically, useful when trying to understand how weights are learned over iterations
-    #         if get(self.params,"save_periodically",False):
-    #             if (self.epoch + 1) % get(self.params,"save_every",10) == 0 or self.epoch==0:
-    #                 self.save(epoch=f"{self.epoch}")
-
-    #         # estimate training time
-    #         if e==0:
-    #             t1 = time.time()
-    #             dtEst= (t1-t0) * n_epochs
-    #             print(f"Training time estimate: {dtEst/60:.2f} min = {dtEst/60**2:.2f} h", flush=True)
-    #         sys.stdout.flush()
-    #     t_1 = time.time()
-    #     traintime = t_1 - t_0
-    #     self.params['train_time'] = traintime
-    #     print(
-    #         f"train_model: Finished training {n_epochs} epochs after {traintime:.2f} s = {traintime / 60:.2f} min = {traintime / 60 ** 2:.2f} h.", flush=True)
-
-    #     #save final model
-    #     print("train_model: Saving final model: ", flush=True)
-    #     self.save()
-    #     # generate and plot samples at the end
-    #     if get(self.params, "sample", True):
-    #         print("generate_samples: Start generating samples", flush=True)
-    #         if get(self.params, "reconstruct", False):
-    #             samples, c = self.reconstruct_n()
-    #         else:
-    #             samples, c = self.sample_n()
-    #         self.plot_samples(samples=samples, conditions=c, energy=self.single_energy)
-
-    # def train_one_epoch(self):
-    #     # create list to save train_loss
-    #     train_losses = np.array([])
-    #     grad_norms = np.array([])
-
-    #     # iterate batch wise over input
-    #     for batch_id, x in enumerate(self.train_loader):
-
-    #         self.optimizer.zero_grad(set_to_none=True)
-
-    #         # calculate batch loss
-    #         loss = self.batch_loss(x)
-    #         if np.isfinite(loss.item()): # and (abs(loss.item() - loss_m) / loss_s < 5 or len(self.train_losses_epoch) == 0):
-    #             loss.backward()
-    #             clip = self.params.get('clip_gradients_to', None)
-    #             if clip:
-    #                 nn.utils.clip_grad_norm_(self.net.parameters(), clip)
-
-    #             grad_norm = (
-    #                     torch.nn.utils.clip_grad_norm(
-    #                         self.model.parameters(), float("inf")
-    #                         ).cpu().item()
-    #                     )
-
-    #             self.optimizer.step()
-    #             train_losses = np.append(train_losses, loss.item())
-    #             grad_norms = np.append(grad_norms, grad_norm)
-    #             # if self.log:
-    #             #     self.logger.add_scalar("train_losses", train_losses[-1], self.epoch*self.n_trainbatches + batch_id)
-
-    #             if self.use_scheduler:
-    #                 self.scheduler.step()
-    #                 # if self.log:
-    #                 #     self.logger.add_scalar("learning_rate", self.scheduler.get_last_lr()[0],
-    #                 #                            self.epoch * self.n_trainbatches + batch_id)
-
-    #         else:
-    #             print(f"train_model: Unstable loss. Skipped backprop for epoch {self.epoch}, batch_id {batch_id}")
-
-    #     self.train_losses_epoch = np.append(self.train_losses_epoch, train_losses.mean())
-    #     self.grad_norms_epoch = np.append(self.grad_norms_epoch, grad_norms.mean())
-    #     self.train_losses = np.concatenate([self.train_losses, train_losses], axis=0)
-    #     if self.log:
-    #         self.logger.add_scalar("train_losses_epoch", self.train_losses_epoch[-1], self.epoch)
-    #         self.logger.add_scalar("grad_norm", self.grad_norms_epoch[-1], self.epoch)
-    #         if self.use_scheduler:
-    #             self.logger.add_scalar("learning_rate_epoch", self.scheduler.get_last_lr()[0],
-    #                                    self.epoch)
-
     # @torch.inference_mode()
     # def latent_samples(self, epoch=None):
     #     """
@@ -316,28 +187,6 @@ class CaloChallenge(BaseExperiment):
     #             samples[start:stop] = self.forward(x,c)[0].cpu()
     #         samples = samples.reshape(-1, math.prod(self.shape)).numpy()
     #     plot_latent(samples, self.doc.basedir, epoch)
-
-    # @torch.inference_mode()
-    # def validate_one_epoch(self):
-
-    #     val_losses = np.array([])
-    #     # iterate batch wise over input
-    #     for batch_id, x in enumerate(self.val_loader):
-
-    #         # calculate batch loss
-    #         loss = self.batch_loss(x)
-    #         val_losses = np.append(val_losses, loss.item())
-    #         # if self.log:
-    #         #     self.logger.add_scalar("val_losses", val_losses[-1], self.epoch*self.n_trainbatches + batch_id)
-
-    #     self.val_losses_epoch = np.append(self.val_losses_epoch, val_losses.mean())
-    #     self.val_losses = np.concatenate([self.val_losses, val_losses], axis=0)
-    #     if self.log:
-    #         self.logger.add_scalar("val_losses_epoch", self.val_losses_epoch[-1], self.epoch)
-    #     self.latent_samples(epoch=len(self.val_losses_epoch))
-
-    # def batch_loss(self, x):
-    #     pass
 
     def generate_Einc_ds1(self, sample_multiplier=1000):
         """generate the incident energy distribution of CaloChallenge ds1
@@ -455,17 +304,18 @@ class CaloChallenge(BaseExperiment):
             samples[:, 1:] = torch.clip(samples[:, 1:], min=0.0, max=1.0)
             reference[:, 1:] = torch.clip(reference[:, 1:], min=0.0, max=1.0)
 
-            plot_ui_dists(
-                samples.detach().cpu().numpy(),
-                reference.detach().cpu().numpy(),
-                documenter=doc,
-            )
-            evaluate.eval_ui_dists(
-                samples.detach().cpu().numpy(),
-                reference.detach().cpu().numpy(),
-                documenter=doc,
-                params=self.params,
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                plot_ui_dists(
+                    samples.detach().cpu().numpy(),
+                    reference.detach().cpu().numpy(),
+                    cfg=self.cfg,
+                )
+                evaluate.eval_ui_dists(
+                    samples.detach().cpu().numpy(),
+                    reference.detach().cpu().numpy(),
+                    cfg=self.cfg,
+                )
         else:
             # postprocess
             for fn in self.transforms[::-1]:
@@ -478,16 +328,6 @@ class CaloChallenge(BaseExperiment):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 evaluate.run_from_py(samples, conditions, self.cfg)
-
-    # def plot_saved_samples(self, name="", energy=None, doc=None):
-    #     if doc is None: doc = self.doc
-    #     mode = self.params.get('eval_mode', 'all')
-    #     script_args = (
-    #         f"-i {doc.basedir}/ "
-    #         f"-r {self.params['eval_hdf5_file']} -m {mode} --cut {self.params['eval_cut']} "
-    #         f"-d {self.params['eval_dataset']} --output_dir {doc.basedir}/final/ --save_mem"
-    #     ) + (f" --energy {energy}" if energy is not None else '')
-    #     evaluate.main(script_args.split())
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
@@ -516,31 +356,6 @@ class CaloChallenge(BaseExperiment):
             raise ValueError(f"Cannot load model from {model_path}")
 
         self.energy_model.to(self.device, dtype=self.dtype)
-
-    # def save(self, epoch=""):
-    #     """ Save the model, and more if needed"""
-    #     torch.save({"opt": self.optimizer.state_dict(),
-    #                 "net": self.net.state_dict(),
-    #                 "losses": self.train_losses_epoch,
-    #                 "epoch": self.epoch,
-    #                 "scheduler": self.scheduler.state_dict()}
-    #                 , self.doc.get_file(f"model{epoch}.pt"))
-
-    # def load(self, epoch=""):
-    #     """ Load the model, and more if needed"""
-    #     name = self.doc.get_file(f"model{epoch}.pt")
-    #     state_dicts = torch.load(name, map_location=self.device)
-    #     self.net.load_state_dict(state_dicts["net"])
-
-    #     if "losses" in state_dicts:
-    #         self.train_losses_epoch = state_dicts.get("losses", {})
-    #     if "epoch" in state_dicts:
-    #         self.epoch = state_dicts.get("epoch", 0)
-    #     #if "opt" in state_dicts:
-    #     #    self.optimizer.load_state_dict(state_dicts["opt"])
-    #     #if "scheduler" in state_dicts:
-    #     #    self.scheduler.load_state_dict(state_dicts["scheduler"])
-    #     self.net.to(self.device)
 
     # def load_other(self, model_dir):
     #     """ Load a different model (e.g. to sample u_i's)"""
