@@ -420,9 +420,12 @@ def plot_histograms(hlf_classes, reference_class, arg, labels, input_names='', p
     #if arg.dataset[0] == '1':
     #    plot_Etot_Einc_discrete(hlf_class, reference_class, arg)
 
-def eval_ui_dists(source_array, reference_array, documenter, params):
-    args = args_class(params)
-    args.output_dir = documenter.basedir + "/eval/"
+def eval_ui_dists(source_array, reference_array, cfg):
+    if not os.path.isdir(cfg.run_dir+f"/eval/"):
+        os.makedirs(cfg.run_dir+f"/eval/")
+        
+    args = args_class(cfg)
+    args.output_dir = cfg.run_dir + "/eval/"
     
     if not os.path.isdir(args.output_dir):
         os.makedirs(args.output_dir)
