@@ -6,6 +6,14 @@ import os
 from challenge_files import *
 from challenge_files import XMLHandler
 from itertools import pairwise
+import torch.distributions as dist
+
+
+class LogUniform(dist.TransformedDistribution):
+    def __init__(self, lb, ub):
+        super(LogUniform, self).__init__(
+            dist.Uniform(lb.log(), ub.log()), dist.ExpTransform()
+        )
 
 
 def logit(array, alpha=1.0e-6, inv=False):
@@ -389,6 +397,40 @@ class SmoothUPeaks(object):
             # restore u0
             transformed[:, 0] = u[:, 0]
 
+        return transformed, energy
+
+
+class SelectiveLogUniformNoise(object):
+    """
+    Add noise to input data with the option to exlude some features
+        func: torch distribution used to sample from
+        width_noise: noise rescaling
+        exclusions: list of indices for features that should not be transformed
+    """
+
+    def __init__(self, a, b, exclusions=None, cut=False):
+        # self.func = func
+        self.a = a
+        self.b = b
+        self.func = LogUniform(torch.tensor(self.a), torch.tensor(self.b))
+        self.exclusions = exclusions
+        self.cut = cut  # apply cut if True
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = shower < self.b
+            if self.exclusions:
+                mask[:, self.exclusions] = False
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0
+        else:
+            noise = self.func.sample(shower.shape).to(shower.dtype)
+            mask = shower != 1
+            if self.exclusions:
+                noise[:, self.exclusions] = 0.0
+            transformed = shower
+            transformed[mask] = (shower + noise.to(shower.device))[mask]
         return transformed, energy
 
 
