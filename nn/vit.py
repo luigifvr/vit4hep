@@ -39,10 +39,8 @@ class ViT(nn.Module):
             "causal_attn": False,
             "checkpoint_grads": False,
             "patch_dim": 12,
-            "patch_shape": [3, 16, 1],
-            "x_out": None,
+            "num_patches": [15, 4, 9],
             "use_torch_sdpa": True,
-            "use_time_condition": False,
         }
 
         for k, p in defaults.items():

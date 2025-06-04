@@ -42,7 +42,7 @@ class BaseModel(nn.Module):
     ):
         raise NotImplementedError
 
-    def log_prob(self, x, c):
+    def log_prob(self):
         raise NotImplementedError
 
 
@@ -110,7 +110,9 @@ class CINN(BaseModel):
         return x.reshape(z.shape[0], self.in_channels, *self.shape)
 
     def _batch_loss(self, x):
-        return -self.log_prob(x[0], x[1])  # neg log prob
+        x = x[0].to(self.device, self.dtype)
+        c = x[1].to(self.device, self.dtype)
+        return -self.log_prob(x, c)  # neg log prob
 
     def build_net(self):
         raise NotImplementedError
@@ -170,8 +172,12 @@ class CFM(BaseModel):
     def _batch_loss(self, x):
         # get input and conditions
         x, c = x[0], x[1]
+        x = x.to(self.device, self.dtype)
+        c = c.to(self.device, self.dtype)
 
-        t = self.distribution.sample([x.shape[0]] + [1] * (x.dim() - 1)).to(x.device)
+        t = self.time_distribution.sample([x.shape[0]] + [1] * (x.dim() - 1))
+        t = t.to(self.device, self.dtype)
+
         x_0 = torch.randn_like(x)
 
         x_t, x_t_dot = self.trajectory(x_0, x, t)

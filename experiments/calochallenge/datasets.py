@@ -17,7 +17,7 @@ class CaloChallengeDataset(Dataset):
         hdf5_file,
         particle_type,
         xml_filename,
-        val_frac=0.3,
+        train_val_frac=0.3,
         transform=None,
         split="full",
         device="cpu",
@@ -30,6 +30,7 @@ class CaloChallengeDataset(Dataset):
             xml_filename: path to XML filename
             transform: list of transformations
         """
+        assert train_val_frac[0] + train_val_frac[1] <= 1.0
 
         self.voxels, self.layer_boundaries = load_data(
             hdf5_file, particle_type, xml_filename
@@ -49,8 +50,8 @@ class CaloChallengeDataset(Dataset):
             for fn in self.transform:
                 self.layers, self.energy = fn(self.layers, self.energy)
 
-        val_size = int(len(self.energy) * val_frac)
-        trn_size = len(self.energy) - val_size
+        val_size = int(len(self.energy) * train_val_frac[1])
+        trn_size = int(len(self.energy) * train_val_frac[0])
         # make train/val split
         if split == "training":
             self.layers = self.layers[:trn_size]
@@ -59,8 +60,8 @@ class CaloChallengeDataset(Dataset):
             self.layers = self.layers[-val_size:]
             self.energy = self.energy[-val_size:]
 
-        self.layers = self.layers.to(device)
-        self.energy = self.energy.to(device)
+        self.layers = self.layers.to(dtype)
+        self.energy = self.energy.to(dtype)
 
         self.min_bounds = self.layers.min()
         self.max_bounds = self.layers.max()
