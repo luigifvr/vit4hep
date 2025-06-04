@@ -1,11 +1,11 @@
 _target_: experiments.calochallenge.model.CaloChallengeCINN
 in_channels: 1
-shape: [45, 16, 9]
-patch_shape: [3, 8, 1]
+shape: [45, 50, 18]
+patch_shape: [3, 5, 2]
 
 coupling_block: CaloRQSplineNFlows
-nblocks: 6
-is_spatial: [False, True, False, True, False, True] # 4
+nblocks: 5
+is_spatial: [False, True, False, True, False]
 spatial_factor: [1,2,1]
 cinn_kwargs: 
   num_bins: 10
@@ -17,7 +17,7 @@ vit_kwargs:
   condition_dim: 46
   out_channels: 2
   final_layer_channels: 23
-  hidden_dim: 240
+  hidden_dim: 360
   depth: 2
   num_heads: 6
   mlp_ratio: 4.0

@@ -1,7 +1,4 @@
-import os
 import torch
-import numpy as np
-import gc
 
 from torch.utils.data import Dataset
 from experiments.logger import LOGGER
@@ -17,7 +14,7 @@ class CaloChallengeDataset(Dataset):
         hdf5_file,
         particle_type,
         xml_filename,
-        train_val_frac=0.3,
+        train_val_frac=[0.7, 0.3],
         transform=None,
         split="full",
         device="cpu",
@@ -30,7 +27,7 @@ class CaloChallengeDataset(Dataset):
             xml_filename: path to XML filename
             transform: list of transformations
         """
-        assert train_val_frac[0] + train_val_frac[1] <= 1.0
+        assert split == "full" or train_val_frac[0] + train_val_frac[1] <= 1.0
 
         self.voxels, self.layer_boundaries = load_data(
             hdf5_file, particle_type, xml_filename
@@ -59,6 +56,9 @@ class CaloChallengeDataset(Dataset):
         elif split == "validation":
             self.layers = self.layers[-val_size:]
             self.energy = self.energy[-val_size:]
+        elif split == "full":
+            self.layers = self.layers[...]
+            self.energy = self.energy[...]
 
         self.layers = self.layers.to(dtype)
         self.energy = self.energy.to(dtype)

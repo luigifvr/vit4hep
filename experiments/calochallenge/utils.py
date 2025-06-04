@@ -1,15 +1,9 @@
-import torch
-import torch.optim
 import torch.utils.data
 import torch.nn.functional as F
-import yaml
-import math
 import numpy as np
 import h5py
 
 from challenge_files.XMLHandler import XMLHandler
-import challenge_files.HighLevelFeatures as HLF
-import experiments.calochallenge.transforms as transforms
 
 
 def load_data(filename, particle_type, xml_filename, threshold=1e-5):

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torchdiffeq import odeint
 
-from nn.trajectories import linear_trajectory
+from models.trajectories import linear_trajectory
 
 
 class BaseModel(nn.Module):
@@ -165,7 +165,7 @@ class CFM(BaseModel):
 
     def forward(self, x, t, c):
         x = self.to_patches(x)
-        z = self.net.forward(x, t, c)
+        z = self.net(x, t, c)
         z = self.from_patches(z)
         return z
 
@@ -195,11 +195,11 @@ class CFM(BaseModel):
         dtype = batch.dtype
         device = batch.device
 
-        x_T = torch.randn((batch.shape[0], *self.shape), dtype=dtype, device=device)
+        x_T = torch.randn((batch.shape[0], self.in_channels, *self.shape), dtype=dtype, device=device)
 
         def f(t, x_t):
             t_torch = t.repeat((x_t.shape[0], 1)).to(self.device)
-            return self.net(x_t, t_torch, batch)
+            return self.forward(x_t, t_torch, batch)
 
         solver = odeint  # also sdeint is possible
 

@@ -211,8 +211,9 @@ class CaloChallenge(BaseExperiment):
                     self.particle_type,
                     self.xml_filename,
                     transform=self.transforms,
+                    split="full",
                     device=self.device,
-                ).energy
+                ).energy.to(self.device)
 
             # concatenate with Einc
             transformed_cond_loader = DataLoader(

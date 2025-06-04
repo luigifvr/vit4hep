@@ -2,10 +2,10 @@ _target_: experiments.calochallenge.model.CaloChallengeEnergy
 
 shape: [45]
 coupling_block: RQSplineNFlows
-nblocks: 5
+nblocks: 6
 cinn_kwargs: 
   num_bins: 14
-  bounds_init: 23 # (left, right, bottom, top)
+  bounds_init: 25 # (left, right, bottom, top)
 
 subnet_kwargs:
   n_layers: 3

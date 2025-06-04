@@ -10,7 +10,7 @@ from FrEIA.modules.coupling_layers import _BaseCouplingBlock
 from FrEIA.modules.base import InvertibleModule
 from FrEIA import utils
 
-from nn.base_calo2 import BaseCalo2CouplingBlock
+from models.base_coupling import BaseCalo2CouplingBlock
 
 
 class BinnedSpline(BaseCalo2CouplingBlock):

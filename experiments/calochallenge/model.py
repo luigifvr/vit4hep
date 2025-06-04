@@ -3,7 +3,7 @@ from einops import rearrange
 import torch
 
 from FrEIA.framework import InputNode, Node, OutputNode, GraphINN, ConditionNode
-from experiments.base_model import CINN, CFM, BaseModel
+from models.base_model import CINN, CFM, BaseModel
 from experiments.calochallenge.freia_utils import (
     get_coupling_block,
     get_permutation_block,
