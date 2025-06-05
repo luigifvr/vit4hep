@@ -41,6 +41,12 @@ class CaloChallengeFT(CaloChallenge):
         self.model.load_state_dict(state_dict)
         self.model.to(self.device, dtype=self.dtype)
 
+        # reinitialize first layer
+        self.model.net.x_embedder = nn.Linear(
+            self.cfg.model.net.patch_dim,
+            self.cfg.model.net.hidden_dim,
+        ).to(self.device)
+
         # reinitialize final layer
         self.model.net.final_layer = FinalLayer(
             self.cfg.model.net.hidden_dim,
