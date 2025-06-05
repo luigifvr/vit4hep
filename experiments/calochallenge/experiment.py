@@ -52,57 +52,12 @@ class CaloChallenge(BaseExperiment):
 
     """
 
-    # def __init__(self, cfg):
-    #     """
-    #     :param params: file with all relevant model parameters
-    #     """
-    #     super(BaseExperiment).__init__(cfg)
-    # self.doc = doc
-    # self.params = params
-    # self.device = device
-    # self.shape = self.params['shape']#get(self.params,'shape')
-    # self.conditional = get(self.params,'conditional',False)
-    # self.single_energy = get(self.params, 'single_energy', None) # Train on a single energy
-    # self.eval_mode = get(self.params, 'eval_mode', 'all')
-
-    # self.batch_size = self.params["batch_size"]
-    # self.batch_size_sample = get(self.params, "batch_size_sample", 10_000)
-
-    # self.net = self.build_net()
-    # print(self.net)
-    # param_count = sum(p.numel() for p in self.net.parameters() if p.requires_grad)
-    # print(f'init model: Model has {param_count} parameters')
-    # self.params['parameter_count'] = param_count
-
-    # self.epoch = get(self.params, "total_epochs", 0)
-    # self.iterations = get(self.params,"iterations", 1)
-    # self.regular_loss = []
-    # self.kl_loss = []
-
-    # self.runs = get(self.params, "runs", 0)
-    # self.iterate_periodically = get(self.params, "iterate_periodically", False)
-    # self.validate_every = get(self.params, "validate_every", 50)
-
-    # # augment data
-    # self.aug_transforms = get(self.params, "augment_batch", False)
-
-    # # load autoencoder for latent modelling
-    # #self.ae_dir = get(self.params, "autoencoder", None)
-    # #if self.ae_dir is None:
-    # self.transforms = get_transformations(
-    #     params.get('transforms', None), doc=self.doc
-    # )
-    # self.latent = False
-    # else:
-    #    self.ae = self.load_other(self.ae_dir)# model_class='AE'
-    #    self.transforms = self.ae.transforms
-    #    self.latent = True
     def init_data(self):
         self.hdf5_train = self.cfg.data.training_file
         self.hdf5_test = self.cfg.data.test_file
         self.particle_type = self.cfg.data.particle_type
         self.xml_filename = self.cfg.data.xml_filename
-        self.val_frac = self.cfg.data.val_frac
+        self.train_val_frac = self.cfg.data.train_val_frac
         self.transforms = []
 
         for name, kwargs in self.cfg.data.transforms.items():
@@ -118,7 +73,7 @@ class CaloChallenge(BaseExperiment):
             self.hdf5_train,
             self.particle_type,
             self.xml_filename,
-            val_frac=self.val_frac,
+            train_val_frac=self.train_val_frac,
             transform=self.transforms,
             split="training",
             device=self.device,
@@ -129,7 +84,7 @@ class CaloChallenge(BaseExperiment):
             self.hdf5_train,
             self.particle_type,
             self.xml_filename,
-            val_frac=self.val_frac,
+            train_val_frac=self.train_val_frac,
             transform=self.transforms,
             split="validation",
             device=self.device,
@@ -256,8 +211,9 @@ class CaloChallenge(BaseExperiment):
                     self.particle_type,
                     self.xml_filename,
                     transform=self.transforms,
+                    split="full",
                     device=self.device,
-                ).energy
+                ).energy.to(self.device)
 
             # concatenate with Einc
             transformed_cond_loader = DataLoader(
@@ -276,9 +232,6 @@ class CaloChallenge(BaseExperiment):
         )
 
         return sample, transformed_cond.cpu()
-
-    # def sample_batch(self, batch):
-    #     pass
 
     def plot(self):
         LOGGER.info("plot: generating samples")

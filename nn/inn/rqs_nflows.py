@@ -1,14 +1,11 @@
 from typing import Callable
 
-import math
 import numpy as np
-from scipy.stats import special_ortho_group
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from nn.base_coupling import BaseCouplingBlock, OneSidedBaseCouplingBlock
+from models.base_coupling import BaseCouplingBlock, OneSidedBaseCouplingBlock
 from FrEIA.modules import InvertibleModule
-from FrEIA import utils
 
 
 class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):

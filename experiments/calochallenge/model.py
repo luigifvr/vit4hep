@@ -3,14 +3,79 @@ from einops import rearrange
 import torch
 
 from FrEIA.framework import InputNode, Node, OutputNode, GraphINN, ConditionNode
-from FrEIA.modules import ActNorm
-from experiments.base_model import CINN, BaseModel
+from models.base_model import CINN, CFM, BaseModel
 from experiments.calochallenge.freia_utils import (
     get_coupling_block,
     get_permutation_block,
     get_vit_block_kwargs,
     get_block_kwargs,
 )
+
+
+class CaloChallengeCFM(CFM):
+    def __init__(
+        self,
+        net,
+        patch_shape,
+        in_channels=1,
+        time_distribution="uniform",
+        trajectory="linear",
+        odeint_kwargs=None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            patch_shape,
+            in_channels,
+            time_distribution,
+            trajectory,
+            odeint_kwargs,
+            *args,
+            **kwargs,
+        )
+
+        self.net = net
+
+    def from_patches(self, x, dim=3):
+        if dim == 3:
+            x = rearrange(
+                x,
+                "b (l a r) (p1 p2 p3 c) -> b c (l p1) (a p2) (r p3)",
+                **dict(
+                    zip(
+                        ("l", "a", "r", "p1", "p2", "p3"),
+                        self.num_patches + self.patch_shape,
+                    )
+                ),
+            )
+        elif dim == 2:
+            x = rearrange(
+                x,
+                "b (a r) (p1 p2 c) -> b c (a p1) (r p2)",
+                **dict(
+                    zip(("a", "r", "p1", "p2"), self.num_patches + self.patch_shape)
+                ),
+            )
+        else:
+            raise ValueError(self.dim)
+        return x
+
+    def to_patches(self, x, dim=3):
+        if dim == 3:
+            x = rearrange(
+                x,
+                "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
+                **dict(zip(("p1", "p2", "p3"), self.patch_shape)),
+            )
+        elif dim == 2:
+            x = rearrange(
+                x,
+                "b c (a p1) (r p2) -> b (a r) (p1 p2 c)",
+                **dict(zip(("p1", "p2"), self.patch_shape)),
+            )
+        else:
+            raise ValueError(dim)
+        return x
 
 
 class CaloChallengeCINN(CINN):
@@ -164,6 +229,7 @@ class CaloChallengeEnergy(BaseModel):
 
         return GraphINN(nodes)
 
+    @torch.inference_mode()
     def sample_batch(self, batch):
         """
         sample from the learned distribution

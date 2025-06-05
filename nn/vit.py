@@ -10,6 +10,10 @@ from timm.models.vision_transformer import Mlp
 from xformers.ops import memory_efficient_attention
 
 
+def modulate(x, shift, scale):
+    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+
+
 class ViT(nn.Module):
     """
     Vision transformer-based diffusion network.
@@ -22,24 +26,21 @@ class ViT(nn.Module):
         defaults = {
             "dim": 3,
             "condition_dim": 46,
-            "hidden_dim": 180,  # 12 * 12,
-            "out_channels": 2,
+            "hidden_dim": 180,
+            "out_channels": 1,
             "depth": 2,
             "num_heads": 4,
             "mlp_ratio": 2.0,
             "attn_drop": 0.0,
             "proj_drop": 0.0,
             "pos_embedding_coords": "cartesian",
+            "temperature": 10000,
             "learn_pos_embed": True,
             "causal_attn": False,
-            "final_layer_channels": 23,
-            "x1_channels": 23,
             "checkpoint_grads": False,
             "patch_dim": 12,
-            "prod_num_patches": 15 * 4 * 9,  # TODO num_patches not defined
-            "x_out": None,
+            "num_patches": [15, 4, 9],
             "use_torch_sdpa": True,
-            "use_time_condition": False,
         }
 
         for k, p in defaults.items():
@@ -52,46 +53,24 @@ class ViT(nn.Module):
             nn.SiLU(),
             nn.Linear(self.hidden_dim, self.hidden_dim),
         )
-        if self.use_time_condition:
-            self.t_embedder = TimestepEmbedder(self.hidden_dim)
+        self.t_embedder = TimestepEmbedder(self.hidden_dim)
 
         # initialize position embeddings
         if self.learn_pos_embed:
-            # l, a, r = self.num_patches
             self.pos_embed_freqs = nn.Parameter(torch.randn(self.hidden_dim // 2))
-            self.register_buffer(
-                "grid", torch.arange(self.prod_num_patches) / self.prod_num_patches
-            )
-            # self.register_buffer('agrid', torch.arange(a)/a)
-            # self.register_buffer('rgrid', torch.arange(r)/r)
+            l, a, r = self.num_patches
+            self.register_buffer("lgrid", torch.arange(l) / l)
+            self.register_buffer("agrid", torch.arange(a) / a)
+            self.register_buffer("rgrid", torch.arange(r) / r)
         else:
             self.register_buffer(
                 "pos_embed",
                 (
-                    get_2d_cylindrical_sincos_pos_embed(
-                        self.num_patches, self.hidden_dim
-                    )
-                    if self.pos_embedding_coords == "cylindrical" and self.dim == 2
-                    else (
-                        get_2d_cartesian_sincos_pos_embed(
-                            self.num_patches, self.hidden_dim
-                        )
-                        if self.pos_embedding_coords == "cartesian" and self.dim == 2
-                        else (
-                            get_3d_cylindrical_sincos_pos_embed(
-                                self.num_patches, self.hidden_dim
-                            )
-                            if self.pos_embedding_coords == "cylindrical"
-                            and self.dim == 3
-                            else (
-                                get_3d_cartesian_sincos_pos_embed(
-                                    self.num_patches, self.hidden_dim
-                                )
-                                if self.pos_embedding_coords == "cartesian"
-                                and self.dim == 3
-                                else None
-                            )
-                        )
+                    get_sincos_pos_embed(
+                        self.pos_embedding_coords,
+                        self.num_patches,
+                        self.dim,
+                        self.temperature,
                     )
                 ),
             )
@@ -128,21 +107,19 @@ class ViT(nn.Module):
         # initialize output layer
         # TODO: final conv for ViT INN ?
         self.final_layer = FinalLayer(
-            self.hidden_dim, self.patch_dim, self.out_channels, self.x_out
+            self.hidden_dim, self.patch_dim, self.out_channels, x_out=1
         )
 
         # custom weight initialization
         self.initialize_weights()
 
     def learnable_pos_embedding(self):  # TODO
-        wgrid = self.pos_embed_freqs * 2 * math.pi  # .chunk(3)
-        # z, y, x = torch.meshgrid(self.lgrid, self.agrid, self.rgrid, indexing='ij')
-        # z = z.flatten()[:, None] * wz[None, :]
-        # y = y.flatten()[:, None] * wy[None, :]
-        # x = x.flatten()[:, None] * wx[None, :]
-        pos = self.grid[:, None] * wgrid[None, :]
-        # pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim = 1)
-        pe = torch.cat((pos.sin(), pos.cos()), dim=1)
+        wz, wy, wx = (self.pos_embed_freqs * 2 * math.pi).chunk(3)
+        z, y, x = torch.meshgrid(self.lgrid, self.agrid, self.rgrid, indexing="ij")
+        z = z.flatten()[:, None] * wz[None, :]
+        y = y.flatten()[:, None] * wy[None, :]
+        x = x.flatten()[:, None] * wx[None, :]
+        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim=1)
         return pe
 
     def initialize_weights(self):
@@ -173,7 +150,97 @@ class ViT(nn.Module):
         t: (B,) tensor of diffusion timesteps
         c: (B, K) tensor of conditions
         """
-        # x = self.to_patches(x)
+        if self.learn_pos_embed:
+            x = self.x_embedder(x) + self.learnable_pos_embedding()
+        else:
+            x = (
+                self.x_embedder(x) + self.pos_embed
+            )  # (B, T, D), where T = (L*A*R)/prod(patch_size)
+
+        t = self.t_embedder(t)  # (B, D)
+        c = self.c_embedder(c)  # (B, D)
+        c = t + c
+        for block in self.blocks:
+            if self.checkpoint_grads:
+                x = checkpoint(block, x, c, use_reentrant=False)
+            else:
+                x = block(x, c)  # (B, T, D)
+        x = self.final_layer(x, c)  # (B, T, prod(patch_shape) * out_channels)
+        return x
+
+
+class ViT1D(ViT):
+    """
+    Vision transformer-based diffusion network.
+    """
+
+    def __init__(self, param):
+
+        super().__init__(param)
+        defaults = {
+            "prod_num_patches": 15 * 4 * 9,  # TODO num_patches not defined
+            "x_out": None,
+        }
+
+        for k, p in defaults.items():
+            setattr(self, k, param[k] if k in param else p)
+
+        # initialize position embeddings
+        if self.learn_pos_embed:
+            self.pos_embed_freqs = nn.Parameter(torch.randn(self.hidden_dim // 2))
+            self.register_buffer(
+                "grid", torch.arange(self.prod_num_patches) / self.prod_num_patches
+            )
+        else:
+            self.register_buffer(
+                "pos_embed",
+                (
+                    get_sincos_pos_embed(
+                        self.pos_embedding_coords,
+                        self.num_patches,
+                        self.dim,
+                        self.temperature,
+                    )
+                ),
+            )
+
+        # initialize transformer stack
+        self.blocks = nn.ModuleList(
+            [
+                DiTBlock(
+                    self.hidden_dim,
+                    self.num_heads,
+                    mlp_ratio=self.mlp_ratio,
+                    attn_drop=self.attn_drop,
+                    proj_drop=self.proj_drop,
+                    attn_mask=self.attn_mask if self.causal_attn else None,
+                    use_torch_sdpa=self.use_torch_sdpa,
+                )
+                for _ in range(self.depth)
+            ]
+        )
+
+        # initialize output layer
+        # TODO: final conv for ViT INN ?
+        self.final_layer = FinalLayer(
+            self.hidden_dim, self.patch_dim, self.out_channels, self.x_out
+        )
+
+        # custom weight initialization
+        self.initialize_weights()
+
+    def learnable_pos_embedding(self):  # TODO
+        wgrid = self.pos_embed_freqs * 2 * math.pi
+        pos = self.grid[:, None] * wgrid[None, :]
+        pe = torch.cat((pos.sin(), pos.cos()), dim=1)
+        return pe
+
+    def forward(self, x, c):
+        """
+        Forward pass of DiT.
+        x: (B, C, *axis_sizes) tensor of spatial inputs
+        c: (B, K) tensor of conditions
+        """
         if self.learn_pos_embed:
             x = self.x_embedder(x) + self.learnable_pos_embedding()
         else:
@@ -188,13 +255,7 @@ class ViT(nn.Module):
             else:
                 x = block(x, c)  # (B, T, D)
         x = self.final_layer(x, c)  # (B, T, prod(patch_shape) * out_channels)
-        # x = self.from_patches(x)                 # (B, out_channels, *axis_sizes)
-        # x = x.reshape(-1, self.out_channels, self.final_layer_channels, 16, 9)
         return x
-
-
-def modulate(x, shift, scale):
-    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
 
 class DiTBlock(nn.Module):
@@ -239,12 +300,10 @@ class FinalLayer(nn.Module):
     The final layer of DiT.
     """
 
-    def __init__(self, hidden_dim, patch_dim, out_channels, x_out=None):
+    def __init__(self, hidden_dim, patch_dim, out_channels=1, x_out=1):
         super().__init__()
         self.norm_final = nn.LayerNorm(hidden_dim, elementwise_affine=False, eps=1e-6)
-        self.linear = nn.Linear(
-            hidden_dim, x_out * patch_dim
-        )  # math.prod(patch_shape) * out_channels )
+        self.linear = nn.Linear(hidden_dim, out_channels * x_out * patch_dim)
         self.adaLN_modulation = nn.Sequential(
             nn.SiLU(), nn.Linear(hidden_dim, 2 * hidden_dim)
         )
@@ -366,45 +425,30 @@ class Attention(nn.Module):
         return x
 
 
-def get_2d_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):
+def get_sincos_pos_embed(pos_embedding_coords, num_patches, dim, temperature=10000):
+    if pos_embedding_coords == "cylindrical" and dim == 3:
+        get_3d_cylindrical_sincos_pos_embed(num_patches, dim, temperature)
+    elif pos_embedding_coords == "cartesian" and dim == 3:
+        get_3d_cartesian_sincos_pos_embed(num_patches, dim, temperature)
+    elif pos_embedding_coords == "cylindrical" and dim == 1:
+        get_1d_cylindrical_sincos_pos_embed(num_patches, dim, temperature)
+    else:
+        raise ValueError
+
+
+def get_1d_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):
     """
     Embeds patch positions based directly on input indices, which are assumed
     to be depth, angle, radius.
     """
-    A, R = num_patches
-    y, x = torch.meshgrid(torch.arange(A) / A, torch.arange(R) / R, indexing="ij")
+    x = torch.arange(num_patches) / num_patches
 
-    fourier_dim = dim // 4
+    fourier_dim = dim // 2
     omega = torch.arange(fourier_dim) / (fourier_dim - 1)
     omega = 1.0 / (temperature**omega)
-    y = y.flatten()[:, None] * omega[None, :]
     x = x.flatten()[:, None] * omega[None, :]
 
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim=1)
-    # padding can be implemented here
-
-    return pe
-
-
-def get_2d_cartesian_sincos_pos_embed(num_patches, dim, temperature=10000):
-    """
-    Embeds patch positions after converting input indices from polar to cartesian
-    coordinates. i.e. depth, angle, radius -> depth, height, width
-    """
-    A, R = num_patches
-    alpha, r = torch.meshgrid(
-        torch.arange(A) * (2 * math.pi / A), torch.arange(R) / R, indexing="ij"
-    )
-    x = r * alpha.cos()
-    y = r * alpha.sin()
-
-    fourier_dim = dim // 4
-    omega = torch.arange(fourier_dim) / (fourier_dim - 1)
-    omega = 1.0 / (temperature**omega)
-    y = y.flatten()[:, None] * omega[None, :]
-    x = x.flatten()[:, None] * omega[None, :]
-
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim=1)
+    pe = torch.cat((x.sin(), x.cos()), dim=1)
     # padding can be implemented here
 
     return pe

@@ -1,9 +1,9 @@
 import math
 
 from FrEIA.modules import PermuteRandom
-from nn.subnets import SubnetViT, SubnetMLP
-from nn.permute import PermuteRandomS1
-from nn.rqs_nflows import (
+from nn.inn.subnets import SubnetViT, SubnetMLP
+from nn.inn.permute import PermuteRandomS1
+from nn.inn.rqs_nflows import (
     CaloRationalQuadraticSplineBlock,
     OneSidedCaloRationalQuadraticSplineBlock,
     SimpleRationalQuadraticSplineBlock,
