@@ -176,7 +176,7 @@ class ViT1D(ViT):
 
     def __init__(self, param):
 
-        super(ViT, self).__init__(param)
+        super().__init__(param)
         defaults = {
             "prod_num_patches": 15 * 4 * 9,  # TODO num_patches not defined
             "x_out": None,

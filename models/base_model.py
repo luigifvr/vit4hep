@@ -110,8 +110,9 @@ class CINN(BaseModel):
         return x.reshape(z.shape[0], self.in_channels, *self.shape)
 
     def _batch_loss(self, x):
-        x = x[0].to(self.device, self.dtype)
-        c = x[1].to(self.device, self.dtype)
+        x, c = x[0], x[1]
+        x = x.to(self.device, self.dtype)
+        c = c.to(self.device, self.dtype)
         return -self.log_prob(x, c)  # neg log prob
 
     def build_net(self):
@@ -195,7 +196,9 @@ class CFM(BaseModel):
         dtype = batch.dtype
         device = batch.device
 
-        x_T = torch.randn((batch.shape[0], self.in_channels, *self.shape), dtype=dtype, device=device)
+        x_T = torch.randn(
+            (batch.shape[0], self.in_channels, *self.shape), dtype=dtype, device=device
+        )
 
         def f(t, x_t):
             t_torch = t.repeat((x_t.shape[0], 1)).to(self.device)
