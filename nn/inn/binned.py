@@ -1,19 +1,16 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, Tuple
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-from itertools import chain
-
-from FrEIA.modules.coupling_layers import _BaseCouplingBlock
 from FrEIA.modules.base import InvertibleModule
 from FrEIA import utils
 
-from models.base_coupling import BaseCalo2CouplingBlock
+from models.base_coupling import BaseCouplingBlock
 
 
-class BinnedSpline(BaseCalo2CouplingBlock):
+class BinnedSpline(BaseCouplingBlock):
     def __init__(
         self,
         dims_in,
@@ -29,6 +26,35 @@ class BinnedSpline(BaseCalo2CouplingBlock):
         super().__init__(
             dims_in, dims_c, clamp=0.0, clamp_activation=lambda u: u, spatial=spatial
         )
+
+        self.spatial = spatial
+        if spatial:
+            self.channels = dims_in[0][1]
+            self.patch_dim = self.channels // 2
+            self.num_patches = dims_in[0][0]
+        else:
+            self.channels = dims_in[0][0]
+            self.patch_dim = dims_in[0][1]
+            self.num_patches = self.channels // 2
+
+        # ndims means the rank of tensor strictly speaking.
+        # i.e. 1D, 2D, 3D tensor, etc.
+        self.ndims = len(dims_in[0])
+
+        if self.spatial:
+            # self.indices1 = [int(k) for k in range(self.channels // 2)]
+            # self.indices2 = [
+            #    int(k + self.channels // 2) for k in range(self.channels // 2)
+            # ]
+            self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
+            self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
+        else:
+            self.indices1 = [int(2 * k) for k in range(self.channels // 2)]
+            self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
+            # self.indices1 = [int(k) for k in range(self.channels // 2)]
+            # self.indices2 = [
+            #    int(k + self.channels // 2) for k in range(self.channels // 2)
+            # ]
 
         self.dtype = dtype
         self.spline_base = BinnedSplineBase(dims_in, dims_c, dtype=dtype, **kwargs)
@@ -92,6 +118,34 @@ class BinnedSpline(BaseCalo2CouplingBlock):
         self, parameters: Dict[str, torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
         return self.spline_base.constrain_parameters(parameters)
+
+    def forward(self, x, c=[], rev=False, jac=True):
+        """See base class docstring"""
+        # TODO update notation
+        # notation:
+        # x1, x2: two halves of the input
+        # y1, y2: two halves of the output
+        # *_c: variable with condition concatenated
+        # j1, j2: Jacobians of the two coupling operations
+        if self.spatial:
+            x1, x2 = x[0][:, :, self.indices1], x[0][:, :, self.indices2]
+        else:
+            x1, x2 = x[0][:, self.indices1], x[0][:, self.indices2]
+
+        # always the last vector is transformed
+        y1, y2, j = super().forward(x1, x2, c, rev=rev, jac=jac)
+
+        if self.spatial:
+            y = x[0].clone()
+            y[:, :, ::2] = y1
+            y[:, :, 1::2] = y2
+            # y = torch.cat((y1, y2), 2)
+        else:
+            y = x[0].clone()
+            y[:, ::2] = y1
+            y[:, 1::2] = y2
+            # y = torch.cat((y1, y2), 1)
+        return (y,), j
 
 
 class BinnedSplineBase(InvertibleModule):
