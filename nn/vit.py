@@ -69,6 +69,7 @@ class ViT(nn.Module):
                     get_sincos_pos_embed(
                         self.pos_embedding_coords,
                         self.num_patches,
+                        self.hidden_dim,
                         self.dim,
                         self.temperature,
                     )
@@ -198,6 +199,7 @@ class ViT1D(ViT):
                     get_sincos_pos_embed(
                         self.pos_embedding_coords,
                         self.num_patches,
+                        self.hidden_dim,
                         self.dim,
                         self.temperature,
                     )
@@ -425,15 +427,18 @@ class Attention(nn.Module):
         return x
 
 
-def get_sincos_pos_embed(pos_embedding_coords, num_patches, dim, temperature=10000):
+def get_sincos_pos_embed(
+    pos_embedding_coords, num_patches, hidden_dim, dim, temperature=10000
+):
     if pos_embedding_coords == "cylindrical" and dim == 3:
-        get_3d_cylindrical_sincos_pos_embed(num_patches, dim, temperature)
+        pe = get_3d_cylindrical_sincos_pos_embed(num_patches, hidden_dim, temperature)
     elif pos_embedding_coords == "cartesian" and dim == 3:
-        get_3d_cartesian_sincos_pos_embed(num_patches, dim, temperature)
+        pe = get_3d_cartesian_sincos_pos_embed(num_patches, hidden_dim, temperature)
     elif pos_embedding_coords == "cylindrical" and dim == 1:
-        get_1d_cylindrical_sincos_pos_embed(num_patches, dim, temperature)
+        pe = get_1d_cylindrical_sincos_pos_embed(num_patches, hidden_dim, temperature)
     else:
         raise ValueError
+    return pe
 
 
 def get_1d_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):
