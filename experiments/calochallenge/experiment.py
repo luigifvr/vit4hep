@@ -14,7 +14,7 @@ from experiments.logger import LOGGER
 from experiments.base_experiment import BaseExperiment
 from experiments.calochallenge.datasets import CaloChallengeDataset
 import experiments.calochallenge.transforms as transforms
-from challenge_files import evaluate
+from experiments.calochallenge.challenge_files import evaluate
 from experiments.calochallenge.plots import plot_ui_dists
 
 
@@ -302,7 +302,9 @@ class CaloChallenge(BaseExperiment):
         )
         model_path = os.path.join(energy_model_cfg.run_dir, "models", f"model_run0.pt")
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
+                "model"
+            ]
             LOGGER.info(f"Loading energy model from {model_path}")
             self.energy_model.load_state_dict(state_dict)
         except FileNotFoundError:
