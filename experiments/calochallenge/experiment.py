@@ -199,10 +199,17 @@ class CaloChallenge(BaseExperiment):
             if self.cfg.sample_us:  # TODO
                 # load energy model
                 self.load_energy_model()
-
+                
+                t2 = time.time()
                 # sample us
                 u_samples = torch.vstack(
                     [self.energy_model.sample_batch(c) for c in transformed_cond_loader]
+                )
+                t3 = time.time()
+                energy_sampling_time = t3 - t2
+                LOGGER.info(
+                    f"sample_n: Finished generating {len(u_samples)} energy samples "
+                    f"after {energy_sampling_time} s."
                 )
 
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
