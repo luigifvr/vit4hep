@@ -37,9 +37,7 @@ class BaseModel(nn.Module):
     def to_patches(self):
         raise NotImplementedError
 
-    def _batch_loss(
-        self,
-    ):
+    def _batch_loss(self):
         raise NotImplementedError
 
     def log_prob(self):
@@ -47,17 +45,8 @@ class BaseModel(nn.Module):
 
 
 class CINN(BaseModel):
-    def __init__(self, patch_shape, in_channels=1, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        self.patch_shape = patch_shape
-        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape)]
-        self.in_channels = in_channels
-
-        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape)):
-            assert (
-                s % p == 0
-            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
 
         self.net = None
 
@@ -82,9 +71,7 @@ class CINN(BaseModel):
         return log_prob.mean()
 
     def forward(self, x, c, rev=False, jac=True):
-        x = self.to_patches(x)
         z, log_jac = super().forward(x, c, rev=rev, jac=jac)
-        z = self.from_patches(z)
         return z, log_jac
 
     @torch.inference_mode()
@@ -126,8 +113,7 @@ class CFM(BaseModel):
 
     def __init__(
         self,
-        patch_shape,
-        in_channels=1,
+        net,
         time_distribution="uniform",
         trajectory="linear",
         odeint_kwargs=None,
@@ -140,16 +126,7 @@ class CFM(BaseModel):
         self.trajectory = self.get_trajectory(trajectory)
         self.odeint_kwargs = odeint_kwargs
 
-        self.patch_shape = patch_shape
-        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape)]
-        self.in_channels = in_channels
-
-        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape)):
-            assert (
-                s % p == 0
-            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
-
-        self.net = None
+        self.net = net
 
     def get_trajectory(self, trajectory):
         if trajectory == "linear":
@@ -165,9 +142,7 @@ class CFM(BaseModel):
             raise ValueError
 
     def forward(self, x, t, c):
-        x = self.to_patches(x)
         z = self.net(x, t, c)
-        z = self.from_patches(z)
         return z
 
     def _batch_loss(self, x):
