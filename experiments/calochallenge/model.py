@@ -1,6 +1,7 @@
 import math
 from einops import rearrange
 import torch
+from torchdiffeq import odeint
 
 from FrEIA.framework import InputNode, Node, OutputNode, GraphINN, ConditionNode
 from models.base_model import CINN, CFM, BaseModel
