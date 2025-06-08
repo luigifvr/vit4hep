@@ -171,12 +171,10 @@ class CFM(BaseModel):
         dtype = batch.dtype
         device = batch.device
 
-        x_T = torch.randn(
-            (batch.shape[0], self.in_channels, *self.shape), dtype=dtype, device=device
-        )
+        x_T = torch.randn((batch.shape[0], *self.shape), dtype=dtype, device=device)
 
         def f(t, x_t):
-            t_torch = t.repeat((x_t.shape[0], 1)).to(self.device)
+            t_torch = t.repeat((x_t.shape[0], 1)).to(device)
             return self.forward(x_t, t_torch, batch)
 
         solver = odeint  # also sdeint is possible

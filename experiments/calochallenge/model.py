@@ -91,6 +91,34 @@ class CaloChallengeCFM(CFM):
         z = self.from_patches(z)
         return z
 
+    @torch.inference_mode()
+    def sample_batch(self, batch):
+        """
+        Generate n_samples new samples.
+        Start from Gaussian random noise and solve the reverse ODE to obtain samples
+        """
+        dtype = batch.dtype
+        device = batch.device
+
+        x_T = torch.randn(
+            (batch.shape[0], self.in_channels, *self.shape), dtype=dtype, device=device
+        )
+
+        def f(t, x_t):
+            t_torch = t.repeat((x_t.shape[0], 1)).to(self.device)
+            return self.forward(x_t, t_torch, batch)
+
+        solver = odeint  # also sdeint is possible
+
+        sample = solver(
+            f,
+            x_T,
+            torch.tensor([0.0, 1.0], dtype=dtype, device=device),  # (t_min, t_max)
+            **self.odeint_kwargs,
+        )[-1]
+
+        return sample
+
 
 class CaloChallengeCINN(CINN):
     def __init__(

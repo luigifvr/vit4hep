@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 import os
 import h5py
 from hydra.utils import instantiate
+from omegaconf import OmegaConf
 
 # Other functions of project
 from experiments.logger import LOGGER
@@ -291,53 +292,20 @@ class CaloChallenge(BaseExperiment):
 
     def load_energy_model(self):
         # initialize model
-        self.energy_model = instantiate(self.cfg.energy_model)
+        energy_model_cfg = OmegaConf.load(self.cfg.energy_model + "config.yaml")
+        self.energy_model = instantiate(energy_model_cfg.model)
         num_parameters = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
+            p.numel() for p in self.energy_model.parameters() if p.requires_grad
         )
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
-        model_path = os.path.join(
-            self.cfg.energy_model.run_dir, "models", f"model_run0.pt"
-        )
+        model_path = os.path.join(energy_model_cfg.run_dir, "models", f"model_run0.pt")
         try:
-            state_dict = torch.load(model_path, map_location="cpu")["model"]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
             LOGGER.info(f"Loading energy model from {model_path}")
             self.energy_model.load_state_dict(state_dict)
         except FileNotFoundError:
             raise ValueError(f"Cannot load model from {model_path}")
 
         self.energy_model.to(self.device, dtype=self.dtype)
-
-    # def load_other(self, model_dir):
-    #     """ Load a different model (e.g. to sample u_i's)"""
-
-    #     with open(os.path.join(model_dir, 'params.yaml')) as f:
-    #         params = yaml.load(f, Loader=yaml.FullLoader)
-
-    #     model_class = params['model']
-    #     # choose model
-    #     if model_class == 'TBD':
-    #         Model = self.__class__
-    #     if model_class == 'TransfusionAR':
-    #         from Models import TransfusionAR
-    #         Model = TransfusionAR
-    #     elif model_class == 'AE':
-    #         from Models import AE
-    #         Model = AE
-
-    #     # load model
-    #     doc = Documenter(None, existing_run=model_dir, read_only=True)
-    #     other = Model(params, self.device, doc)
-    #     state_dicts = torch.load(
-    #         os.path.join(model_dir, 'model.pt'), map_location=self.device
-    #     )
-    #     other.net.load_state_dict(state_dicts["net"])
-
-    #     # use eval mode and freeze weights
-    #     other.eval()
-    #     for p in other.parameters():
-    #         p.requires_grad = False
-
-    #     return other
