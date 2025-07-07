@@ -12,7 +12,60 @@ class BaseModel(nn.Module):
 
         self.shape = shape
 
+    def from_patches(self, x):
+        """
+        Transform from input geometry to patches
+
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor of the form (batch_size, *dims)
+
+        Returns
+        -------
+        output: torch.Tensor
+            Output patched tensor with shape (batch_size, #patches, patch_dim)
+        """
+        pass
+
+    def to_patches(self, x):
+        """
+        Transform from patches back to original geometry
+
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor of the form (batch_size, num_patches, patch_dim)
+
+        Returns
+        -------
+        output: torch.Tensor
+            Output tensor with shape (batch_size, *dims)
+        """
+        pass
+    
     def forward(self, x, c, rev=False, jac=True):
+        """
+        Simple forward pass
+
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+        c: torch.Tensor
+            Input conditions
+        rev: bool
+            If True, generate samples 
+        jac: bool
+            Keep track of the Jacobian
+
+        Returns
+        -------
+        Output: torch.Tensor
+            Tensor transformed by the network
+        log_jac: None or torch.Tensor
+            Jacobian of the transformation if jac==True
+        """
         z, log_jac = self.net.forward(x, c, rev=rev, jac=jac)
         return z, log_jac
 
@@ -30,12 +83,6 @@ class BaseModel(nn.Module):
         c = batch
         x, _ = self.forward(z, c, rev=True)
         return x
-
-    def from_patches(self):
-        raise NotImplementedError
-
-    def to_patches(self):
-        raise NotImplementedError
 
     def _batch_loss(self):
         raise NotImplementedError
@@ -109,6 +156,11 @@ class CINN(BaseModel):
 class CFM(BaseModel):
     """
     Base class for a Conditional Flow Matching model
+
+    Parameters
+    ----------
+    net: nn.Module
+        A neural network used to predict the velocity vector
     """
 
     def __init__(

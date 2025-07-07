@@ -4,19 +4,46 @@ import math
 import torch
 import torch.nn as nn
 
-from einops import rearrange
 from torch.utils.checkpoint import checkpoint
 from timm.models.vision_transformer import Mlp
 from xformers.ops import memory_efficient_attention
 
 
-def modulate(x, shift, scale):
-    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
-
-
 class ViT(nn.Module):
     """
-    Vision transformer-based diffusion network.
+    A Vision Transformer base architecture
+    Parameters
+    ----------
+    dim: int
+        Number of spatial dimensions
+    condition_dim: int
+        Number of conditions
+    hidden_dim: int
+        Dimensionality of embedded vectors
+    out_channels: int
+        Number of output channels
+    depth: int
+        Number of tranformer blocks
+    num_heads: int
+        Number of attention heads
+    mlp_ratio: int
+        Multiplicative factor of hidden size of MLP
+    attn_drop: int
+        Dropout fraction in the self-attention
+    proj_drop: int
+        Dropout after MLP layer
+    pos_embedding_coords: str
+        Type of positional embedding: cartesian or cylindrical
+    temperature: int
+        Temperature parameter in positional embedding
+    checkpoint_grad: bool
+        Use gradients checkpointing
+    patch_dim: int
+        Size of a single patch
+    num_batches: List[int]
+        List with the number of patches for each dim
+    use_torch_sdpa: bool
+        Use torch scaled-dot product attention instead of xformers
     """
 
     def __init__(self, param):
@@ -426,6 +453,8 @@ class Attention(nn.Module):
         x = self.proj_drop(x)
         return x
 
+def modulate(x, shift, scale):
+    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
 def get_sincos_pos_embed(
     pos_embedding_coords, num_patches, hidden_dim, dim, temperature=10000

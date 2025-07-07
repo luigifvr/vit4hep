@@ -61,14 +61,14 @@ class CaloChallenge(BaseExperiment):
         self.train_val_frac = self.cfg.data.train_val_frac
         self.transforms = []
 
+        LOGGER.info("init_data: preparing model training")
         for name, kwargs in self.cfg.data.transforms.items():
             if name == "StandardizeFromFile":
                 kwargs["model_dir"] = self.cfg.run_dir
             self.transforms.append(getattr(transforms, name)(**kwargs))
-
-        LOGGER.info("init_data: preparing model training")
-        LOGGER.info("init_data: list of preprocessing steps ")
-        LOGGER.info(self.transforms)
+        LOGGER.info("init_data: list of preprocessing steps:")
+        for idx, transform in enumerate(self.transforms):
+            LOGGER.info(f"{transform.__class__.__name__}")
 
         self.train_dataset = CaloChallengeDataset(
             self.hdf5_train,
