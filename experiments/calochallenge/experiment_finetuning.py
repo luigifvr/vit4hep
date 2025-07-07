@@ -21,7 +21,7 @@ class CaloChallengeFT(CaloChallenge):
         self.backbone_cfg = OmegaConf.load(backbone_cfg)
 
         self.model_num_patches = self.cfg.model.net.param.num_patches
-
+        self.model_patch_dim = self.cfg.model.net.param.patch_dim
         with open_dict(self.cfg):
             self.cfg.model.net = self.backbone_cfg.model.net
             self.cfg.ema = self.backbone_cfg.ema
@@ -48,6 +48,24 @@ class CaloChallengeFT(CaloChallenge):
         self.model.load_state_dict(state_dict)
         self.model.to(self.device, dtype=self.dtype)
 
+        if self.cfg.finetuning.map_embedding:
+            self.embedding = self.model.net.x_embedder
+            self.embedding_mapper = nn.Linear(
+                self.model_patch_dim,
+                self.backbone_cfg.model.net.param.patch_dim
+            ).to(self.device, dtype=self.dtype)
+            LOGGER.info(
+                (
+                    f"Mapping embedding from {self.model_patch_dim} "
+                    f"to {self.backbone_cfg.model.net.param.patch_dim}"
+                )
+            )
+            self.model.net.x_embedder = nn.Sequential(
+                self.embedding_mapper,
+                self.embedding
+            ).to(self.device, dtype=self.dtype)
+
+        # define the positional embedding
         self.model.net.pos_embed = get_sincos_pos_embed(
             self.cfg.model.net.param.pos_embedding_coords,
             self.model_num_patches,
@@ -58,7 +76,7 @@ class CaloChallengeFT(CaloChallenge):
         # reinitialize final layer
         self.model.net.final_layer = FinalLayer(
             self.cfg.model.net.param.hidden_dim,
-            self.cfg.model.net.param.patch_dim,
+            self.model_patch_dim,
             self.cfg.model.net.param.out_channels,
         ).to(self.device, dtype=self.dtype)
 
@@ -70,19 +88,27 @@ class CaloChallengeFT(CaloChallenge):
 
     def _init_optimizer(self):
         # collect parameter lists
+        params_embedder = (
+            list(self.embedding.parameters())
+            if self.cfg.finetuning.map_embedding
+            else list(self.model.net.x_embedder.parameters())
+        )
+
         params_backbone = (
-            list(self.model.net.x_embedder.parameters())
+            params_embedder
             + list(self.model.net.c_embedder.parameters())
             + list(self.model.net.t_embedder.parameters())
             + list(self.model.net.blocks.parameters())
         )
-
+        if self.cfg.finetuning.map_embedding:
+            params_embedder = self.embedding_mapper.parameters()
         params_head = self.model.net.final_layer.parameters()
 
         # assign parameter-specific learning rates
         param_groups = [
             {"params": params_backbone, "lr": self.cfg.finetuning.backbone_lr},
             {"params": params_head, "lr": self.cfg.finetuning.head_lr},
+            {"params": params_embedder, "lr": self.cfg.finetuning.embedder_lr} if self.cfg.finetuning.map_embedding else {},
         ]
 
         super()._init_optimizer(param_groups=param_groups)
