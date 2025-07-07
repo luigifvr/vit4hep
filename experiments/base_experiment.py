@@ -1,5 +1,9 @@
+"Modified from https://github.com/heidelberg-hepml/lorentz-gatr/blob/main/experiments/base_experiment.py"
+
 import numpy as np
 import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 import os, time
 import zipfile
@@ -99,6 +103,9 @@ class BaseExperiment:
     def init_model(self):
         # initialize model
         self.model = instantiate(self.cfg.model)
+        # pass device and dtype
+        self.model.device = self.device
+        self.model.dtype = self.dtype
         num_parameters = sum(
             p.numel() for p in self.model.parameters() if p.requires_grad
         )
@@ -123,17 +130,23 @@ class BaseExperiment:
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )
             try:
-                state_dict = torch.load(model_path, map_location="cpu")["model"]
+                state_dict = torch.load(
+                    model_path, map_location="cpu", weights_only=False
+                )["model"]
                 LOGGER.info(f"Loading model from {model_path}")
                 self.model.load_state_dict(state_dict)
                 if self.ema is not None:
                     LOGGER.info(f"Loading EMA from {model_path}")
-                    state_dict = torch.load(model_path, map_location="cpu")["ema"]
+                    state_dict = torch.load(
+                        model_path, map_location="cpu", weights_only=False
+                    )["ema"]
                     self.ema.load_state_dict(state_dict)
             except FileNotFoundError:
                 raise ValueError(f"Cannot load model from {model_path}")
 
         self.model.to(self.device, dtype=self.dtype)
+        if self.cfg.distribute_parallel:
+            self.model = DDP(self.model, device_ids=[self.local_rank])
         if self.ema is not None:
             self.ema.to(self.device)
 
@@ -295,7 +308,15 @@ class BaseExperiment:
         LOGGER.debug("Logger initialized")
 
     def _init_backend(self):
-        self.device = get_device()
+        if self.cfg.distribute_parallel:
+            dist.init_process_group(backend="nccl")
+            self.rank = int(os.environ["RANK"])
+            self.local_rank = int(os.environ["LOCAL_RANK"])
+            self.world_size = int(os.environ["WORLD_SIZE"])
+
+            self.device = get_device(rank=self.local_rank)
+        else:
+            self.device = get_device()
         LOGGER.info(f"Using device {self.device}")
         self.dtype = get_dtype(self.cfg.dtype)
         LOGGER.info(f"Using dtype {self.dtype}")
@@ -355,7 +376,9 @@ class BaseExperiment:
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )
             try:
-                state_dict = torch.load(model_path, map_location="cpu")["optimizer"]
+                state_dict = torch.load(
+                    model_path, map_location="cpu", weights_only=False
+                )["optimizer"]
                 LOGGER.info(f"Loading optimizer from {model_path}")
                 self.optimizer.load_state_dict(state_dict)
             except FileNotFoundError:
@@ -400,7 +423,9 @@ class BaseExperiment:
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )
             try:
-                state_dict = torch.load(model_path, map_location="cpu")["scheduler"]
+                state_dict = torch.load(
+                    model_path, map_location="cpu", weights_only=False
+                )["scheduler"]
                 LOGGER.info(f"Loading scheduler from {model_path}")
                 self.scheduler.load_state_dict(state_dict)
             except FileNotFoundError:
@@ -478,6 +503,8 @@ class BaseExperiment:
                 if self.cfg.training.scheduler in ["ReduceLROnPlateau"]:
                     self.scheduler.step(val_loss)
 
+            if self.cfg.distribute_parallel:
+                dist.destroy_process_group()
             # output
             dt = time.time() - self.training_start_time
             if (
@@ -518,7 +545,9 @@ class BaseExperiment:
                 f"model_run{self.cfg.run_idx}_it{smallest_val_loss_step}.pt",
             )
             try:
-                state_dict = torch.load(model_path, map_location=self.device)["model"]
+                state_dict = torch.load(
+                    model_path, map_location=self.device, weights_only=False
+                )["model"]
                 LOGGER.info(f"Loading model from {model_path}")
                 self.model.load_state_dict(state_dict)
             except FileNotFoundError:
@@ -530,6 +559,10 @@ class BaseExperiment:
         # actual update step
         loss = self._batch_loss(data)
         self.optimizer.zero_grad()
+
+        if self.cfg.distribute_parallel:
+            dist.all_reduce(loss, op=dist.ReduceOp.AVG)
+
         loss.backward()
 
         grad_norm_net = (

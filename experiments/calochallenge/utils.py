@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 import h5py
 
-from challenge_files.XMLHandler import XMLHandler
+from experiments.calochallenge.challenge_files.XMLHandler import XMLHandler
 
 
 def load_data(filename, particle_type, xml_filename, threshold=1e-5):

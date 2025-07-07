@@ -1,6 +1,7 @@
 import math
 from einops import rearrange
 import torch
+from torchdiffeq import odeint
 
 from FrEIA.framework import InputNode, Node, OutputNode, GraphINN, ConditionNode
 from models.base_model import CINN, CFM, BaseModel
@@ -25,14 +26,22 @@ class CaloChallengeCFM(CFM):
         **kwargs,
     ):
         super().__init__(
-            patch_shape,
-            in_channels,
+            None,
             time_distribution,
             trajectory,
             odeint_kwargs,
             *args,
             **kwargs,
         )
+
+        self.patch_shape = patch_shape
+        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape)]
+        self.in_channels = in_channels
+
+        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape)):
+            assert (
+                s % p == 0
+            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
 
         self.net = net
 
@@ -77,20 +86,64 @@ class CaloChallengeCFM(CFM):
             raise ValueError(dim)
         return x
 
+    def forward(self, x, t, c):
+        x = self.to_patches(x)
+        z = self.net(x, t, c)
+        z = self.from_patches(z)
+        return z
+
+    @torch.inference_mode()
+    def sample_batch(self, batch):
+        """
+        Generate n_samples new samples.
+        Start from Gaussian random noise and solve the reverse ODE to obtain samples
+        """
+        dtype = batch.dtype
+        device = batch.device
+
+        x_T = torch.randn(
+            (batch.shape[0], self.in_channels, *self.shape), dtype=dtype, device=device
+        )
+
+        def f(t, x_t):
+            t_torch = t.repeat((x_t.shape[0], 1)).to(self.device)
+            return self.forward(x_t, t_torch, batch)
+
+        solver = odeint  # also sdeint is possible
+
+        sample = solver(
+            f,
+            x_T,
+            torch.tensor([0.0, 1.0], dtype=dtype, device=device),  # (t_min, t_max)
+            **self.odeint_kwargs,
+        )[-1]
+
+        return sample
+
 
 class CaloChallengeCINN(CINN):
     def __init__(
         self,
+        patch_shape,
+        in_channels,
         coupling_block,
         nblocks,
         is_spatial,
-        spatial_factor,
         cinn_kwargs,
         vit_kwargs,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+
+        self.patch_shape = patch_shape
+        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape)]
+        self.in_channels = in_channels
+
+        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape)):
+            assert (
+                s % p == 0
+            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
 
         self.nblocks = nblocks
         self.CouplingBlock = get_coupling_block(coupling_block)
@@ -179,8 +232,14 @@ class CaloChallengeCINN(CINN):
 
         return GraphINN(nodes)
 
+    def forward(self, x, c, rev=False, jac=True):
+        x = self.to_patches(x)
+        z, log_jac = super().forward(x, c, rev=rev, jac=jac)
+        z = self.from_patches(z)
+        return z, log_jac
 
-class CaloChallengeEnergy(BaseModel):
+
+class CaloChallengeEnergyCINN(CINN):
     def __init__(
         self,
         shape,

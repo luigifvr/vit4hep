@@ -3,8 +3,8 @@ import torch.nn.functional as F
 import numpy as np
 import os
 
-from challenge_files import *
-from challenge_files import XMLHandler
+from experiments.calochallenge.challenge_files import *
+from experiments.calochallenge.challenge_files import XMLHandler
 from itertools import pairwise
 import torch.distributions as dist
 

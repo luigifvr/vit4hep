@@ -8,6 +8,7 @@ from nn.inn.rqs_nflows import (
     OneSidedCaloRationalQuadraticSplineBlock,
     SimpleRationalQuadraticSplineBlock,
 )
+from nn.inn.rqs_v2 import RationalQuadraticSpline
 
 
 def get_coupling_block(coupling_block):
@@ -16,6 +17,8 @@ def get_coupling_block(coupling_block):
         CouplingBlock = CaloRationalQuadraticSplineBlock
     elif coupling_block == "OneSidedCaloRQSplineNFlows":
         CouplingBlock = OneSidedCaloRationalQuadraticSplineBlock
+    elif coupling_block == "CaloRQSplineFrEIA":
+        CouplingBlock = RationalQuadraticSpline
     elif coupling_block == "RQSplineNFlows":
         CouplingBlock = SimpleRationalQuadraticSplineBlock
     else:
