@@ -51,8 +51,7 @@ class CaloChallengeFT(CaloChallenge):
         if self.cfg.finetuning.map_embedding:
             self.embedding = self.model.net.x_embedder
             self.embedding_mapper = nn.Linear(
-                self.model_patch_dim,
-                self.backbone_cfg.model.net.param.patch_dim
+                self.model_patch_dim, self.backbone_cfg.model.net.param.patch_dim
             ).to(self.device, dtype=self.dtype)
             LOGGER.info(
                 (
@@ -61,8 +60,7 @@ class CaloChallengeFT(CaloChallenge):
                 )
             )
             self.model.net.x_embedder = nn.Sequential(
-                self.embedding_mapper,
-                self.embedding
+                self.embedding_mapper, self.embedding
             ).to(self.device, dtype=self.dtype)
 
         # define the positional embedding
@@ -108,7 +106,11 @@ class CaloChallengeFT(CaloChallenge):
         param_groups = [
             {"params": params_backbone, "lr": self.cfg.finetuning.backbone_lr},
             {"params": params_head, "lr": self.cfg.finetuning.head_lr},
-            {"params": params_embedder, "lr": self.cfg.finetuning.embedder_lr} if self.cfg.finetuning.map_embedding else {},
+            (
+                {"params": params_embedder, "lr": self.cfg.finetuning.embedder_lr}
+                if self.cfg.finetuning.map_embedding
+                else {}
+            ),
         ]
 
         super()._init_optimizer(param_groups=param_groups)

@@ -19,6 +19,7 @@ class CaloChallengeDataset(Dataset):
         split="full",
         device="cpu",
         dtype=torch.float32,
+        rank=0,
     ):
         """
         Arguments:
@@ -42,10 +43,10 @@ class CaloChallengeDataset(Dataset):
         self.energy = torch.tensor(self.energy, dtype=self.dtype)
         self.layers = torch.tensor(self.layers, dtype=self.dtype)
 
-        # apply preprocessing and then move to GPU
+        # apply preprocessing
         if self.transform:
             for fn in self.transform:
-                self.layers, self.energy = fn(self.layers, self.energy)
+                self.layers, self.energy = fn(self.layers, self.energy, rank=rank)
 
         val_size = int(len(self.energy) * train_val_frac[1])
         trn_size = int(len(self.energy) * train_val_frac[0])

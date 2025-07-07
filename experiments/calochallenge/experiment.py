@@ -79,6 +79,7 @@ class CaloChallenge(BaseExperiment):
             split="training",
             device=self.device,
             dtype=self.dtype,
+            rank=self.rank,
         )
 
         self.val_dataset = CaloChallengeDataset(
@@ -90,6 +91,7 @@ class CaloChallenge(BaseExperiment):
             split="validation",
             device=self.device,
             dtype=self.dtype,
+            rank=self.rank,
         )
 
         self.layer_boundaries = self.train_dataset.layer_boundaries
@@ -98,12 +100,25 @@ class CaloChallenge(BaseExperiment):
         pass
 
     def _init_dataloader(self):
-        self.batch_size = self.cfg.training.batchsize
+        self.batch_size = self.cfg.training.batchsize // self.world_size
+
+        self.train_dist_sampler = torch.utils.data.distributed.DistributedSampler(
+            self.train_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
+            shuffle=True,
+        )
+        self.val_dist_sampler = torch.utils.data.distributed.DistributedSampler(
+            self.val_dataset, num_replicas=self.world_size, rank=self.rank, shuffle=True
+        )
+
         self.train_loader = DataLoader(
-            self.train_dataset, batch_size=self.batch_size, shuffle=True
+            self.train_dataset,
+            batch_size=self.batch_size,
+            sampler=self.train_dist_sampler,
         )
         self.val_loader = DataLoader(
-            self.val_dataset, batch_size=self.batch_size, shuffle=True
+            self.val_dataset, batch_size=self.batch_size, sampler=self.val_dist_sampler
         )
 
         LOGGER.info(
@@ -199,7 +214,7 @@ class CaloChallenge(BaseExperiment):
             if self.cfg.sample_us:  # TODO
                 # load energy model
                 self.load_energy_model()
-                
+
                 t2 = time.time()
                 # sample us
                 u_samples = torch.vstack(

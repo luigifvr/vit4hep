@@ -453,8 +453,10 @@ class Attention(nn.Module):
         x = self.proj_drop(x)
         return x
 
+
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+
 
 def get_sincos_pos_embed(
     pos_embedding_coords, num_patches, hidden_dim, dim, temperature=10000

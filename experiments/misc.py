@@ -9,7 +9,7 @@ class NaNError(BaseException):
 
 def get_device() -> torch.device:
     """Gets CUDA if available, CPU else."""
-    return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    return torch.device(f"cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
 def get_dtype(dtype) -> torch.dtype:
