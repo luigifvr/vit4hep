@@ -37,7 +37,7 @@ class Standardize(object):
         self.means = means
         self.stds = stds
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             transformed = shower * self.stds + self.means
         else:
@@ -67,21 +67,22 @@ class StandardizeFromFile(object):
         except FileNotFoundError:
             self.written = False
 
-    def write(self, shower, energy):
-        self.mean = shower.mean(axis=0)
-        self.std = shower.std(axis=0)
+    def write(self):
         np.save(self.mean_path, self.mean.detach().cpu().numpy())
         np.save(self.std_path, self.std.detach().cpu().numpy())
-        self.written = True
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             transformed = shower * self.std.to(shower.device) + self.mean.to(
                 shower.device
             )
         else:
             if not self.written:
-                self.write(shower, energy)
+                self.mean = shower.mean()
+                self.std = shower.std()
+                if rank == 0:
+                    self.write()
+                self.written = True
             transformed = (shower - self.mean.to(shower.device)) / self.std.to(
                 shower.device
             )
@@ -98,7 +99,7 @@ class SelectDims(object):
     def __init__(self, start, end):
         self.indices = torch.arange(start, end)
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             return shower, energy
         transformed = shower[..., self.indices]
@@ -114,7 +115,7 @@ class AddFeaturesToCond(object):
     def __init__(self, split_index):
         self.split_index = split_index
 
-    def __call__(self, x, c, rev=False):
+    def __call__(self, x, c, rev=False, rank=0):
 
         if rev:
             c_, split = c[:, :1], c[:, 1:]
@@ -134,7 +135,7 @@ class AddEmptyLayer(object):
         self.shape = shape
         self.noise_width = noise_width
 
-    def __call__(self, x, c, rev=False):
+    def __call__(self, x, c, rev=False, rank=0):
         if rev:
             c_ = c
             x_ = x[:, :, :-1]
@@ -155,7 +156,7 @@ class LogEnergy(object):
         self.alpha = alpha
         self.cond_transform = True
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             transformed = torch.exp(energy) - self.alpha
         else:
@@ -172,7 +173,7 @@ class ScaleVoxels(object):
     def __init__(self, factor):
         self.factor = factor
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             transformed = shower / self.factor
         else:
@@ -192,7 +193,7 @@ class ScaleTotalEnergy(object):
         self.factor = factor
         self.n_layers = n_layers
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             shower[..., -self.n_layers] /= self.factor
         else:
@@ -212,7 +213,7 @@ class ScaleEnergy(object):
         self.e_max = e_max
         self.cond_transform = True
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             transformed = energy * (self.e_max - self.e_min)
             transformed += self.e_min
@@ -220,44 +221,6 @@ class ScaleEnergy(object):
             transformed = energy - self.e_min
             transformed /= self.e_max - self.e_min
         return shower, transformed
-
-
-class LogTransform(object):
-    """
-    Take log of input data
-        alpha: regularization
-    """
-
-    def __init__(self, alpha):
-        self.alpha = alpha
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            transformed = torch.exp(shower) - self.alpha
-        else:
-            transformed = torch.log(shower + self.alpha)
-        return transformed, energy
-
-
-class SelectiveLogTransform(object):
-    """
-    Take log of input data
-        alpha: regularization
-        exclusions: list of indices for features that should not be transformed
-    """
-
-    def __init__(self, alpha, exclusions=None):
-        self.alpha = alpha
-        self.exclusions = exclusions
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            transformed = torch.exp(shower) - self.alpha
-        else:
-            transformed = torch.log(shower + self.alpha)
-        if self.exclusions is not None:
-            transformed[..., self.exclusions] = shower[..., self.exclusions]
-        return transformed, energy
 
 
 class ExclusiveLogTransform(object):
@@ -271,7 +234,7 @@ class ExclusiveLogTransform(object):
         self.delta = delta
         self.exclusions = exclusions
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             transformed = torch.exp(shower) - self.delta
         else:
@@ -293,7 +256,7 @@ class ExclusiveLogitTransform(object):
         self.exclusions = exclusions
         self.rescale = rescale
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             if self.rescale:
                 transformed = logit(shower, alpha=self.delta, inv=True)
@@ -320,7 +283,7 @@ class RegularizeLargeLogit(object):
         self.exclusions = exclusions
         self.cut = cut
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             mask = shower > 1 - self.b
             if self.exclusions:
@@ -351,7 +314,7 @@ class AddNoise(object):
         self.noise_width = noise_width
         self.cut = cut  # apply cut if True
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             mask = shower < self.noise_width
             transformed = shower
@@ -360,43 +323,6 @@ class AddNoise(object):
         else:
             noise = self.func.sample(shower.shape) * self.noise_width
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
-        return transformed, energy
-
-
-class SmoothUPeaks(object):
-    """
-    Smooth voxels equal to 0 or 1 using uniform noise
-        w0: noise width for zeros
-        w1: noise width for ones
-        eps: threshold below which values are considered zero
-    """
-
-    def __init__(self, w0, w1, eps=1.0e-10):
-        self.func = torch.distributions.Uniform(torch.tensor(0.0), torch.tensor(1.0))
-        self.w0 = w0
-        self.w1 = w1
-        self.scale = 1 + w0 + w1
-        self.eps = eps
-
-    def __call__(self, u, energy, rev=False):
-        if rev:
-            # undo scaling
-            transformed = u * self.scale - self.w0
-            # clip to [0, 1]
-            transformed = torch.clip(transformed, min=0.0, max=1.0)
-            # restore u0
-            transformed[:, 0] = u[:, 0]
-        else:
-            # sample noise values
-            n0 = self.w0 * self.func.sample(u.shape).to(u.device)
-            n1 = self.w1 * self.func.sample(u.shape).to(u.device)
-            # add noise to us
-            transformed = u - n0 * (u <= self.eps) + n1 * (u >= 1 - self.eps)
-            # scale to [0,1] in preparation for logit
-            transformed = (transformed + self.w0) / self.scale
-            # restore u0
-            transformed[:, 0] = u[:, 0]
-
         return transformed, energy
 
 
@@ -416,7 +342,7 @@ class SelectiveLogUniformNoise(object):
         self.exclusions = exclusions
         self.cut = cut  # apply cut if True
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             mask = shower < self.b
             if self.exclusions:
@@ -452,7 +378,7 @@ class SelectiveUniformNoise(object):
         self.exclusions = exclusions
         self.cut = cut  # apply cut if True
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             mask = shower < self.b
             if self.exclusions:
@@ -484,7 +410,7 @@ class SelectiveNormalNoise(object):
         self.exclusions = exclusions
         self.cut = 0.0 if cut is None else cut  # apply cut if True
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             mask = shower < self.cut
             if self.exclusions:
@@ -517,7 +443,7 @@ class SelectiveLogNormalNoise(object):
         self.exclusions = exclusions
         self.cut = 0.0 if cut is None else cut  # apply cut if True
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             mask = shower < self.cut
             if self.exclusions:
@@ -535,29 +461,6 @@ class SelectiveLogNormalNoise(object):
         return transformed, energy
 
 
-class SetToVal(object):
-    """
-    Masks voxels to zero in the reverse transformation
-        cut: threshold value for the mask
-    """
-
-    def __init__(self, val=0.0):
-        self.val = val
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            mask = shower < self.val
-            transformed = shower
-            if self.val:
-                transformed[mask] = self.val
-        else:
-            mask = shower < self.val
-            transformed = shower
-            if self.val:
-                transformed[mask] = self.val
-        return transformed, energy
-
-
 class CutValues(object):
     """
     Cut in Normalized space
@@ -569,7 +472,7 @@ class CutValues(object):
         self.cut = cut
         self.n_layers = n_layers
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             mask = shower <= self.cut
             mask[:, -self.n_layers :] = False
@@ -578,84 +481,6 @@ class CutValues(object):
                 transformed[mask] = 0.0
         else:
             transformed = shower
-        return transformed, energy
-
-
-class CutBothValues(object):
-    def __init__(self, cut=0.0):
-        self.cut = cut
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            mask = shower <= self.cut
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0
-        else:
-            mask = shower <= self.cut
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0
-        return transformed, energy
-
-
-class ZeroMask(object):
-    """
-    Masks voxels to zero in the reverse transformation
-        cut: threshold value for the mask
-    """
-
-    def __init__(self, cut=0.0):
-        self.cut = cut
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            mask = shower < self.cut
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0
-        else:
-            transformed = shower
-        return transformed, energy
-
-
-class AddPowerlawNoise(object):
-    """
-    Add noise to input data following a power law distribution:
-        eps ~ k x^(k-1)
-        k   -- The power parameter of the distribution
-        cut -- The value below which voxels will be masked to zero in the reverse transformation
-    """
-
-    def __init__(self, k, cut=None):
-        self.k = k
-        self.cut = cut
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            mask = shower < self.cut
-            transformed = shower
-            if self.cut is not None:
-                transformed[mask] = 0.0
-        else:
-            noise = torch.from_numpy(np.random.power(self.k, shower.shape)).to(
-                shower.dtype
-            )
-            transformed = shower + noise.reshape(shower.shape).to(shower.device)
-        return transformed, energy
-
-
-class NormalizeByEinc(object):
-    """
-    Normalize each shower by the incident energy
-
-    """
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            transformed = shower * energy
-        else:
-            transformed = shower / energy
         return transformed, energy
 
 
@@ -668,27 +493,11 @@ class Reshape(object):
     def __init__(self, shape):
         self.shape = torch.Size(shape)
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
             shower = shower.reshape(-1, self.shape.numel())
         else:
             shower = shower.reshape(-1, *self.shape)
-        return shower, energy
-
-
-class Reweight(object):
-    """
-    Reweight voxels
-    """
-
-    def __init__(self, factor):
-        self.factor = factor
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            shower = shower ** (1 / self.factor)
-        else:
-            shower = shower ** (self.factor)
         return shower, energy
 
 
@@ -707,7 +516,7 @@ class NormalizeByElayer(object):
         self.n_layers = len(self.layer_boundaries) - 1
         self.cut = cut
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
 
             # select u features
@@ -766,36 +575,6 @@ class NormalizeByElayer(object):
         return transformed, energy
 
 
-class AddCoordChannels(object):
-    """
-    Add channel to image containing the coordinate value along particular
-    dimension. This breaks the translation symmetry of the convoluitons,
-    as discussed in arXiv:2308.03876
-
-        dims -- List of dimensions for which should have a coordinate channel
-                should be created.
-    """
-
-    def __init__(self, dims):
-        self.dims = dims
-
-    def __call__(self, shower, energy, rev=False):
-
-        if rev:
-            transformed = shower  # generated shower already only has 1 channel
-        else:
-            coords = []
-            for d in self.dims:
-                bcst_shp = [1] * shower.ndim
-                bcst_shp[d] = -1
-                size = shower.size(d)
-                coords.append(
-                    torch.ones_like(shower) / size * torch.arange(size).view(bcst_shp)
-                )
-            transformed = torch.cat([shower] + coords, dim=1)
-        return transformed, energy
-
-
 class AddAngularBins(object):
     def __init__(self, xml_filename, ptype, num_bins, n_voxels):
         self.xml = XMLHandler.XMLHandler(xml_filename, ptype)
@@ -803,7 +582,7 @@ class AddAngularBins(object):
         self.num_bins = np.array(num_bins)
         self.n_voxels = self.layer_boundaries[-1]
 
-    def __call__(self, shower, energy, rev=False):
+    def __call__(self, shower, energy, rev=False, rank=0):
 
         if rev:
             new_n_voxels = self.new_layer_boundaries[-1]
