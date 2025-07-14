@@ -15,6 +15,7 @@ import mlflow
 from torch_ema import ExponentialMovingAverage
 import pytorch_optimizer
 import torch.distributed as dist
+from experiments.misc import remove_module_from_state_dict
 
 from experiments.misc import get_device, get_dtype, flatten_dict
 import experiments.logger
@@ -77,6 +78,7 @@ class BaseExperiment:
 
         self.init_physics()
         self.init_model()
+        self.init_ddp()
         self.init_data()
         self._init_dataloader()
         self._init_loss()
@@ -137,6 +139,7 @@ class BaseExperiment:
                 state_dict = torch.load(
                     model_path, map_location="cpu", weights_only=False
                 )["model"]
+                state_dict = remove_module_from_state_dict(state_dict)
                 LOGGER.info(f"Loading model from {model_path}")
                 self.model.load_state_dict(state_dict)
                 if self.ema is not None:
@@ -151,11 +154,13 @@ class BaseExperiment:
         self.model.to(self.device, dtype=self.dtype)
         if self.ema is not None:
             self.ema.to(self.device)
+
+    def init_ddp(self):
         if self.world_size > 1:
             self.model.net = DDP(
                 self.model.net,
                 device_ids=[self.rank],
-                find_unused_parameters=True,
+                find_unused_parameters=False,
             )
 
     def _init(self):
