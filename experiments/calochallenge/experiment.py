@@ -212,21 +212,7 @@ class CaloChallenge(BaseExperiment):
         if self.cfg.model_type == "shape":
 
             if self.cfg.sample_us:  # TODO
-                # load energy model
-                self.load_energy_model()
-
-                t2 = time.time()
-                # sample us
-                u_samples = torch.vstack(
-                    [self.energy_model.sample_batch(c) for c in transformed_cond_loader]
-                )
-                t3 = time.time()
-                energy_sampling_time = t3 - t2
-                LOGGER.info(
-                    f"sample_n: Finished generating {len(u_samples)} energy samples "
-                    f"after {energy_sampling_time} s."
-                )
-
+                u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             else:  # optionally use truth us
                 transformed_cond = CaloChallengeDataset(
@@ -256,6 +242,31 @@ class CaloChallenge(BaseExperiment):
 
         return sample, transformed_cond.cpu()
 
+    def sample_us(self, transformed_cond_loader):
+        """Sample u_i's from the energy model"""
+        # load energy model
+        self.load_energy_model()
+
+        # sample us
+        t_0 = time.time()
+        u_samples = torch.vstack(
+            [self.energy_model.sample_batch(c) for c in transformed_cond_loader]
+        )
+        t_1 = time.time()
+        LOGGER.info(
+            f"sample_us: Finished generating {len(u_samples)} energy samples "
+            f"after {t_1 - t_0} s."
+        )
+
+        for fn in self.energy_model_transforms[::-1]:
+            if hasattr(fn, "u_transform"):
+                u_samples, _ = fn(u_samples, None, rev=True)
+        for fn in self.transforms:
+            if hasattr(fn, "u_transform"):
+                u_samples, _ = fn(u_samples, None)
+
+        return u_samples.to(self.dtype)
+    
     def plot(self):
         LOGGER.info("plot: generating samples")
         samples, conditions = self.sample_n()
@@ -315,6 +326,13 @@ class CaloChallenge(BaseExperiment):
     def load_energy_model(self):
         # initialize model
         energy_model_cfg = OmegaConf.load(self.cfg.energy_model + "config.yaml")
+        #get transforms
+        self.energy_model_transforms = []
+        for name, kwargs in energy_model_cfg.data.transforms.items():
+            if name == "StandardizeFromFile":
+                kwargs["model_dir"] = energy_model_cfg.run_dir
+            self.energy_model_transforms.append(getattr(transforms, name)(**kwargs))        
+
         self.energy_model = instantiate(energy_model_cfg.model)
         num_parameters = sum(
             p.numel() for p in self.energy_model.parameters() if p.requires_grad

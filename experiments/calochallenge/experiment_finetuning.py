@@ -51,6 +51,36 @@ class CaloChallengeFT(CaloChallenge):
         self.model.load_state_dict(state_dict)
         self.model.to(self.device, dtype=self.dtype)
 
+        # add embedding layers
+        self.add_embedding_layers()
+
+        # define the positional embedding
+        self.model.net.pos_embed = get_sincos_pos_embed(
+            self.cfg.model.net.param.pos_embedding_coords,
+            self.model_num_patches,
+            self.cfg.model.net.param.hidden_dim,
+            self.cfg.model.net.param.dim,
+        ).to(self.device, dtype=self.dtype)
+
+        # reinitialize final layer
+        self.model.net.final_layer = FinalLayer(
+            self.cfg.model.net.param.hidden_dim,
+            self.model_patch_dim,
+            self.cfg.model.net.param.out_channels,
+        ).to(self.device, dtype=self.dtype)
+
+        if self.cfg.ema:
+            LOGGER.info(f"Re-initializing EMA")
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(), decay=self.cfg.training.ema_decay
+            ).to(self.device)
+
+    def add_embedding_layers(self):
+        """
+        Add embedding layers to the model.
+        This is necessary for fine-tuning on a different dataset.
+        """
+        LOGGER.info("Adding embedding layers to the model")
         if self.cfg.finetuning.map_x_embedding:
             self.embedding = self.model.net.x_embedder
             self.embedding_mapper = nn.Linear(
@@ -89,27 +119,6 @@ class CaloChallengeFT(CaloChallenge):
             self.model.net.c_embedder = nn.Linear(
                 self.model_condition_dim, self.cfg.model.net.param.hidden_dim
             ).to(self.device, dtype=self.dtype)
-
-        # define the positional embedding
-        self.model.net.pos_embed = get_sincos_pos_embed(
-            self.cfg.model.net.param.pos_embedding_coords,
-            self.model_num_patches,
-            self.cfg.model.net.param.hidden_dim,
-            self.cfg.model.net.param.dim,
-        ).to(self.device, dtype=self.dtype)
-
-        # reinitialize final layer
-        self.model.net.final_layer = FinalLayer(
-            self.cfg.model.net.param.hidden_dim,
-            self.model_patch_dim,
-            self.cfg.model.net.param.out_channels,
-        ).to(self.device, dtype=self.dtype)
-
-        if self.cfg.ema:
-            LOGGER.info(f"Re-initializing EMA")
-            self.ema = ExponentialMovingAverage(
-                self.model.parameters(), decay=self.cfg.training.ema_decay
-            ).to(self.device)
 
     def _init_optimizer(self):
         # collect parameter lists

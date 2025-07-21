@@ -132,6 +132,8 @@ class BaseExperiment:
 
         # load existing model if specified
         if self.warm_start:
+            if self.cfg.finetuning:
+                self.add_embedding_layers()
             model_path = os.path.join(
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )

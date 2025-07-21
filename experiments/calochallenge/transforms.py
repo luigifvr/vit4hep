@@ -59,6 +59,7 @@ class StandardizeFromFile(object):
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
         self.dtype = torch.get_default_dtype()
+        self.u_transform = True 
         try:
             # load from file
             self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
@@ -192,6 +193,7 @@ class ScaleTotalEnergy(object):
     def __init__(self, factor, n_layers=45):
         self.factor = factor
         self.n_layers = n_layers
+        self.u_transform = True
 
     def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
@@ -233,6 +235,7 @@ class ExclusiveLogTransform(object):
     def __init__(self, delta, exclusions=None):
         self.delta = delta
         self.exclusions = exclusions
+        self.u_transform = True
 
     def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
@@ -255,6 +258,7 @@ class ExclusiveLogitTransform(object):
         self.delta = delta
         self.exclusions = exclusions
         self.rescale = rescale
+        self.u_transform = True
 
     def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
@@ -282,6 +286,7 @@ class RegularizeLargeLogit(object):
         )
         self.exclusions = exclusions
         self.cut = cut
+        self.u_transform = True
 
     def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
