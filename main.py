@@ -4,7 +4,7 @@ import torch.multiprocessing as mp
 import torch.distributed as dist
 
 from experiments.calochallenge.experiment import CaloChallenge
-from experiments.calochallenge.experiment_finetuning import CaloChallengeFT
+from experiments.calochallenge.calochallenge_cfm.experiment_finetuning import CaloChallengeFTCFM
 
 
 @hydra.main(config_path="configs", config_name="default", version_base=None)
@@ -29,8 +29,8 @@ def experiment(rank, world_size, cfg):
         torch.cuda.set_device(rank)
     if cfg.exp_type == "calochallenge":
         exp = CaloChallenge(cfg, rank, world_size)
-    elif cfg.exp_type == "calochallenge_ft":
-        exp = CaloChallengeFT(cfg, rank, world_size)
+    elif cfg.exp_type == "calochallenge_ft_cfm":
+        exp = CaloChallengeFTCFM(cfg, rank, world_size)
     else:
         raise ValueError(f"exp_type {cfg.exp_type} not implemented")
 

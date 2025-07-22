@@ -15,8 +15,8 @@ import mlflow
 from torch_ema import ExponentialMovingAverage
 import pytorch_optimizer
 import torch.distributed as dist
-from experiments.misc import remove_module_from_state_dict
 
+from experiments.misc import remove_module_from_state_dict
 from experiments.misc import get_device, get_dtype, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER, RankFilter
@@ -78,7 +78,7 @@ class BaseExperiment:
 
         self.init_physics()
         self.init_model()
-        self.init_ddp()
+        self._init_ddp()
         self.init_data()
         self._init_dataloader()
         self._init_loss()
@@ -157,7 +157,7 @@ class BaseExperiment:
         if self.ema is not None:
             self.ema.to(self.device)
 
-    def init_ddp(self):
+    def _init_ddp(self):
         if self.world_size > 1:
             self.model.net = DDP(
                 self.model.net,

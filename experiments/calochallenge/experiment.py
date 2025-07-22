@@ -116,9 +116,13 @@ class CaloChallenge(BaseExperiment):
             self.train_dataset,
             batch_size=self.batch_size,
             sampler=self.train_dist_sampler,
+            pin_memory=True,
         )
         self.val_loader = DataLoader(
-            self.val_dataset, batch_size=self.batch_size, sampler=self.val_dist_sampler
+            self.val_dataset,
+            batch_size=self.batch_size,
+            sampler=self.val_dist_sampler,
+            pin_memory=True,
         )
 
         LOGGER.info(
@@ -266,7 +270,7 @@ class CaloChallenge(BaseExperiment):
                 u_samples, _ = fn(u_samples, None)
 
         return u_samples.to(self.dtype)
-    
+
     def plot(self):
         LOGGER.info("plot: generating samples")
         samples, conditions = self.sample_n()
@@ -326,12 +330,12 @@ class CaloChallenge(BaseExperiment):
     def load_energy_model(self):
         # initialize model
         energy_model_cfg = OmegaConf.load(self.cfg.energy_model + "config.yaml")
-        #get transforms
+        # get transforms
         self.energy_model_transforms = []
         for name, kwargs in energy_model_cfg.data.transforms.items():
             if name == "StandardizeFromFile":
                 kwargs["model_dir"] = energy_model_cfg.run_dir
-            self.energy_model_transforms.append(getattr(transforms, name)(**kwargs))        
+            self.energy_model_transforms.append(getattr(transforms, name)(**kwargs))
 
         self.energy_model = instantiate(energy_model_cfg.model)
         num_parameters = sum(

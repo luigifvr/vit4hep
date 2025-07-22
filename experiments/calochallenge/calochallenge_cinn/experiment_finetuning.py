@@ -55,7 +55,7 @@ class CaloChallengeFT(CaloChallenge):
         self.add_embedding_layers()
 
         # define the positional embedding
-        self.model.net.pos_embed = get_sincos_pos_embed(
+        self.model.net.vit.pos_embed = get_sincos_pos_embed(
             self.cfg.model.net.param.pos_embedding_coords,
             self.model_num_patches,
             self.cfg.model.net.param.hidden_dim,
