@@ -59,7 +59,7 @@ class StandardizeFromFile(object):
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
         self.dtype = torch.get_default_dtype()
-        self.u_transform = True 
+        self.u_transform = True
         try:
             # load from file
             self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
