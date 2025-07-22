@@ -465,19 +465,20 @@ def get_sincos_pos_embed(
         pe = get_3d_cylindrical_sincos_pos_embed(num_patches, hidden_dim, temperature)
     elif pos_embedding_coords == "cartesian" and dim == 3:
         pe = get_3d_cartesian_sincos_pos_embed(num_patches, hidden_dim, temperature)
-    elif pos_embedding_coords == "cylindrical" and dim == 1:
-        pe = get_1d_cylindrical_sincos_pos_embed(num_patches, hidden_dim, temperature)
+    elif dim == 1:
+        pe = get_1d_sincos_pos_embed(num_patches, hidden_dim, temperature)
     else:
         raise ValueError
     return pe
 
 
-def get_1d_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):
+def get_1d_sincos_pos_embed(num_patches, dim, temperature=10000):
     """
     Embeds patch positions based directly on input indices, which are assumed
     to be depth, angle, radius.
     """
-    x = torch.arange(num_patches) / num_patches
+    prod_patches = int(math.prod(num_patches)/2)
+    x = torch.arange(prod_patches) / prod_patches
 
     fourier_dim = dim // 2
     omega = torch.arange(fourier_dim) / (fourier_dim - 1)
