@@ -55,12 +55,24 @@ class CaloChallengeFTCFM(CaloChallenge):
         self.add_embedding_layers()
 
         # define the positional embedding
-        self.model.net.pos_embed = get_sincos_pos_embed(
-            self.cfg.model.net.param.pos_embedding_coords,
-            self.model_num_patches,
-            self.cfg.model.net.param.hidden_dim,
-            self.cfg.model.net.param.dim,
-        ).to(self.device, dtype=self.dtype)
+        if self.model.net.learn_pos_embed:
+            l, a, r = self.model_num_patches
+            self.model.net.lgrid = (
+                torch.arange(l, device=self.device, dtype=self.dtype) / l
+            )
+            self.model.net.agrid = (
+                torch.arange(a, device=self.device, dtype=self.dtype) / a
+            )
+            self.model.net.rgrid = (
+                torch.arange(r, device=self.device, dtype=self.dtype) / r
+            )
+        else:
+            self.model.net.pos_embed = get_sincos_pos_embed(
+                self.cfg.model.net.param.pos_embedding_coords,
+                self.model_num_patches,
+                self.cfg.model.net.param.hidden_dim,
+                self.cfg.model.net.param.dim,
+            ).to(self.device, dtype=self.dtype)
 
         # reinitialize final layer
         self.model.net.final_layer = FinalLayer(
@@ -126,6 +138,11 @@ class CaloChallengeFTCFM(CaloChallenge):
             params_embedder = list(
                 self.model.net.module.x_embedder.parameters()
             ) + list(self.model.net.module.c_embedder.parameters())
+            (
+                +[self.model.net.module.pos_embed_freqs]
+                if self.model.net.module.learn_pos_embed
+                else []
+            )
 
             params_backbone = list(
                 self.model.net.module.t_embedder.parameters()
@@ -133,8 +150,12 @@ class CaloChallengeFTCFM(CaloChallenge):
 
             params_head = self.model.net.module.final_layer.parameters()
         else:
-            params_embedder = list(self.model.net.x_embedder.parameters()) + list(
-                self.model.net.c_embedder.parameters()
+            params_embedder = (
+                list(self.model.net.x_embedder.parameters())
+                + list(self.model.net.c_embedder.parameters())
+                + [self.model.net.pos_embed_freqs]
+                if self.model.net.learn_pos_embed
+                else []
             )
 
             params_backbone = list(self.model.net.t_embedder.parameters()) + list(

@@ -63,7 +63,7 @@ class CaloChallenge(BaseExperiment):
 
         LOGGER.info("init_data: preparing model training")
         for name, kwargs in self.cfg.data.transforms.items():
-            if name == "StandardizeFromFile":
+            if "FromFile" in name:
                 kwargs["model_dir"] = self.cfg.run_dir
             self.transforms.append(getattr(transforms, name)(**kwargs))
         LOGGER.info("init_data: list of preprocessing steps:")
@@ -333,7 +333,7 @@ class CaloChallenge(BaseExperiment):
         # get transforms
         self.energy_model_transforms = []
         for name, kwargs in energy_model_cfg.data.transforms.items():
-            if name == "StandardizeFromFile":
+            if "FromFile" in name:
                 kwargs["model_dir"] = energy_model_cfg.run_dir
             self.energy_model_transforms.append(getattr(transforms, name)(**kwargs))
 

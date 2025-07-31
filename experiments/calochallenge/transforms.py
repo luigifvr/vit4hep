@@ -2,11 +2,11 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import os
+import torch.distributions as dist
 
 from experiments.calochallenge.challenge_files import *
 from experiments.calochallenge.challenge_files import XMLHandler
 from itertools import pairwise
-import torch.distributions as dist
 
 
 class LogUniform(dist.TransformedDistribution):
@@ -45,7 +45,7 @@ class Standardize(object):
         return transformed, energy
 
 
-class StandardizeFromFile(object):
+class GlobalStandardizeFromFile(object):
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -58,6 +58,7 @@ class StandardizeFromFile(object):
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
+
         self.dtype = torch.get_default_dtype()
         self.u_transform = True
         try:
@@ -87,6 +88,105 @@ class StandardizeFromFile(object):
             transformed = (shower - self.mean.to(shower.device)) / self.std.to(
                 shower.device
             )
+        return transformed, energy
+
+
+class StandardizeVoxelsFromFile(object):
+    """
+    Standardize features
+        mean_path: path to `.npy` file containing means of the features
+        std_path: path to `.npy` file containing standard deviations of the features
+        create: whether or not to calculate and save mean/std based on first call
+    """
+
+    def __init__(self, n_voxels, model_dir):
+
+        self.model_dir = model_dir
+        self.mean_path = os.path.join(model_dir, "means.npy")
+        self.std_path = os.path.join(model_dir, "stds.npy")
+
+        self.dtype = torch.get_default_dtype()
+        self.n_voxels = n_voxels
+        try:
+            # load from file
+            self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
+            self.std = torch.from_numpy(np.load(self.std_path)).to(self.dtype)
+            self.written = True
+        except FileNotFoundError:
+            self.written = False
+
+    def write(self):
+        np.save(self.mean_path, self.mean.detach().cpu().numpy())
+        np.save(self.std_path, self.std.detach().cpu().numpy())
+
+    def __call__(self, shower, energy, rev=False, rank=0):
+        voxels = shower[:, : self.n_voxels]
+        us = shower[:, self.n_voxels :]
+        if rev:
+            trafo_voxels = voxels * self.std.to(shower.device) + self.mean.to(
+                shower.device
+            )
+            transformed = torch.cat((trafo_voxels, us), dim=1)
+        else:
+            if not self.written:
+                self.mean = voxels.mean(0)
+                self.std = voxels.std(0)
+                if rank == 0:
+                    self.write()
+                self.written = True
+            trafo_voxels = (voxels - self.mean.to(shower.device)) / self.std.to(
+                shower.device
+            )
+            transformed = torch.cat((trafo_voxels, us), dim=1)
+        return transformed, energy
+
+
+class StandardizeUsFromFile(object):
+    """
+    Standardize features
+        mean_path: path to `.npy` file containing means of the features
+        std_path: path to `.npy` file containing standard deviations of the features
+        create: whether or not to calculate and save mean/std based on first call
+    """
+
+    def __init__(self, n_us, model_dir):
+
+        self.model_dir = model_dir
+        self.mean_us_path = os.path.join(model_dir, "means_u.npy")
+        self.std_us_path = os.path.join(model_dir, "stds_u.npy")
+
+        self.dtype = torch.get_default_dtype()
+        self.n_us = n_us
+        self.u_transform = True
+        try:
+            # load from file
+            self.mean_u = torch.from_numpy(np.load(self.mean_us_path)).to(self.dtype)
+            self.std_u = torch.from_numpy(np.load(self.std_us_path)).to(self.dtype)
+            self.written = True
+        except FileNotFoundError:
+            self.written = False
+
+    def write(self):
+        np.save(self.mean_us_path, self.mean_u.detach().cpu().numpy())
+        np.save(self.std_us_path, self.std_u.detach().cpu().numpy())
+
+    def __call__(self, shower, energy, rev=False, rank=0):
+        us = shower[:, -self.n_us :]
+        voxels = shower[:, : -self.n_us]
+        if rev:
+            trafo_us = us * self.std_u.to(shower.device) + self.mean_u.to(shower.device)
+            transformed = torch.cat((voxels, trafo_us), dim=1)
+        else:
+            if not self.written:
+                self.mean_u = us.mean(0)
+                self.std_u = us.std(0)
+                if rank == 0:
+                    self.write()
+                self.written = True
+            trafo_us = (us - self.mean_u.to(shower.device)) / self.std_u.to(
+                shower.device
+            )
+            transformed = torch.cat((voxels, trafo_us), dim=1)
         return transformed, energy
 
 
