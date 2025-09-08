@@ -4,7 +4,11 @@ import torch.multiprocessing as mp
 import torch.distributed as dist
 
 from experiments.calochallenge.experiment import CaloChallenge
-from experiments.calochallenge.calochallenge_cfm.experiment_finetuning import CaloChallengeFTCFM
+from experiments.calochallenge.calochallenge_cfm.experiment_finetuning import (
+    CaloChallengeFTCFM,
+)
+from experiments.calogan.experiment import CaloGAN
+from experiments.calogan.experiment_finetuning import CaloGANFTCFM
 
 
 @hydra.main(config_path="configs", config_name="default", version_base=None)
@@ -31,6 +35,10 @@ def experiment(rank, world_size, cfg):
         exp = CaloChallenge(cfg, rank, world_size)
     elif cfg.exp_type == "calochallenge_ft_cfm":
         exp = CaloChallengeFTCFM(cfg, rank, world_size)
+    elif cfg.exp_type == "calogan":
+        exp = CaloGAN(cfg, rank, world_size)
+    elif cfg.exp_type == "calogan_ft_cfm":
+        exp = CaloGANFTCFM(cfg, rank, world_size)
     else:
         raise ValueError(f"exp_type {cfg.exp_type} not implemented")
 

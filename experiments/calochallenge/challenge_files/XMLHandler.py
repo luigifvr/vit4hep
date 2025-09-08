@@ -9,7 +9,6 @@ import xml.etree.ElementTree as ET
 
 
 class XMLHandler:
-
     def __init__(self, particle_name, filename="binning.xml"):
 
         tree = ET.parse(filename)

@@ -52,8 +52,8 @@ from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 
 import experiments.calochallenge.challenge_files.HighLevelFeatures as HLF
-
 from experiments.calochallenge.challenge_files.evaluate_plotting_helper import *
+from experiments.calochallenge.challenge_files.resnet import generate_model
 
 torch.set_default_dtype(torch.float64)
 
@@ -62,7 +62,7 @@ plt.rc("axes", titlesize="medium")
 plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
 plt.rc("text", usetex=True)
 # hardcoded labels for histograms
-labels = ["ViT", "latViT"]
+labels = ["ViT-CFM", "latViT"]
 
 ########## Parser Setup ##########
 
@@ -129,6 +129,12 @@ def define_parser():
     parser.add_argument("--cut", type=float)
     parser.add_argument("--energy", type=float, default=None)
 
+    parser.add_argument(
+        "--cls_resnet_layers",
+        type=int,
+        default=18,
+        help="Number of layers in the ResNet classifier, default is 18.",
+    )
     parser.add_argument(
         "--cls_n_layer",
         type=int,
@@ -549,20 +555,14 @@ def plot_histograms(
     plot_weighted_depth_r(
         hlf_classes, reference_class, arg, labels, input_names, p_label
     )
-    # grouped
-    # plot_weighted_depth_a(hlf_classes, reference_class, arg, labels, input_names, p_label, l=9)
-    # plot_weighted_depth_r(hlf_classes, reference_class, arg, labels, input_names, p_label, l=9)
-    # no dataset 1 results
-    # if arg.dataset[0] == '1':
-    #    plot_Etot_Einc_discrete(hlf_class, reference_class, arg)
 
 
 def eval_ui_dists(source_array, reference_array, cfg):
-    if not os.path.isdir(cfg.run_dir + f"/eval/"):
-        os.makedirs(cfg.run_dir + f"/eval/")
+    if not os.path.isdir(cfg.run_dir + f"/eval_{cfg.run_idx}/"):
+        os.makedirs(cfg.run_dir + f"/eval_{cfg.run_idx}/")
 
     args = args_class(cfg)
-    args.output_dir = cfg.run_dir + "/eval/"
+    args.output_dir = cfg.run_dir + f"/eval_{cfg.run_idx}/"
 
     if not os.path.isdir(args.output_dir):
         os.makedirs(args.output_dir)
@@ -658,6 +658,7 @@ class args_class:
         self.reference_file = cfg.eval_hdf5_file
         self.which_cuda = 0
 
+        self.cls_resnet_layers = cfg.eval_cls_resnet_layers
         self.cls_n_layer = cfg.eval_cls_n_layer
         self.cls_n_hidden = cfg.eval_cls_n_hidden
         self.cls_dropout_probability = cfg.eval_cls_dropout
@@ -670,11 +671,11 @@ class args_class:
 def run_from_py(sample, energy, cfg):
     print("Running evaluation script run_from_py:")
 
-    if not os.path.isdir(cfg.run_dir + f"/eval/"):
-        os.makedirs(cfg.run_dir + f"/eval/")
+    if not os.path.isdir(cfg.run_dir + f"/eval_{cfg.run_idx}/"):
+        os.makedirs(cfg.run_dir + f"/eval_{cfg.run_idx}/")
 
     args = args_class(cfg)
-    args.output_dir = cfg.run_dir + "/eval/"
+    args.output_dir = cfg.run_dir + f"/eval_{cfg.run_idx}/"
     print("Input sample of shape: ")
     print(sample.shape)
     particle = {
@@ -844,13 +845,13 @@ def run_from_py(sample, energy, cfg):
                 )
         print("Plotting histograms ...")
         if args.dataset == "1-photons":
-            p_label = r"$\gamma$ DS-1"
+            p_label = r"$\gamma$ ds-1"
         elif args.dataset == "1-pions":
-            p_label = r"$\pi^{+}$ DS-1"
+            p_label = r"$\pi^{+}$ ds-1"
         elif args.dataset == "2":
-            p_label = r"$e^{+}$ DS-2"
+            p_label = r"$e^{-}$ ds-2"
         else:
-            p_label = r"$e^{+}$ DS-3"
+            p_label = r"$e^{-}$ ds-3"
 
         plot_histograms(
             [
@@ -862,6 +863,7 @@ def run_from_py(sample, energy, cfg):
             [
                 "",
             ],
+            p_label=p_label,
         )
         plot_cell_dist(
             [
@@ -877,9 +879,16 @@ def run_from_py(sample, energy, cfg):
         )
         print("Plotting histograms: DONE. \n")
 
-    if args.mode in ["all", "all-cls", "cls-low", "cls-high", "cls-low-normed"]:
+    if args.mode in [
+        "all",
+        "all-cls",
+        "cls-low",
+        "cls-high",
+        "cls-low-normed",
+        "cls-resnet",
+    ]:
         if args.mode in ["all", "all-cls"]:
-            list_cls = ["cls-low", "cls-high"]
+            list_cls = ["cls-low", "cls-high", "cls-resnet"]
         else:
             list_cls = [args.mode]
 
@@ -899,7 +908,9 @@ def run_from_py(sample, energy, cfg):
 
         print("Calculating high-level features for classifer: DONE.\n")
         for key in list_cls:
-            if (args.mode in ["cls-low"]) or (key in ["cls-low"]):
+            if (args.mode in ["cls-low", "cls-resnet"]) or (
+                key in ["cls-low", "cls-resnet"]
+            ):
                 source_array = prepare_low_data_for_classifier(
                     sample, energy, hlf, 0.0, cut=cut, normed=False
                 )
@@ -939,15 +950,22 @@ def run_from_py(sample, energy, cfg):
             )
             print("Using {}".format(args.device))
 
-            # set up DNN classifier
-            input_dim = train_data.shape[1] - 1
-            DNN_kwargs = {
-                "num_layer": args.cls_n_layer,  # 2
-                "num_hidden": args.cls_n_hidden,  # 512
-                "input_dim": input_dim,
-                "dropout_probability": args.cls_dropout_probability,
-            }  # 0
-            classifier = DNN(**DNN_kwargs)
+            if key in ["all", "cls-low", "cls-low-normed", "cls-high"]:
+                # set up DNN classifier
+                input_dim = train_data.shape[1] - 1
+                DNN_kwargs = {
+                    "num_layer": args.cls_n_layer,
+                    "num_hidden": args.cls_n_hidden,
+                    "input_dim": input_dim,
+                    "dropout_probability": args.cls_dropout_probability,
+                }
+                classifier = DNN(**DNN_kwargs)
+            elif key in ["cls-resnet"]:
+                classifier = generate_model(
+                    args.cls_resnet_layers,
+                    img_shape={"2": (45, 16, 9), "3": (45, 50, 18)}[args.dataset],
+                )
+
             classifier.to(args.device)
             print(classifier)
             total_parameters = sum(
@@ -1271,7 +1289,14 @@ def main(raw_args=None):
         print("Plotting histograms: DONE. \n")
 
     print("at classification branch")
-    if args.mode in ["all", "all-cls", "cls-low", "cls-high", "cls-low-normed"]:
+    if args.mode in [
+        "all",
+        "all-cls",
+        "cls-low",
+        "cls-high",
+        "cls-low-normed",
+        "cls-resnet",
+    ]:
         print("in classification branch")
         if args.mode in ["all", "all-cls"]:
             list_cls = ["cls-low", "cls-high"]
@@ -1298,7 +1323,9 @@ def main(raw_args=None):
 
             print("Calculating high-level features for classifer: DONE.\n")
             for key in list_cls:
-                if (args.mode in ["cls-low"]) or (key in ["cls-low"]):
+                if (args.mode in ["cls-low", "cls-resnet"]) or (
+                    key in ["cls-low", "cls-resnet"]
+                ):
                     source_array = prepare_low_data_for_classifier(
                         showers[n],
                         energies[n],
@@ -1366,15 +1393,21 @@ def main(raw_args=None):
                 )
                 print("Using {}".format(args.device))
 
-                # set up DNN classifier
-                input_dim = train_data.shape[1] - 1
-                DNN_kwargs = {
-                    "num_layer": args.cls_n_layer,
-                    "num_hidden": args.cls_n_hidden,
-                    "input_dim": input_dim,
-                    "dropout_probability": args.cls_dropout_probability,
-                }
-                classifier = DNN(**DNN_kwargs)
+                if key in ["all", "cls-low", "cls-low-normed", "cls-high"]:
+                    # set up DNN classifier
+                    input_dim = train_data.shape[1] - 1
+                    DNN_kwargs = {
+                        "num_layer": args.cls_n_layer,
+                        "num_hidden": args.cls_n_hidden,
+                        "input_dim": input_dim,
+                        "dropout_probability": args.cls_dropout_probability,
+                    }
+                    classifier = DNN(**DNN_kwargs)
+                elif key in ["cls-resnet"]:
+                    classifier = generate_model(
+                        args.cls_resnet_layers,
+                        img_shape={"2": (45, 16, 9), "3": (45, 50, 18)}[args.dataset],
+                    )
                 classifier.to(args.device)
                 print(classifier)
                 total_parameters = sum(
