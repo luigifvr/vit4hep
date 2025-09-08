@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-import numpy as np
+from collections import OrderedDict
 import torch
 
 
@@ -9,7 +9,7 @@ class NaNError(BaseException):
 
 def get_device() -> torch.device:
     """Gets CUDA if available, CPU else."""
-    return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    return torch.device(f"cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
 def get_dtype(dtype) -> torch.dtype:
@@ -59,3 +59,12 @@ def frequency_check(step, every_n_steps, skip_initial=False):
         return False
 
     return step % every_n_steps == 0
+
+
+def remove_module_from_state_dict(state_dict):
+    """Remove 'module.' from keys in a state dictionary."""
+    new_state_dict = OrderedDict()
+    for key, value in state_dict.items():
+        new_key = key.replace("module.", "")
+        new_state_dict[new_key] = value
+    return new_state_dict

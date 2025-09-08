@@ -70,15 +70,15 @@ def get_vit_block_kwargs(
             block_kwargs.update(cinn_kwargs)
         else:
             patch_dim = int(math.prod(patch_shape))
-            num_patches = int(
-                math.prod([s // p for s, p in zip(shape, patch_shape)]) / 2
-            )
+            num_patches = [s // p for s, p in zip(shape, patch_shape)]
+            prod_num_patches = int(math.prod(num_patches) / 2)
 
             def func(x_in, x_out):
                 subnet = SubnetViT(
                     x_out=x_out,
                     patch_dim=patch_dim,
-                    prod_num_patches=num_patches,
+                    num_patches=num_patches,
+                    prod_num_patches=prod_num_patches,
                     **vit_kwargs,
                 )
                 return subnet

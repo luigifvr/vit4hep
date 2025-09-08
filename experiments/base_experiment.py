@@ -14,10 +14,12 @@ from hydra.utils import instantiate
 import mlflow
 from torch_ema import ExponentialMovingAverage
 import pytorch_optimizer
+import torch.distributed as dist
 
+from experiments.misc import remove_module_from_state_dict
 from experiments.misc import get_device, get_dtype, flatten_dict
 import experiments.logger
-from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
+from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER, RankFilter
 from experiments.mlflow import log_mlflow
 
 # set to 'True' to debug autograd issues (slows down code)
@@ -26,8 +28,10 @@ MIN_STEP_SKIP = 1000
 
 
 class BaseExperiment:
-    def __init__(self, cfg):
+    def __init__(self, cfg, rank=0, world_size=1):
         self.cfg = cfg
+        self.rank = rank
+        self.world_size = world_size
 
     def __call__(self):
         # pass all exceptions to the logger
@@ -66,13 +70,15 @@ class BaseExperiment:
         # implement all ml boilerplate as private methods (_name)
         t0 = time.time()
 
-        # save config
-        LOGGER.debug(OmegaConf.to_yaml(self.cfg))
-        self._save_config("config.yaml", to_mlflow=True)
-        self._save_config(f"config_{self.cfg.run_idx}.yaml")
+        if self.rank == 0:
+            # save config
+            LOGGER.debug(OmegaConf.to_yaml(self.cfg))
+            self._save_config("config.yaml", to_mlflow=True)
+            self._save_config(f"config_{self.cfg.run_idx}.yaml")
 
         self.init_physics()
         self.init_model()
+        self._init_ddp()
         self.init_data()
         self._init_dataloader()
         self._init_loss()
@@ -126,6 +132,8 @@ class BaseExperiment:
 
         # load existing model if specified
         if self.warm_start:
+            if self.cfg.finetuning:
+                self.add_embedding_layers()
             model_path = os.path.join(
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )
@@ -133,6 +141,7 @@ class BaseExperiment:
                 state_dict = torch.load(
                     model_path, map_location="cpu", weights_only=False
                 )["model"]
+                state_dict = remove_module_from_state_dict(state_dict)
                 LOGGER.info(f"Loading model from {model_path}")
                 self.model.load_state_dict(state_dict)
                 if self.ema is not None:
@@ -145,10 +154,16 @@ class BaseExperiment:
                 raise ValueError(f"Cannot load model from {model_path}")
 
         self.model.to(self.device, dtype=self.dtype)
-        if self.cfg.distribute_parallel:
-            self.model = DDP(self.model, device_ids=[self.local_rank])
         if self.ema is not None:
             self.ema.to(self.device)
+
+    def _init_ddp(self):
+        if self.world_size > 1:
+            self.model.net = DDP(
+                self.model.net,
+                device_ids=[self.rank],
+                find_unused_parameters=False,
+            )
 
     def _init(self):
         run_name = self._init_experiment()
@@ -167,6 +182,7 @@ class BaseExperiment:
 
     def _init_experiment(self):
         self.warm_start = False if self.cfg.warm_start_idx is None else True
+        self.cfg.save = self.cfg.save and self.rank == 0  # only save on rank 0
 
         if not self.warm_start:
             if self.cfg.run_name is None:
@@ -287,6 +303,9 @@ class BaseExperiment:
             file_handler.setLevel(logging.DEBUG)
             LOGGER.addHandler(file_handler)
 
+        rankfilter = RankFilter(self.rank)
+        LOGGER.addFilter(rankfilter)  # only log on rank 0
+
         # init stream_handler
         stream_handler = logging.StreamHandler()
         stream_handler.setLevel(LOGGER.level)
@@ -308,16 +327,9 @@ class BaseExperiment:
         LOGGER.debug("Logger initialized")
 
     def _init_backend(self):
-        if self.cfg.distribute_parallel:
-            dist.init_process_group(backend="nccl")
-            self.rank = int(os.environ["RANK"])
-            self.local_rank = int(os.environ["LOCAL_RANK"])
-            self.world_size = int(os.environ["WORLD_SIZE"])
-
-            self.device = get_device(rank=self.local_rank)
-        else:
-            self.device = get_device()
+        self.device = get_device()
         LOGGER.info(f"Using device {self.device}")
+        LOGGER.info(f"World size is {self.world_size}")
         self.dtype = get_dtype(self.cfg.dtype)
         LOGGER.info(f"Using dtype {self.dtype}")
 
@@ -464,9 +476,12 @@ class BaseExperiment:
 
         # recycle trainloader
         def cycle(iterable):
+            epoch = 0
             while True:
+                self.train_loader.sampler.set_epoch(epoch)
                 for x in iterable:
                     yield x
+                epoch += 1
 
         iterator = iter(cycle(self.train_loader))
         for step in range(self.cfg.training.iterations):
@@ -503,8 +518,6 @@ class BaseExperiment:
                 if self.cfg.training.scheduler in ["ReduceLROnPlateau"]:
                     self.scheduler.step(val_loss)
 
-            if self.cfg.distribute_parallel:
-                dist.destroy_process_group()
             # output
             dt = time.time() - self.training_start_time
             if (
@@ -560,9 +573,6 @@ class BaseExperiment:
         loss = self._batch_loss(data)
         self.optimizer.zero_grad()
 
-        if self.cfg.distribute_parallel:
-            dist.all_reduce(loss, op=dist.ReduceOp.AVG)
-
         loss.backward()
 
         grad_norm_net = (
@@ -605,7 +615,8 @@ class BaseExperiment:
             self.scheduler.step()
 
         # collect metrics
-
+        if self.world_size > 1:
+            dist.all_reduce(loss, op=dist.ReduceOp.AVG)
         self.train_loss.append(loss.item())
         self.train_lr.append(self.optimizer.param_groups[0]["lr"])
         self.grad_norm_train.append(grad_norm)
@@ -639,6 +650,9 @@ class BaseExperiment:
                         loss = self._batch_loss(data)
                 else:
                     loss = self._batch_loss(data)
+
+                if self.world_size > 1:
+                    dist.all_reduce(loss, op=dist.ReduceOp.AVG)
 
                 losses.append(loss.cpu().item())
 

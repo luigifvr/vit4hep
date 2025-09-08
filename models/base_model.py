@@ -43,7 +43,7 @@ class BaseModel(nn.Module):
             Output tensor with shape (batch_size, *dims)
         """
         pass
-    
+
     def forward(self, x, c, rev=False, jac=True):
         """
         Simple forward pass
@@ -55,7 +55,7 @@ class BaseModel(nn.Module):
         c: torch.Tensor
             Input conditions
         rev: bool
-            If True, generate samples 
+            If True, generate samples
         jac: bool
             Keep track of the Jacobian
 

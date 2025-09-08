@@ -1,41 +1,3 @@
-# pylint: disable=invalid-name
-"""Main script to evaluate contributions to the Fast Calorimeter Challenge 2022
-
-modified by L. Favaro, A. Ore, S. Palacios for CaloDREAM
-
-input:
-    - path to a folder containing .hdf5 samples.
-      The script loads only files with *samples.hdf5 in the name
-output:
-    - metrics for evaluation (plots, classifier scores, etc.)
-
-usage:
-    -i --input_file: path of the input files to be evaluated.
-    -r --reference_file: Name and path of the reference .hdf5 file.
-    -m --mode: Which metric to look at. Choices are
-               'all': does all of the below (with low-level classifier).
-               'avg': plots the average shower of the whole dataset.
-               'avg-E': plots the average showers at different energy (ranges).
-               'hist-p': plots histograms of high-level features.
-               'hist-chi': computes the chi2 difference of the histograms.
-               'hist': plots histograms and computes chi2.
-               'all-cls': only run classifiers in list_cls
-               'no-cls': does all of the above (no classifier).
-               'cls-low': trains a classifier on low-level features (voxels).
-               'cls-low-normed': trains a classifier on normalized voxels.
-               'cls-high': trains a classifier on high-level features (same as histograms).
-    -d --dataset: Which dataset the evaluation is for. Choices are
-                  '1-photons', '1-pions', '2', '3'
-       --output_dir: Folder in which the evaluation results (plots, scores) are saved.
-       --save_mem: If included, data is moved to the GPU batch by batch instead of once.
-                   This reduced the memory footprint a lot, especially for datasets 2 and 3.
-
-       --no_cuda: if added, code will not run on GPU, even if available.
-       --which_cuda: Which GPU to use if multiple are available.
-
-additional options for the classifier start with --cls_ and can be found below.
-"""
-
 import argparse
 import os
 import pickle
@@ -52,8 +14,9 @@ from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 
 import experiments.calochallenge.challenge_files.HighLevelFeatures as HLF
+
 from experiments.calochallenge.challenge_files.evaluate_plotting_helper import *
-from experiments.calochallenge.challenge_files.resnet import generate_model
+from experiments.calogan.utils import load_data
 
 torch.set_default_dtype(torch.float64)
 
@@ -129,12 +92,6 @@ def define_parser():
     parser.add_argument("--cut", type=float)
     parser.add_argument("--energy", type=float, default=None)
 
-    parser.add_argument(
-        "--cls_resnet_layers",
-        type=int,
-        default=18,
-        help="Number of layers in the ResNet classifier, default is 18.",
-    )
     parser.add_argument(
         "--cls_n_layer",
         type=int,
@@ -254,44 +211,6 @@ def prepare_low_data_for_classifier(
         ret = np.concatenate(
             [np.log10(E_inc), voxel, label * np.ones_like(E_inc)], axis=1
         )
-    return ret
-
-
-def prepare_high_data_for_classifier(
-    voxel_orig, E_inc_orig, hlf_class, label, cut=0.0, single_energy=None
-):
-    """takes hdf5_file, extracts high-level features, appends label, returns array"""
-    E_inc = E_inc_orig.copy()
-    E_tot = hlf_class.GetEtot()
-    E_layer = []
-    for layer_id in hlf_class.GetElayers():
-        E_layer.append(hlf_class.GetElayers()[layer_id].reshape(-1, 1))
-    EC_etas = []
-    EC_phis = []
-    Width_etas = []
-    Width_phis = []
-    for layer_id in hlf_class.layersBinnedInAlpha:
-        EC_etas.append(hlf_class.GetECEtas()[layer_id].reshape(-1, 1))
-        EC_phis.append(hlf_class.GetECPhis()[layer_id].reshape(-1, 1))
-        Width_etas.append(hlf_class.GetWidthEtas()[layer_id].reshape(-1, 1))
-        Width_phis.append(hlf_class.GetWidthPhis()[layer_id].reshape(-1, 1))
-    E_layer = np.concatenate(E_layer, axis=1)
-    EC_etas = np.concatenate(EC_etas, axis=1)
-    EC_phis = np.concatenate(EC_phis, axis=1)
-    Width_etas = np.concatenate(Width_etas, axis=1)
-    Width_phis = np.concatenate(Width_phis, axis=1)
-    ret = np.concatenate(
-        [
-            np.log10(E_inc),
-            np.log10(E_layer + 1e-8),
-            EC_etas / 1e2,
-            EC_phis / 1e2,
-            Width_etas / 1e2,
-            Width_phis / 1e2,
-            label * np.ones_like(E_inc),
-        ],
-        axis=1,
-    )
     return ret
 
 
@@ -478,58 +397,6 @@ def calibrate_classifier(model, calibration_data, arg):
     return iso_reg
 
 
-def check_file(given_file, arg, which=None):
-    """checks if the provided file has the expected structure based on the dataset"""
-    print(
-        "Checking if {} file has the correct form ...".format(
-            which if which is not None else "provided"
-        )
-    )
-    num_features = {"1-photons": 368, "1-pions": 533, "2": 6480, "3": 40500}[
-        arg.dataset
-    ]
-    num_events = given_file["incident_energies"].shape[0]
-    assert (
-        given_file["showers"].shape[0] == num_events
-    ), "Number of energies provided does not match number of showers, {} != {}".format(
-        num_events, given_file["showers"].shape[0]
-    )
-    assert (
-        given_file["showers"].shape[1] == num_features
-    ), "Showers have wrong shape, expected {}, got {}".format(
-        num_features, given_file["showers"].shape[1]
-    )
-
-    print("Found {} events in the file.".format(num_events))
-    print(
-        "Checking if {} file has the correct form: DONE \n".format(
-            which if which is not None else "provided"
-        )
-    )
-
-
-def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1):
-    """reads .hdf5 file and returns samples and their energy"""
-    print("Extracting showers from {} file ...".format(which))
-    if single_energy is not None:
-        energy_mask = given_file["incident_energies"][:] == single_energy
-        energy = given_file["incident_energies"][:][energy_mask].reshape(-1, 1)
-        shower = given_file["showers"][:][energy_mask.flatten()]
-    else:
-        shower = given_file["showers"][:max_len]
-        energy = given_file["incident_energies"][:max_len]
-    print("Extracting showers from {} file: DONE.\n".format(which))
-    return shower.astype("float32", copy=False), energy.astype("float32", copy=False)
-
-
-def load_reference(filename):
-    """Load existing pickle with high-level features for reference in plots"""
-    print("Loading file with high-level features.")
-    with open(filename, "rb") as file:
-        hlf_ref = pickle.load(file)
-    return hlf_ref
-
-
 def save_reference(ref_hlf, fname):
     """Saves high-level features class to file"""
     print("Saving file with high-level features.")
@@ -557,7 +424,7 @@ def plot_histograms(
     )
 
 
-def eval_ui_dists(source_array, reference_array, cfg):
+def eval_calogan_lowlevel(source_array, cfg):
     if not os.path.isdir(cfg.run_dir + f"/eval_{cfg.run_idx}/"):
         os.makedirs(cfg.run_dir + f"/eval_{cfg.run_idx}/")
 
@@ -566,6 +433,18 @@ def eval_ui_dists(source_array, reference_array, cfg):
 
     if not os.path.isdir(args.output_dir):
         os.makedirs(args.output_dir)
+
+    reference_data = load_data(cfg.eval_hdf5_file)
+    reference_array = np.hstack(
+        (
+            reference_data["layer_0"].reshape(-1, 288),
+            reference_data["layer_1"].reshape(-1, 144),
+            reference_data["layer_2"].reshape(-1, 72),
+        ),
+    )
+    print(source_array.shape, reference_array.shape)
+    print(source_array[0, :])
+    print(reference_array[0, :])
 
     # add label in source array
     source_array = np.concatenate(
@@ -658,7 +537,6 @@ class args_class:
         self.reference_file = cfg.eval_hdf5_file
         self.which_cuda = 0
 
-        self.cls_resnet_layers = cfg.eval_cls_resnet_layers
         self.cls_n_layer = cfg.eval_cls_n_layer
         self.cls_n_hidden = cfg.eval_cls_n_hidden
         self.cls_dropout_probability = cfg.eval_cls_dropout
@@ -879,16 +757,9 @@ def run_from_py(sample, energy, cfg):
         )
         print("Plotting histograms: DONE. \n")
 
-    if args.mode in [
-        "all",
-        "all-cls",
-        "cls-low",
-        "cls-high",
-        "cls-low-normed",
-        "cls-resnet",
-    ]:
+    if args.mode in ["all", "all-cls", "cls-low", "cls-high", "cls-low-normed"]:
         if args.mode in ["all", "all-cls"]:
-            list_cls = ["cls-low", "cls-high", "cls-resnet"]
+            list_cls = ["cls-low", "cls-high"]
         else:
             list_cls = [args.mode]
 
@@ -908,9 +779,7 @@ def run_from_py(sample, energy, cfg):
 
         print("Calculating high-level features for classifer: DONE.\n")
         for key in list_cls:
-            if (args.mode in ["cls-low", "cls-resnet"]) or (
-                key in ["cls-low", "cls-resnet"]
-            ):
+            if (args.mode in ["cls-low"]) or (key in ["cls-low"]):
                 source_array = prepare_low_data_for_classifier(
                     sample, energy, hlf, 0.0, cut=cut, normed=False
                 )
@@ -950,22 +819,15 @@ def run_from_py(sample, energy, cfg):
             )
             print("Using {}".format(args.device))
 
-            if key in ["all", "cls-low", "cls-low-normed", "cls-high"]:
-                # set up DNN classifier
-                input_dim = train_data.shape[1] - 1
-                DNN_kwargs = {
-                    "num_layer": args.cls_n_layer,
-                    "num_hidden": args.cls_n_hidden,
-                    "input_dim": input_dim,
-                    "dropout_probability": args.cls_dropout_probability,
-                }
-                classifier = DNN(**DNN_kwargs)
-            elif key in ["cls-resnet"]:
-                classifier = generate_model(
-                    args.cls_resnet_layers,
-                    img_shape={"2": (45, 16, 9), "3": (45, 50, 18)}[args.dataset],
-                )
-
+            # set up DNN classifier
+            input_dim = train_data.shape[1] - 1
+            DNN_kwargs = {
+                "num_layer": args.cls_n_layer,  # 2
+                "num_hidden": args.cls_n_hidden,  # 512
+                "input_dim": input_dim,
+                "dropout_probability": args.cls_dropout_probability,
+            }  # 0
+            classifier = DNN(**DNN_kwargs)
             classifier.to(args.device)
             print(classifier)
             total_parameters = sum(
@@ -1289,14 +1151,7 @@ def main(raw_args=None):
         print("Plotting histograms: DONE. \n")
 
     print("at classification branch")
-    if args.mode in [
-        "all",
-        "all-cls",
-        "cls-low",
-        "cls-high",
-        "cls-low-normed",
-        "cls-resnet",
-    ]:
+    if args.mode in ["all", "all-cls", "cls-low", "cls-high", "cls-low-normed"]:
         print("in classification branch")
         if args.mode in ["all", "all-cls"]:
             list_cls = ["cls-low", "cls-high"]
@@ -1323,9 +1178,7 @@ def main(raw_args=None):
 
             print("Calculating high-level features for classifer: DONE.\n")
             for key in list_cls:
-                if (args.mode in ["cls-low", "cls-resnet"]) or (
-                    key in ["cls-low", "cls-resnet"]
-                ):
+                if (args.mode in ["cls-low"]) or (key in ["cls-low"]):
                     source_array = prepare_low_data_for_classifier(
                         showers[n],
                         energies[n],
@@ -1393,21 +1246,15 @@ def main(raw_args=None):
                 )
                 print("Using {}".format(args.device))
 
-                if key in ["all", "cls-low", "cls-low-normed", "cls-high"]:
-                    # set up DNN classifier
-                    input_dim = train_data.shape[1] - 1
-                    DNN_kwargs = {
-                        "num_layer": args.cls_n_layer,
-                        "num_hidden": args.cls_n_hidden,
-                        "input_dim": input_dim,
-                        "dropout_probability": args.cls_dropout_probability,
-                    }
-                    classifier = DNN(**DNN_kwargs)
-                elif key in ["cls-resnet"]:
-                    classifier = generate_model(
-                        args.cls_resnet_layers,
-                        img_shape={"2": (45, 16, 9), "3": (45, 50, 18)}[args.dataset],
-                    )
+                # set up DNN classifier
+                input_dim = train_data.shape[1] - 1
+                DNN_kwargs = {
+                    "num_layer": args.cls_n_layer,
+                    "num_hidden": args.cls_n_hidden,
+                    "input_dim": input_dim,
+                    "dropout_probability": args.cls_dropout_probability,
+                }
+                classifier = DNN(**DNN_kwargs)
                 classifier.to(args.device)
                 print(classifier)
                 total_parameters = sum(

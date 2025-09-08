@@ -45,7 +45,7 @@ class Standardize(object):
         return transformed, energy
 
 
-class GlobalStandardizeFromFile(object):
+class GlobalStandardizeFromFileGAN(object):
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -61,6 +61,7 @@ class GlobalStandardizeFromFile(object):
 
         self.dtype = torch.get_default_dtype()
         self.u_transform = True
+        self.layer_keys = ["layer_0", "layer_1", "layer_2", "extra_dims"]
         try:
             # load from file
             self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
@@ -73,22 +74,21 @@ class GlobalStandardizeFromFile(object):
         np.save(self.mean_path, self.mean.detach().cpu().numpy())
         np.save(self.std_path, self.std.detach().cpu().numpy())
 
-    def __call__(self, shower, energy, rev=False, rank=0):
+    def __call__(self, data_dict, rev=False, rank=0):
         if rev:
-            transformed = shower * self.std.to(shower.device) + self.mean.to(
-                shower.device
-            )
+            for key in self.layer_keys:
+                data_dict[key] = data_dict[key] * self.std + self.mean
         else:
             if not self.written:
+                shower = torch.cat([data_dict[key] for key in self.layer_keys], dim=1)
                 self.mean = shower.mean()
                 self.std = shower.std()
                 if rank == 0:
                     self.write()
                 self.written = True
-            transformed = (shower - self.mean.to(shower.device)) / self.std.to(
-                shower.device
-            )
-        return transformed, energy
+            for key in self.layer_keys:
+                data_dict[key] = (data_dict[key] - self.mean) / self.std
+        return data_dict
 
 
 class StandardizeVoxelsFromFile(object):
@@ -247,7 +247,7 @@ class AddEmptyLayer(object):
         return x_, c_
 
 
-class LogEnergy(object):
+class LogEnergyGAN(object):
     """
     Log transform incident energies
         alpha: Optional regularization for the log
@@ -257,12 +257,14 @@ class LogEnergy(object):
         self.alpha = alpha
         self.cond_transform = True
 
-    def __call__(self, shower, energy, rev=False, rank=0):
+    def __call__(self, data_dict, rev=False, rank=0):
         if rev:
-            transformed = torch.exp(energy) - self.alpha
+            energy = data_dict["energy"]
+            data_dict["energy"] = torch.exp(energy) - self.alpha
         else:
-            transformed = torch.log(energy + self.alpha)
-        return shower, transformed
+            energy = data_dict["energy"]
+            data_dict["energy"] = torch.log(energy + self.alpha)
+        return data_dict
 
 
 class ScaleVoxels(object):
@@ -303,7 +305,7 @@ class ScaleTotalEnergy(object):
         return shower, energy
 
 
-class ScaleEnergy(object):
+class ScaleEnergyGAN(object):
     """
     Scale incident energies to lie in the range [0, 1]
         e_min: Expected minimum value of the energy
@@ -315,14 +317,18 @@ class ScaleEnergy(object):
         self.e_max = e_max
         self.cond_transform = True
 
-    def __call__(self, shower, energy, rev=False, rank=0):
+    def __call__(self, data_dict, rev=False, rank=0):
         if rev:
+            energy = data_dict["energy"]
             transformed = energy * (self.e_max - self.e_min)
             transformed += self.e_min
+            data_dict["energy"] = transformed
         else:
+            energy = data_dict["energy"]
             transformed = energy - self.e_min
             transformed /= self.e_max - self.e_min
-        return shower, transformed
+            data_dict["energy"] = transformed
+        return data_dict
 
 
 class ExclusiveLogTransform(object):
@@ -347,7 +353,7 @@ class ExclusiveLogTransform(object):
         return transformed, energy
 
 
-class ExclusiveLogitTransform(object):
+class ExclusiveLogitTransformGAN(object):
     """
     Take log of input data
         delta: regularization
@@ -359,22 +365,22 @@ class ExclusiveLogitTransform(object):
         self.exclusions = exclusions
         self.rescale = rescale
         self.u_transform = True
+        self.layer_keys = ["layer_0", "layer_1", "layer_2", "extra_dims"]
 
-    def __call__(self, shower, energy, rev=False, rank=0):
+    def __call__(self, data_dict, rev=False, rank=0):
         if rev:
-            if self.rescale:
-                transformed = logit(shower, alpha=self.delta, inv=True)
-            else:
-                transformed = torch.special.expit(shower)
+            for key in self.layer_keys:
+                if self.rescale:
+                    data_dict[key] = logit(data_dict[key], alpha=self.delta, inv=True)
+                else:
+                    data_dict[key] = torch.special.expit(data_dict[key])
         else:
-            if self.rescale:
-                transformed = logit(shower, alpha=self.delta)
-            else:
-                transformed = torch.logit(shower, eps=self.delta)
-
-        if self.exclusions is not None:
-            transformed[..., self.exclusions] = shower[..., self.exclusions]
-        return transformed, energy
+            for key in self.layer_keys:
+                if self.rescale:
+                    data_dict[key] = logit(data_dict[key], alpha=self.delta)
+                else:
+                    data_dict[key] = torch.logit(data_dict[key], eps=self.delta)
+        return data_dict
 
 
 class RegularizeLargeLogit(object):
@@ -606,7 +612,7 @@ class Reshape(object):
         return shower, energy
 
 
-class NormalizeByElayer(object):
+class NormalizeLayerEnergyGAN(object):
     """
     Normalize each shower by the layer energy
     This will change the shower shape to N_voxels+N_layers
@@ -614,28 +620,26 @@ class NormalizeByElayer(object):
        eps: numerical epsilon
     """
 
-    def __init__(self, ptype, xml_file, cut=0.0, eps=1.0e-10):
+    def __init__(self, cut=0.0, eps=1.0e-10):
+        self.bin_edges = [0, 288, 432, 504]
         self.eps = eps
-        self.xml = XMLHandler.XMLHandler(xml_file, ptype)
-        self.layer_boundaries = np.unique(self.xml.GetBinEdges())
-        self.n_layers = len(self.layer_boundaries) - 1
         self.cut = cut
+        self.layer_keys = ["layer_0", "layer_1", "layer_2"]
+        self.n_layers = 3
 
-    def __call__(self, shower, energy, rev=False, rank=0):
+    def __call__(self, data_dict, rev=False, rank=0):
+        energy = data_dict["energy"]
         if rev:
 
             # select u features
-            us = shower[:, -self.n_layers :]
+            us = data_dict["extra_dims"]
 
             # clip u_{i>0} into [0,1]
             us[:, (-self.n_layers + 1) :] = torch.clip(
                 us[:, (-self.n_layers + 1) :],
-                min=torch.tensor(0.0, device=shower.device),
-                max=torch.tensor(1.0, device=shower.device),
+                min=torch.tensor(0.0, device=energy.device),
+                max=torch.tensor(1.0, device=energy.device),
             )
-
-            # select voxels
-            shower = shower[:, : -self.n_layers]
 
             # calculate unnormalised energies from the u's
             layer_Es = []
@@ -648,25 +652,20 @@ class NormalizeByElayer(object):
             layer_Es.append(total_E - cum_sum)
             layer_Es = torch.vstack(layer_Es).T
 
-            # Normalize each layer and multiply it with its original energy
-            transformed = torch.zeros_like(shower)
-            for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
-                layer = shower[:, start:end]  # select layer
+            for l, key in enumerate(self.layer_keys):
+                layer = data_dict[key].clone()  # select layer
                 layer /= layer.sum(-1, keepdims=True) + self.eps  # normalize to unity
                 mask = layer <= self.cut
                 layer[mask] = 0.0  # apply normalized cut
-                transformed[:, start:end] = (
-                    layer * layer_Es[:, [l]]
-                )  # scale to layer energy
-
+                data_dict[key] = layer * layer_Es[:, [l]]  # scale to layer energy
         else:
             # compute layer energies
             layer_Es = []
-            for start, end in pairwise(self.layer_boundaries):
-                layer_E = torch.sum(shower[:, start:end], dim=1, keepdims=True)
-                shower[:, start:end] /= layer_E + self.eps  # normalize to unity
+            for key in self.layer_keys:
+                layer_E = torch.sum(data_dict[key], dim=1, keepdims=True)
+                data_dict[key] /= layer_E + self.eps  # normalize to unity
                 layer_Es.append(layer_E)  # store layer energy
-            layer_Es = torch.cat(layer_Es, dim=1).to(shower.device)
+            layer_Es = torch.cat(layer_Es, dim=1).to(energy.device)
 
             # compute generalized extra dimensions
             extra_dims = [torch.sum(layer_Es, dim=1, keepdim=True) / energy]
@@ -675,9 +674,8 @@ class NormalizeByElayer(object):
                 extra_dim = layer_Es[:, [l]] / (remaining_E + self.eps)
                 extra_dims.append(extra_dim)
             extra_dims = torch.cat(extra_dims, dim=1)
-
-            transformed = torch.cat((shower, extra_dims), dim=1)
-        return transformed, energy
+            data_dict["extra_dims"] = extra_dims
+        return data_dict
 
 
 class AddAngularBins(object):

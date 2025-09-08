@@ -12,13 +12,13 @@ from omegaconf import OmegaConf
 # Other functions of project
 from experiments.logger import LOGGER
 from experiments.base_experiment import BaseExperiment
-from experiments.calochallenge.datasets import CaloChallengeDataset
-import experiments.calochallenge.transforms as transforms
-from experiments.calochallenge.challenge_files import evaluate
+from experiments.calogan.datasets import CaloGANDataset
+import experiments.calogan.transforms as transforms
+from experiments.calogan.evaluate import eval_calogan_lowlevel
 from experiments.calochallenge.plots import plot_ui_dists
 
 
-class CaloChallenge(BaseExperiment):
+class CaloGAN(BaseExperiment):
     """
     Base Class for Generative Models to inherit from.
     Children classes should overwrite the individual methods as needed.
@@ -56,9 +56,6 @@ class CaloChallenge(BaseExperiment):
     def init_data(self):
         self.hdf5_train = self.cfg.data.training_file
         self.hdf5_test = self.cfg.data.test_file
-        self.particle_type = self.cfg.data.particle_type
-        self.xml_filename = self.cfg.data.xml_filename
-        self.train_val_frac = self.cfg.data.train_val_frac
         self.transforms = []
 
         LOGGER.info("init_data: preparing model training")
@@ -70,31 +67,25 @@ class CaloChallenge(BaseExperiment):
         for idx, transform in enumerate(self.transforms):
             LOGGER.info(f"{transform.__class__.__name__}")
 
-        self.train_dataset = CaloChallengeDataset(
+        self.train_dataset = CaloGANDataset(
             self.hdf5_train,
-            self.particle_type,
-            self.xml_filename,
-            train_val_frac=self.train_val_frac,
             transform=self.transforms,
-            split="training",
+            return_us=self.cfg.data.return_us,
             device=self.device,
             dtype=self.dtype,
             rank=self.rank,
         )
 
-        self.val_dataset = CaloChallengeDataset(
+        self.val_dataset = CaloGANDataset(
             self.hdf5_train,
-            self.particle_type,
-            self.xml_filename,
-            train_val_frac=self.train_val_frac,
             transform=self.transforms,
-            split="validation",
+            return_us=self.cfg.data.return_us,
             device=self.device,
             dtype=self.dtype,
             rank=self.rank,
         )
 
-        self.layer_boundaries = self.train_dataset.layer_boundaries
+        self.layer_boundaries = self.train_dataset.bin_edges
 
     def init_physics(self):
         pass
@@ -148,46 +139,6 @@ class CaloChallenge(BaseExperiment):
     def evaluate(self):
         pass
 
-    # @torch.inference_mode()
-    # def latent_samples(self, epoch=None):
-    #     """
-    #         Plot latent space distribution.
-
-    #         Parameters:
-    #         epoch (int): current epoch
-    #     """
-    #     self.eval()
-    #     with torch.no_grad():
-    #         samples = torch.zeros(self.val_loader.dataset.layers.shape) #TODO ugly
-    #         stop = 0
-    #         for x, c in self.val_loader:
-    #             start = stop
-    #             stop += len(x)
-    #             samples[start:stop] = self.forward(x,c)[0].cpu()
-    #         samples = samples.reshape(-1, math.prod(self.shape)).numpy()
-    #     plot_latent(samples, self.doc.basedir, epoch)
-
-    def generate_Einc_ds1(self, sample_multiplier=1000):
-        """generate the incident energy distribution of CaloChallenge ds1
-        sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
-        and 5, 3, 2, 1 times sample multiplier for the highest energies
-
-        """
-        ret = np.logspace(8, 18, 11, base=2)
-        ret = np.tile(ret, 10)
-        ret = np.array(
-            [
-                *ret,
-                *np.tile(2.0**19, 5),
-                *np.tile(2.0**20, 3),
-                *np.tile(2.0**21, 2),
-                *np.tile(2.0**22, 1),
-            ]
-        )
-        ret = np.tile(ret, sample_multiplier)
-        np.random.shuffle(ret)
-        return ret
-
     @torch.inference_mode()
     def sample_n(self):
 
@@ -195,22 +146,17 @@ class CaloChallenge(BaseExperiment):
 
         t_0 = time.time()
 
-        Einc = torch.tensor(
-            (
-                10 ** np.random.uniform(3, 6, size=self.cfg.n_samples)
-                if self.cfg.eval_dataset in ["2", "3"]
-                else self.generate_Einc_ds1()
-            ),
-            dtype=self.dtype,
-            device=self.device,
-        ).unsqueeze(1)
+        Einc = torch.rand((self.cfg.n_samples, 1)) * 99 + 1
+        Einc = Einc.to(device=self.device, dtype=self.dtype)
 
+        samples_dict = {}
+        samples_dict["energy"] = Einc
         # transform Einc to basis used in training
-        dummy, transformed_cond = None, Einc
         for fn in self.transforms:
             if hasattr(fn, "cond_transform"):
-                dummy, transformed_cond = fn(dummy, transformed_cond)
+                samples_dict = fn(samples_dict)
 
+        transformed_cond = samples_dict["energy"]
         batchsize_sample = self.cfg.training.batchsize_sample
         transformed_cond_loader = DataLoader(
             dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
@@ -219,16 +165,14 @@ class CaloChallenge(BaseExperiment):
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
 
-            if self.cfg.sample_us:  # TODO
+            if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             else:  # optionally use truth us
-                transformed_cond = CaloChallengeDataset(
+                transformed_cond = CaloGANDataset(
                     self.hdf5_test,
-                    self.particle_type,
-                    self.xml_filename,
                     transform=self.transforms,
-                    split="full",
+                    return_us=self.cfg.data.return_us,
                     device=self.device,
                 ).energy.to(self.device)
 
@@ -247,8 +191,7 @@ class CaloChallenge(BaseExperiment):
             f"sample_n: Finished generating {len(sample)} samples "
             f"after {sampling_time} s."
         )
-
-        return sample.detach().cpu(), transformed_cond.detach().cpu()
+        return sample, transformed_cond.cpu()
 
     def sample_us(self, transformed_cond_loader):
         """Sample u_i's from the energy model"""
@@ -266,35 +209,46 @@ class CaloChallenge(BaseExperiment):
             f"after {t_1 - t_0} s."
         )
 
+        u_samples_dict = {}
+        u_samples_dict["extra_dims"] = u_samples
         for fn in self.energy_model_transforms[::-1]:
             if hasattr(fn, "u_transform"):
-                u_samples, _ = fn(u_samples, None, rev=True)
+                fn.layer_keys = ["extra_dims"]
+                u_samples_dict = fn(u_samples_dict, rev=True)
         for fn in self.transforms:
             if hasattr(fn, "u_transform"):
-                u_samples, _ = fn(u_samples, None)
+                fn.layer_keys = ["extra_dims"]
+                u_samples_dict = fn(u_samples_dict)
 
-        return u_samples.to(self.dtype)
+        return u_samples_dict["extra_dims"].to(self.dtype)
 
     def plot(self):
         LOGGER.info("plot: generating samples")
         samples, conditions = self.sample_n()
 
         if self.cfg.model_type == "energy":
-            reference = CaloChallengeDataset(
+            reference = CaloGANDataset(
                 self.hdf5_test,
-                self.particle_type,
-                self.xml_filename,
                 transform=self.transforms,  # TODO: Or, apply NormalizeEByLayer popped from model transforms
+                return_us=self.cfg.data.return_us,
                 device=self.device,
-            ).layers
-
+            )
+            samples_dict = {}
+            samples_dict["extra_dims"] = samples
+            samples_dict["energy"] = conditions
+            reference_dict = {}
+            reference_dict["extra_dims"] = reference.layers
+            reference_dict["energy"] = reference.energy
             # postprocess
             for fn in self.transforms[::-1]:
-                if fn.__class__.__name__ == "NormalizeByElayer":
+                if fn.__class__.__name__ == "NormalizeLayerEnergyGAN":
                     break  # this might break plotting
-                samples, _ = fn(samples, conditions, rev=True)
-                reference, _ = fn(reference, conditions, rev=True)
+                fn.layer_keys = ["extra_dims"]
+                samples_dict = fn(samples_dict, rev=True)
+                reference_dict = fn(reference_dict, rev=True)
 
+            samples = samples_dict["extra_dims"]
+            reference = reference_dict["extra_dims"]
             # clip u_i's (except u_0) to [0,1]
             samples[:, 1:] = torch.clip(samples[:, 1:], min=0.0, max=1.0)
             reference[:, 1:] = torch.clip(reference[:, 1:], min=0.0, max=1.0)
@@ -312,17 +266,36 @@ class CaloChallenge(BaseExperiment):
                     cfg=self.cfg,
                 )
         else:
+            bin_edges = self.cfg.data.bin_edges
+            samples = samples.reshape(samples.shape[0], -1)
+
+            samples_dict = {}
+            samples_dict["energy"] = conditions[:, 0]
+            samples_dict["extra_dims"] = conditions[:, 1:]
+            samples_dict["layer_0"] = samples[:, bin_edges[0] : bin_edges[1]]
+            samples_dict["layer_1"] = samples[:, bin_edges[1] : bin_edges[2]]
+            samples_dict["layer_2"] = samples[:, bin_edges[2] : bin_edges[3]]
+            print(samples[:, bin_edges[0] : bin_edges[1]].shape)
             # postprocess
             for fn in self.transforms[::-1]:
-                samples, conditions = fn(samples, conditions, rev=True)
+                samples_dict = fn(samples_dict, rev=True)
 
-            samples = samples.numpy()
-            conditions = conditions.numpy()
+            samples = (
+                torch.hstack(
+                    (
+                        samples_dict["layer_0"],
+                        samples_dict["layer_1"],
+                        samples_dict["layer_2"],
+                    ),
+                )
+                .detach()
+                .cpu()
+                .numpy()
+            )
 
-            self.save_sample(samples, conditions)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                evaluate.run_from_py(samples, conditions, self.cfg)
+                eval_calogan_lowlevel(samples, self.cfg)
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""

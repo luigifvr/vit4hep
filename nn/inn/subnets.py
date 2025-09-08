@@ -6,11 +6,12 @@ from nn.vit import ViT1D
 class SubnetViT(nn.Module):
     "A subnet constructor for a ViT"
 
-    def __init__(self, x_out=None, patch_dim=24, prod_num_patches=15 * 2 * 9, **kwargs):
+    def __init__(self, x_out=None, patch_dim=24, num_patches=[15, 2, 9], prod_num_patches=15 * 2 * 9, **kwargs):
         super().__init__()
 
         vit_kwargs = {
             "patch_dim": patch_dim,
+            "num_patches": num_patches,
             "prod_num_patches": prod_num_patches,
             "x_out": x_out,
         }
