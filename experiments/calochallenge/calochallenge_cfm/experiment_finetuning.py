@@ -22,7 +22,7 @@ class CaloChallengeFTCFM(CaloChallenge):
         self.backbone_cfg = OmegaConf.load(backbone_cfg)
 
         self.model_num_patches = self.cfg.model.net.param.num_patches
-        self.model_patch_dim = self.cfg.model.net.param.patch_dim
+        self.model_patch_dim = self.cfg.model.net.param.patch_dim  # ft patch dim
         self.model_condition_dim = self.cfg.model.net.param.condition_dim
         with open_dict(self.cfg):
             self.cfg.model.net = self.backbone_cfg.model.net
@@ -54,45 +54,22 @@ class CaloChallengeFTCFM(CaloChallenge):
         # add embedding layers
         self.add_embedding_layers()
 
-        # define the positional embedding
-        if self.model.net.learn_pos_embed:
-            l, a, r = self.model_num_patches
-            self.model.net.lgrid = (
-                torch.arange(l, device=self.device, dtype=self.dtype) / l
-            )
-            self.model.net.agrid = (
-                torch.arange(a, device=self.device, dtype=self.dtype) / a
-            )
-            self.model.net.rgrid = (
-                torch.arange(r, device=self.device, dtype=self.dtype) / r
-            )
-        else:
-            self.model.net.pos_embed = get_sincos_pos_embed(
-                self.cfg.model.net.param.pos_embedding_coords,
-                self.model_num_patches,
-                self.cfg.model.net.param.hidden_dim,
-                self.cfg.model.net.param.dim,
-            ).to(self.device, dtype=self.dtype)
-
-        # reinitialize final layer
-        self.model.net.final_layer = FinalLayer(
-            self.cfg.model.net.param.hidden_dim,
-            self.model_patch_dim,
-            self.cfg.model.net.param.out_channels,
-        ).to(self.device, dtype=self.dtype)
-
         if self.cfg.ema:
             LOGGER.info(f"Re-initializing EMA")
             self.ema = ExponentialMovingAverage(
                 self.model.parameters(), decay=self.cfg.training.ema_decay
             ).to(self.device)
 
+        with open_dict(self.cfg):
+            self.cfg.model.net.param.num_patches = self.model_num_patches
+            self.cfg.model.net.param.patch_dim = self.model_patch_dim
+            self.cfg.model.net.param.condition_dim = self.model_condition_dim
+
     def add_embedding_layers(self):
         """
         Add embedding layers to the model.
         This is necessary for fine-tuning on a different dataset.
         """
-        LOGGER.info("Adding embedding layers to the model")
         if self.cfg.finetuning.map_x_embedding:
             self.embedding = self.model.net.x_embedder
             self.embedding_mapper = nn.Linear(
@@ -105,12 +82,22 @@ class CaloChallengeFTCFM(CaloChallenge):
                 )
             )
             self.model.net.x_embedder = nn.Sequential(
-                self.embedding_mapper, self.embedding
+                self.embedding_mapper, nn.SiLU(), self.embedding
             ).to(self.device, dtype=self.dtype)
         else:
-            self.model.net.x_embedder = nn.Linear(
-                self.model_patch_dim, self.cfg.model.net.param.hidden_dim
-            ).to(self.device, dtype=self.dtype)
+            if self.cfg.finetuning.reinitialize_x_embedding:
+                self.model.net.x_embedder = nn.Linear(
+                    self.model_patch_dim,
+                    self.cfg.model.net.param.hidden_dim,
+                ).to(self.device, dtype=self.dtype)
+            if self.cfg.finetuning.interpolate:
+                x_embed_weights = self.model.net.x_embedder.weight
+                x_embed_weights = nn.functional.interpolate(
+                    x_embed_weights.unsqueeze(1),
+                    size=self.model_patch_dim,
+                    mode="linear",
+                ).squeeze(1)
+                self.model.net.x_embedder.weight.data = x_embed_weights.data
 
         if self.cfg.finetuning.map_c_embedding:
             self.c_embedding = self.model.net.c_embedder
@@ -125,11 +112,59 @@ class CaloChallengeFTCFM(CaloChallenge):
                 )
             )
             self.model.net.c_embedder = nn.Sequential(
-                self.c_embedding_mapper, self.c_embedding
+                self.c_embedding_mapper, nn.SiLU(), self.c_embedding
             ).to(self.device, dtype=self.dtype)
         else:
-            self.model.net.c_embedder = nn.Linear(
-                self.model_condition_dim, self.cfg.model.net.param.hidden_dim
+            if self.cfg.finetuning.reinitialize_c_embedding:
+                self.model.net.c_embedder = nn.Sequential(
+                    nn.Linear(
+                        self.model_condition_dim,
+                        self.cfg.model.net.param.hidden_dim,
+                    ),
+                    nn.SiLU(),
+                    nn.Linear(
+                        self.cfg.model.net.param.hidden_dim,
+                        self.cfg.model.net.param.hidden_dim,
+                    ),
+                ).to(self.device, dtype=self.dtype)
+            if self.cfg.finetuning.interpolate:
+                c_embed_weights = self.model.net.c_embedder[0].weight
+                c_embed_weights = nn.functional.interpolate(
+                    c_embed_weights.unsqueeze(1),
+                    size=self.model_condition_dim,
+                    mode="linear",
+                ).squeeze(1)
+                self.model.net.c_embedder[0].weight.data = c_embed_weights.data
+
+        # define the positional embedding
+        if self.model.net.learn_pos_embed:
+            if self.cfg.finetuning.reinitialize_pos_embedding:
+                l, a, r = self.model_num_patches
+                self.model.net.lgrid = (
+                    torch.arange(l, device=self.device, dtype=self.dtype) / l
+                )
+                self.model.net.agrid = (
+                    torch.arange(a, device=self.device, dtype=self.dtype) / a
+                )
+                self.model.net.rgrid = (
+                    torch.arange(r, device=self.device, dtype=self.dtype) / r
+                )
+            else:
+                pass
+        else:
+            self.model.net.pos_embed = get_sincos_pos_embed(
+                self.cfg.model.net.param.pos_embedding_coords,
+                self.model_num_patches,
+                self.cfg.model.net.param.hidden_dim,
+                self.cfg.model.net.param.dim,
+            ).to(self.device, dtype=self.dtype)
+
+        # reinitialize final layer
+        if self.cfg.finetuning.reinitialize_final_layer:
+            self.model.net.final_layer = FinalLayer(
+                self.cfg.model.net.param.hidden_dim,
+                self.model_patch_dim,
+                self.cfg.model.net.param.out_channels,
             ).to(self.device, dtype=self.dtype)
 
     def _init_optimizer(self):
@@ -138,7 +173,7 @@ class CaloChallengeFTCFM(CaloChallenge):
             params_embedder = list(
                 self.model.net.module.x_embedder.parameters()
             ) + list(self.model.net.module.c_embedder.parameters())
-            (
+            +(
                 +[self.model.net.module.pos_embed_freqs]
                 if self.model.net.module.learn_pos_embed
                 else []

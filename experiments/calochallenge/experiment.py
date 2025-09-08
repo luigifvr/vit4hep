@@ -100,7 +100,11 @@ class CaloChallenge(BaseExperiment):
         pass
 
     def _init_dataloader(self):
-        self.batch_size = self.cfg.training.batchsize // self.world_size
+        self.batch_size = (
+            self.cfg.training.batchsize // self.world_size
+            if self.world_size > 1
+            else self.cfg.training.batchsize
+        )
 
         self.train_dist_sampler = torch.utils.data.distributed.DistributedSampler(
             self.train_dataset,
@@ -244,7 +248,7 @@ class CaloChallenge(BaseExperiment):
             f"after {sampling_time} s."
         )
 
-        return sample, transformed_cond.cpu()
+        return sample.detach().cpu(), transformed_cond.detach().cpu()
 
     def sample_us(self, transformed_cond_loader):
         """Sample u_i's from the energy model"""
@@ -312,8 +316,8 @@ class CaloChallenge(BaseExperiment):
             for fn in self.transforms[::-1]:
                 samples, conditions = fn(samples, conditions, rev=True)
 
-            samples = samples.detach().cpu().numpy()
-            conditions = conditions.detach().cpu().numpy()
+            samples = samples.numpy()
+            conditions = conditions.numpy()
 
             self.save_sample(samples, conditions)
             with warnings.catch_warnings():
