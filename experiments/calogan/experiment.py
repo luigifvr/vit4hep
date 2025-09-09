@@ -20,37 +20,21 @@ from experiments.calochallenge.plots import plot_ui_dists
 
 class CaloGAN(BaseExperiment):
     """
-    Base Class for Generative Models to inherit from.
-    Children classes should overwrite the individual methods as needed.
-    Every child class MUST overwrite the methods:
-
-    def build_net(self): should register some NN architecture as self.net
-    def batch_loss(self, x): takes a batch of samples as input and returns the loss
-    def sample_n_parallel(self, n_samples): generates and returns n_samples new samples
-
-    See tbd.py for an example of child class
-
+    Train a generative model on the CaloGAN datasets.
     Structure:
 
-    __init__(params)      : Read in parameters and register the important ones
-    build_net()           : Create the NN and register it as self.net
-                            HAS TO BE OVERWRITTEN IN CHILD CLASS
-    prepare_training()    : Read in the appropriate parameters and prepare the model for training
-                            Currently this is called from run_training(), so it should not be called on its own
-    run_training()        : Run the actual training.
-                            Necessary parameters are read in and the training is performed.
-                            This calls on the methods train_one_epoch() and validate_one_epoch()
-    train_one_epoch()     : Performs one epoch of model training.
-                            This calls on the method batch_loss(x)
-    validate_one_epoch()  : Performs one epoch of validation.
-                            This calls on the method batch_loss(x)
-    batch_loss(x)         : Takes one batch of samples as input and returns the loss.
-                            HAS TO BE OVERWRITTEN IN CHILD CLASS
-    sample_n(n_samples)   : Generates and returns n_samples new samples as a numpy array
-                            HAS TO BE OVERWRITTEN IN CHILD CLASS
-    sample_and_plot       : Generates n_samples and makes plots with them.
-                            This is meant to be used during training if intermediate plots are wanted
-
+    init_data()          : Read in data parameters and prepare the datasets
+    init_physics()       : Read in physics parameters (pass)
+    _init_dataloader()   : Create the dataloaders for training and validation
+    _init_loss()         : Define loss function overwritten in model class
+    _init_metrics()      : Metrics to be tracjked during training (pass)
+    _batch_loss()        : Calls the model's batch_loss function
+    generate_Einc_ds1()  : Generate the incident energy distribution of CaloChallenge as in the training data
+    sample_us()          : Sample energy ratios from the energy model
+    sample_n()           : Generate n_samples from the trained model, either energy ratios or full normalized showers
+    plot()               : First generate full shower, then make plots and evaluate
+    save_sample()        : Save generated samples in the correct format
+    load_energy_model()  : Load an external energy model if sample_us
     """
 
     def init_data(self):

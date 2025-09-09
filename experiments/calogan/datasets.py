@@ -7,7 +7,7 @@ from experiments.calogan.utils import load_data
 
 
 class CaloGANDataset(Dataset):
-    """Dataset for CaloChallenge showers"""
+    """Dataset for CaloGAN (arXiv:1712.10321) showers"""
 
     def __init__(
         self,
