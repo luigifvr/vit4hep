@@ -1,0 +1,51 @@
+exp_type: calochallenge
+exp_name: CaloChallenge
+dtype: float32
+
+distribute_parallel: false
+
+model_type: energy
+sample_us: False
+n_samples: 100000
+data:
+  training_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_3_1_full.hdf5
+  test_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_3_2_full.hdf5
+  particle_type: electron
+  xml_filename: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_3.xml
+  train_val_frac: [0.99,0.01]
+  transforms:
+    NormalizeByElayer:
+        ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_3.xml
+        xml_file: electron
+    ScaleTotalEnergy: 
+        factor: 0.35
+    SelectDims:
+        start: -45
+        end: 0
+    ExclusiveLogitTransform:
+        delta: 1.0e-6
+        rescale: True
+    StandardizeUsFromFile: {n_us: 45, model_dir: null}
+    LogEnergy: {}
+    ScaleEnergy:
+        e_min: 6.907755
+        e_max: 13.815510
+    Reshape:
+        shape: [45]
+
+eval_dataset: "3"
+eval_mode: all
+eval_cut: 0.015
+eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_3_2_full.hdf5
+eval_cls_n_layer: 2
+eval_cls_n_hidden: 512
+eval_cls_dropout: 0.0
+eval_cls_lr: 2.e-4
+eval_cls_batch_size: 1000
+eval_cls_n_epochs: 100
+eval_cls_save_mem: True
+
+defaults:
+ - default
+ - training: default
+ - model: cfm/cfm_ds3_energy

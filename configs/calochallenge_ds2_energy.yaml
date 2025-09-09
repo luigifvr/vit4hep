@@ -1,8 +1,10 @@
 exp_type: calochallenge
-exp_name: CaloChallenge_prenoise
+exp_name: CaloChallenge
 dtype: float32
 
-model_type: shape
+distribute_parallel: false
+
+model_type: energy
 sample_us: False
 n_samples: 100000
 data:
@@ -10,28 +12,30 @@ data:
   test_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5
   particle_type: electron
   xml_filename: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_2.xml
-  val_frac: 0.2
-  transforms: {
-    SelectiveUniformNoise: {
-        a: 1.e-6,
-        b: 1.e-3,
-        cut: True,
-    },
-    NormalizeByElayer: {
-        ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_2.xml,
+  train_val_frac: [0.99,0.01]
+  transforms:
+    NormalizeByElayer:
+        ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_2.xml
         xml_file: electron
-    },
-    ExclusiveLogitTransform: {delta: 1.0e-7, exclusions: [-45]},
-    StandardizeFromFile: {model_dir: None},
-    LogEnergy: {},
-    ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
-    AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [1, 45, 16, 9]},
-  }
+    ScaleTotalEnergy: 
+        factor: 0.35
+    SelectDims:
+        start: -45
+        end: 0
+    ExclusiveLogitTransform:
+        delta: 1.0e-6
+        rescale: True
+    StandardizeUsFromFile: {n_us: 45, model_dir: null}
+    LogEnergy: {}
+    ScaleEnergy:
+        e_min: 6.907755
+        e_max: 13.815510
+    Reshape:
+        shape: [45]
 
 eval_dataset: "2"
 eval_mode: all
-eval_cut: 0.05
+eval_cut: 0.015
 eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5
 eval_cls_n_layer: 2
 eval_cls_n_hidden: 512
@@ -44,4 +48,4 @@ eval_cls_save_mem: True
 defaults:
  - default
  - training: default
- - model: cinn
+ - model: cfm/cfm_ds2_energy
