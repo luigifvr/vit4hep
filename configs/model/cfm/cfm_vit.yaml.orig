@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 _target_: experiments.calochallenge.model.CaloChallengeCFM
+=======
+_target_: experiments.calochallenge.calochallenge_cfm.model.CaloChallengeCFM
+>>>>>>> Stashed changes
 in_channels: 1
 shape: [45, 16, 9]
 patch_shape: [3, 16, 1]
@@ -18,7 +22,11 @@ net:
     hidden_dim: 480
     out_channels: 1
     depth: 6
+<<<<<<< Updated upstream
     num_heads: 4
+=======
+    num_heads: 6
+>>>>>>> Stashed changes
     mlp_ratio: 4
     attn_drop: 0.0
     proj_drop: 0.0
@@ -26,7 +34,15 @@ net:
     temperature: 10000
     learn_pos_embed: true
     causal_attn: false
+<<<<<<< Updated upstream
     chackpoint_grads: false
     num_patches: [15,1,9]
     patch_dim: 48
     use_torch_sdpa: false
+=======
+    checkpoint_grads: false
+    num_patches: [15,1,9]
+    patch_dim: 48
+    use_torch_sdpa: false
+    use_rotary_emb: false
+>>>>>>> Stashed changes

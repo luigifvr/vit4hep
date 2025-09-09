@@ -1,0 +1,32 @@
+_target_: experiments.calochallenge.calochallenge_cfm.model.CaloChallengeCFM
+in_channels: 1
+shape: [53, 1, 10]
+patch_shape: [1, 1, 5]
+
+time_distribution: uniform
+trajectory: linear
+odeint_kwargs:
+  method: rk4
+  options:
+    step_size: 0.05
+
+net:
+  _target_: nn.vit.ViT
+  param:
+    dim: 3
+    condition_dim: 6
+    hidden_dim: 480
+    out_channels: 1
+    depth: 6
+    num_heads: 6
+    mlp_ratio: 4
+    attn_drop: 0.0
+    proj_drop: 0.0
+    pos_embedding_coords: cylindrical
+    temperature: 10000
+    learn_pos_embed: true
+    causal_attn: false
+    checkpoint_grads: false
+    num_patches: [53,1,2]
+    patch_dim: 5
+    use_torch_sdpa: false

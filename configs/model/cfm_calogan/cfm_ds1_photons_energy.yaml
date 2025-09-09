@@ -1,0 +1,25 @@
+_target_: models.base_model.CFM
+
+shape: [3]
+
+time_distribution: uniform
+trajectory: linear
+odeint_kwargs:
+  method: rk4
+  options:
+    step_size: 0.05
+
+net:
+  _target_: nn.cfm.mlp_transformer.MLPTransformer
+  param:
+    dims_in: 3
+    dims_c: 1
+    dim_embedding: 64
+    nhead: 4
+    num_encoder_layers: 4
+    num_decoder_layers: 4
+    dim_feedforward: 512
+    dropout: 0.0
+    activation: relu
+    embeds: true
+    encode_t_scale: 30

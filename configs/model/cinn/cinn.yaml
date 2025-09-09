@@ -3,31 +3,28 @@ in_channels: 1
 shape: [45, 16, 9]
 patch_shape: [3, 8, 1]
 
-coupling_block: CaloRQSpline2
-nblocks: 4
-is_spatial: [False, False, False, False]
-spatial_factor: [1,2,1]
+coupling_block: CaloRQSplineFrEIA
+nblocks: 10
+is_spatial: [False, False, False, False, False, False, False, False, False, False]
 cinn_kwargs: 
   bins: 10
-  min_bin_sizes: [0.01, 0.01]
-  default_domain: [-17.0, 17.0, -17.0, 17.0] # (left, right, bottom, top)
+  min_bin_sizes: [0.001, 0.001]
+  default_domain: [-1.0, 8.0, -1.0, 8.0] # (left, right, bottom, top)
   identity_tails: False
   domain_clamping: null
 
 vit_kwargs:
-  dim: 3
-  x1_channels: 23
+  dim: 1
   condition_dim: 46
-  out_channels: 2
-  final_layer_channels: 23
-  hidden_dim: 480
-  depth: 2
-  num_heads: 6
+  hidden_dim: 240
+  out_channels: 1
+  depth: 3
+  num_heads: 4
   mlp_ratio: 2.0
   attn_drop: 0
   proj_drop: 0
-  pos_embedding_coords: 'cartesian'
-  learn_pos_embed: True
+  pos_embedding_coords: null
+  learn_pos_embed: False
   causal_attn: False
   cos_attn: False
   final_conv: False

@@ -15,11 +15,18 @@ vit_kwargs:
   dim: 3
   x1_channels: 23
   condition_dim: 46
+<<<<<<< Updated upstream:configs/model/cinn_nflows.yaml
   out_channels: 2
   final_layer_channels: 23
   hidden_dim: 360
   depth: 2
   num_heads: 6
+=======
+  hidden_dim: 192
+  out_channels: 1
+  depth: 3
+  num_heads: 4
+>>>>>>> Stashed changes:configs/model/cinn/cinn_nflows.yaml
   mlp_ratio: 4.0
   attn_drop: 0
   proj_drop: 0
