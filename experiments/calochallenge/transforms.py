@@ -26,25 +26,6 @@ def logit(array, alpha=1.0e-6, inv=False):
     return z
 
 
-class Standardize(object):
-    """
-    Standardize features
-        mean: vector of means
-        std: vector of stds
-    """
-
-    def __init__(self, means, stds):
-        self.means = means
-        self.stds = stds
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        if rev:
-            transformed = shower * self.stds + self.means
-        else:
-            transformed = (shower - self.means) / self.stds
-        return transformed, energy
-
-
 class GlobalStandardizeFromFile(object):
     """
     Standardize features
@@ -227,26 +208,6 @@ class AddFeaturesToCond(object):
         return x_, c_
 
 
-class AddEmptyLayer(object):
-    """
-    Add an empty layer.
-    """
-
-    def __init__(self, noise_width=0.0, shape=(1, 1, 16, 9)):
-        self.shape = shape
-        self.noise_width = noise_width
-
-    def __call__(self, x, c, rev=False, rank=0):
-        if rev:
-            c_ = c
-            x_ = x[:, :, :-1]
-        else:
-            layer = torch.rand((x.shape[0],) + self.shape) * self.noise_width
-            c_ = c
-            x_ = torch.cat((x, layer), dim=2)
-        return x_, c_
-
-
 class LogEnergy(object):
     """
     Log transform incident energies
@@ -325,28 +286,6 @@ class ScaleEnergy(object):
         return shower, transformed
 
 
-class ExclusiveLogTransform(object):
-    """
-    Take log of input data
-        delta: regularization
-        exclusions: list of indices for features that should not be transformed
-    """
-
-    def __init__(self, delta, exclusions=None):
-        self.delta = delta
-        self.exclusions = exclusions
-        self.u_transform = True
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        if rev:
-            transformed = torch.exp(shower) - self.delta
-        else:
-            transformed = torch.log(shower + self.delta)
-        if self.exclusions is not None:
-            transformed[..., self.exclusions] = shower[..., self.exclusions]
-        return transformed, energy
-
-
 class ExclusiveLogitTransform(object):
     """
     Take log of input data
@@ -406,65 +345,6 @@ class RegularizeLargeLogit(object):
         return transformed, energy
 
 
-class AddNoise(object):
-    """
-    Add noise to input data
-        func: torch distribution used to sample from
-        width_noise: noise rescaling
-    """
-
-    def __init__(self, noise_width, cut=False):
-        # self.func = func
-        self.func = torch.distributions.Uniform(torch.tensor(0.0), torch.tensor(1.0))
-        self.noise_width = noise_width
-        self.cut = cut  # apply cut if True
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        if rev:
-            mask = shower < self.noise_width
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0
-        else:
-            noise = self.func.sample(shower.shape) * self.noise_width
-            transformed = shower + noise.reshape(shower.shape).to(shower.device)
-        return transformed, energy
-
-
-class SelectiveLogUniformNoise(object):
-    """
-    Add noise to input data with the option to exlude some features
-        func: torch distribution used to sample from
-        width_noise: noise rescaling
-        exclusions: list of indices for features that should not be transformed
-    """
-
-    def __init__(self, a, b, exclusions=None, cut=False):
-        # self.func = func
-        self.a = a
-        self.b = b
-        self.func = LogUniform(torch.tensor(self.a), torch.tensor(self.b))
-        self.exclusions = exclusions
-        self.cut = cut  # apply cut if True
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        if rev:
-            mask = shower < self.b
-            if self.exclusions:
-                mask[:, self.exclusions] = False
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0
-        else:
-            noise = self.func.sample(shower.shape).to(shower.dtype)
-            mask = shower != 1
-            if self.exclusions:
-                noise[:, self.exclusions] = 0.0
-            transformed = shower
-            transformed[mask] = (shower + noise.to(shower.device))[mask]
-        return transformed, energy
-
-
 class SelectiveUniformNoise(object):
     """
     Add noise to input data with the option to exlude some features
@@ -498,71 +378,6 @@ class SelectiveUniformNoise(object):
                 noise[:, self.exclusions] = 0.0
             transformed = shower
             transformed[mask] = (shower + noise.to(shower.device))[mask]
-        return transformed, energy
-
-
-class SelectiveNormalNoise(object):
-    """
-    Add noise to input data with the option to exlude some features
-        func: torch distribution used to sample from
-        exclusions: list of indices for features that should not be transformed
-    """
-
-    def __init__(self, mean, std, exclusions=None, cut=None):
-        # self.func = func
-        self.mean = mean
-        self.std = std
-        self.exclusions = exclusions
-        self.cut = 0.0 if cut is None else cut  # apply cut if True
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        if rev:
-            mask = shower < self.cut
-            if self.exclusions:
-                mask[:, self.exclusions] = False
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0
-        else:
-            noise = torch.zeros(shower.shape[0], shower.shape[1]).normal_(
-                mean=self.mean, std=self.std
-            )
-            if self.exclusions:
-                noise[:, self.exclusions] = 0.0
-            transformed = shower + noise.to(shower.device)
-        return transformed, energy
-
-
-class SelectiveLogNormalNoise(object):
-    """
-    Add noise to input data with the option to exlude some features
-        func: torch distribution used to sample from
-        width_noise: noise rescaling
-        exclusions: list of indices for features that should not be transformed
-    """
-
-    def __init__(self, mean, std, exclusions=None, cut=None):
-        # self.func = func
-        self.mean = mean
-        self.std = std
-        self.exclusions = exclusions
-        self.cut = 0.0 if cut is None else cut  # apply cut if True
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        if rev:
-            mask = shower < self.cut
-            if self.exclusions:
-                mask[:, self.exclusions] = False
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0
-        else:
-            noise = torch.zeros(shower.shape[0], shower.shape[1]).log_normal_(
-                mean=self.mean, std=self.std
-            )
-            if self.exclusions:
-                noise[:, self.exclusions] = 0.0
-            transformed = shower + noise.to(shower.device)
         return transformed, energy
 
 
@@ -610,8 +425,6 @@ class NormalizeByElayer(object):
     """
     Normalize each shower by the layer energy
     This will change the shower shape to N_voxels+N_layers
-       layer_boundaries: ''
-       eps: numerical epsilon
     """
 
     def __init__(self, ptype, xml_file, cut=0.0, eps=1.0e-10):
@@ -681,7 +494,17 @@ class NormalizeByElayer(object):
 
 
 class AddAngularBins(object):
-    def __init__(self, xml_filename, ptype, num_bins, n_voxels):
+    """
+    Add angular bins given an XML file. After the transformation the shower
+    will have a regular geometry. The inverse step takes the maximum over the
+    added angular bins.
+    Args:
+    xml_filename: path to the XML file
+    ptype: particle type (e.g. "electron")
+    num_bins: list with current number of angular bins per layer
+    """
+
+    def __init__(self, xml_filename, ptype, num_bins):
         self.xml = XMLHandler.XMLHandler(xml_filename, ptype)
         self.layer_boundaries = np.unique(self.xml.GetBinEdges())
         self.num_bins = np.array(num_bins)

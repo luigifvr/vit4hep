@@ -2,6 +2,7 @@
 """Main script to evaluate contributions to the Fast Calorimeter Challenge 2022
 
 modified by L. Favaro, A. Ore, S. Palacios for CaloDREAM
+expanded to include the ResNet classifier
 
 input:
     - path to a folder containing .hdf5 samples.

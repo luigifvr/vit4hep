@@ -1,5 +1,4 @@
 import torch.utils.data
-import torch.nn.functional as F
 import numpy as np
 import h5py
 
