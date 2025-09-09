@@ -7,6 +7,11 @@ from models.trajectories import linear_trajectory
 
 
 class BaseModel(nn.Module):
+    """
+    A base class for generative networks and patching. It contains methods to
+    convert to and from patches, as well as a forward method.
+    The child class has to define the network architecture in self.net.
+    """
     def __init__(self, shape):
         super().__init__()
 

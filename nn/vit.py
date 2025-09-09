@@ -133,7 +133,6 @@ class ViT(nn.Module):
         )
 
         # initialize output layer
-        # TODO: final conv for ViT INN ?
         self.final_layer = FinalLayer(
             self.hidden_dim, self.patch_dim, self.out_channels, x_out=1
         )
@@ -199,14 +198,21 @@ class ViT(nn.Module):
 
 class ViT1D(ViT):
     """
-    Vision transformer-based diffusion network.
+    A child class of ViT with 1D positional embeddings.
+    Useful if only a subset of patches is passed to the model.
+    Parameters
+    ----------
+    prod_num_patches: int
+        Product of number of patches
+    x_out: int
+        Output number of channels
     """
 
     def __init__(self, param):
 
         super().__init__(param)
         defaults = {
-            "prod_num_patches": 15 * 4 * 9,  # TODO num_patches not defined
+            "prod_num_patches": 15 * 4 * 9,
             "x_out": None,
         }
 
@@ -250,7 +256,6 @@ class ViT1D(ViT):
         )
 
         # initialize output layer
-        # TODO: final conv for ViT INN ?
         self.final_layer = FinalLayer(
             self.hidden_dim, self.patch_dim, self.out_channels, self.x_out
         )
@@ -477,7 +482,7 @@ def get_1d_sincos_pos_embed(num_patches, dim, temperature=10000):
     Embeds patch positions based directly on input indices, which are assumed
     to be depth, angle, radius.
     """
-    prod_patches = int(math.prod(num_patches)/2)
+    prod_patches = int(math.prod(num_patches) / 2)
     x = torch.arange(prod_patches) / prod_patches
 
     fourier_dim = dim // 2
