@@ -7,22 +7,20 @@ A codebase for applying Vision Transformers (ViTs) to calorimeter data in high-e
 
 We modularize and extend the [CaloDREAM](https://github.com/luigifvr/calo_dreamer) package for easier training on different datasets for calorimeter shower generation and beyond.
 
+Results for the poster "[A universal Vision Transformer network for fast detector simulation](https://indico.cern.ch/event/1488410/contributions/6561483/)", presented at ACAT25, were obtained using this repository.
+
 ## Installation
 
 Clone the repository:
 
-    ```bash
     git clone git@github.com:luigifvr/vit4hep.git
     cd vit4hep
-    ```
 
 Set up a Python environment (recommended: Python 3.12+):
 
-    ```bash
     python -m venv ~/venvs/vit
     source ~/venvs/vit/bin/activate
     pip install -r requirements.txt
-    ```
 
 Datasets have to be collected separately and the various data paths in the provided config files should be changed to the directories containing those files.
 For instance, [GitHub CaloChallenge](https://calochallenge.github.io/homepage/) provides links to the CaloChallenge datasets.
@@ -51,7 +49,7 @@ python run.py -cn config -cp runs/calo_test/calo_0000 train=false warm_start_idx
 
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
 
-## Project Structure
+## Structure
 
 - `experiments/` — Experiment classes and training logic
 - `nn/` — Model definitions (ViT, heads, etc.)
@@ -89,4 +87,4 @@ See `LICENSE` for details.
 
 ## Contact
 
-For questions or contributions, [contact us](mailto:luigi.favaro@uclouvain.be)
+For questions or contributions, [contact us](mailto:luigi.favaro@uclouvain.be).
