@@ -1,7 +1,7 @@
 _target_: experiments.calochallenge.model.CaloChallengeCINN
 in_channels: 1
-shape: [74, 1, 10]
-patch_shape: [1, 1, 5]
+shape: [45, 50, 18]
+patch_shape: [3, 10, 3]
 
 coupling_block: CaloRQSplineFrEIA
 nblocks: 10
@@ -9,15 +9,15 @@ is_spatial: [False, False, False, False, False, False, False, False, False, Fals
 cinn_kwargs: 
   bins: 10
   min_bin_sizes: [0.01, 0.01]
-  default_domain: [-4.0, 20.0, -20.0, 20.0]
+  default_domain: [-4.0, 20.0, -20.0, 20.0] # (left, right, bottom, top)
   identity_tails: False
   domain_clamping: null
 
 vit_kwargs:
   dim: 1
-  condition_dim: 8
-  out_channels: 1
+  condition_dim: 46
   hidden_dim: 320
+  out_channels: 1
   depth: 3
   num_heads: 4
   mlp_ratio: 4.0

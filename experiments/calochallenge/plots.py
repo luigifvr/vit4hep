@@ -15,6 +15,9 @@ def plot_ui_dists(
     skip_quantiles=0,
     cfg=None,
 ):
+    """
+    Function that plots the u_i energy ratios for both generated and reference samples.
+    """
 
     # iterate layers
     for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T)):

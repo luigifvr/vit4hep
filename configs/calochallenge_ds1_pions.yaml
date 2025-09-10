@@ -1,0 +1,53 @@
+exp_type: calochallenge
+exp_name: CaloChallenge
+dtype: float32
+
+model_type: shape
+sample_us: true
+energy_model: ./runs/CaloChallenge_energy/calochallenge_ds1_pions_energy/
+n_samples: 100000
+data:
+  training_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_1.hdf5
+  test_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_2.hdf5
+  particle_type: pion
+  xml_filename: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_pions.xml
+  train_val_frac: [0.99, 0.01]
+  transforms: {
+    NormalizeByElayer: {
+        ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_pions.xml,
+        xml_file: pion
+    },
+    ScaleTotalEnergy: {n_layers: 7, factor: 0.125},
+    AddAngularBins: {
+        ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_pions.xml,
+        xml_filename: pion,
+        num_bins: [1, 10, 10, 1, 10, 10, 1],
+    },
+    CutValues: {cut: 1.e-7, n_layers: 7},
+    ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
+    GlobalStandardizeFromFile: {model_dir: None},
+    LogEnergy: {},
+    ScaleEnergy: {e_min: 5.5452, e_max: 15.2492},
+    AddFeaturesToCond: {split_index: 740},
+    Reshape: {shape: [1, 74, 1, 10]}
+  }
+
+finetuning: false
+
+eval_dataset: "1-pions"
+eval_mode: all
+eval_cut: 0.015
+eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_2.hdf5
+eval_cls_n_layer: 2
+eval_cls_resnet_layers: 18
+eval_cls_n_hidden: 512
+eval_cls_dropout: 0.0
+eval_cls_lr: 2.e-4
+eval_cls_batch_size: 1000
+eval_cls_n_epochs: 100
+eval_cls_save_mem: True
+
+defaults:
+ - default
+ - training: default
+ - model: cfm/cfm_ds1_pions

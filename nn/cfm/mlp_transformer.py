@@ -1,3 +1,8 @@
+"""
+Transformer-based MLP for CFM as used in CaloDREAM arXiv:2405.09629.
+Used to generate energy ratios with a CFM generative network
+"""
+
 import torch
 import torch.nn as nn
 import math

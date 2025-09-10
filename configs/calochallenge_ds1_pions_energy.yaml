@@ -1,0 +1,50 @@
+exp_type: calochallenge
+exp_name: CaloChallenge
+dtype: float32
+
+model_type: energy
+sample_us: False
+n_samples: 121000
+data:
+  training_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_1.hdf5
+  test_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_2.hdf5
+  particle_type: pion
+  xml_filename: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_pions.xml
+  train_val_frac: [0.99,0.01]
+  transforms:
+    NormalizeByElayer:
+        ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_pions.xml
+        xml_file: pion
+    ScaleTotalEnergy: 
+        factor: 0.125
+        n_layers: 7
+    SelectDims:
+        start: -7
+        end: 0
+    ExclusiveLogitTransform:
+        delta: 1.0e-6
+        rescale: true
+    StandardizeUsFromFile: {n_us: 7, model_dir: null}
+    LogEnergy: {}
+    ScaleEnergy:
+        e_min: 5.5452
+        e_max: 15.2492
+    Reshape:
+        shape: [7]
+
+eval_dataset: "1-pions"
+eval_mode: all
+eval_cut: 0.015
+eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_2.hdf5
+eval_cls_n_layer: 2
+eval_cls_n_hidden: 512
+eval_cls_dropout: 0.0
+eval_cls_lr: 2.e-4
+eval_cls_batch_size: 1000
+eval_cls_n_epochs: 100
+eval_cls_save_mem: True
+
+defaults:
+ - default
+ - training: default
+ - model: cfm/cfm_ds1_pions_energy

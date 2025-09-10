@@ -1,50 +1,56 @@
-exp_type: calochallenge
-exp_name: CaloChallenge_DS1
+exp_type: calochallenge_ft_cfm
+exp_name: CaloChallenge_fromDS2
 dtype: float32
 
 model_type: shape
-sample_us: False
+sample_us: true
+energy_model: ./runs/CaloChallenge_energy/calochallenge_ds1_photons_energy/
 n_samples: 100000
 data:
   training_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/gamma_data_1.hdf5
   test_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/gamma_data_2.hdf5
   particle_type: photon
   xml_filename: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_photons.xml
-  val_frac: 0.1
+  train_val_frac: [0.99, 0.01]
   transforms: {
     NormalizeByElayer: {
         ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_photons.xml,
         xml_file: photon
     },
+    ScaleTotalEnergy: {n_layers: 5, factor: 0.25},
     AddAngularBins: {
         ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_photons.xml,
         xml_filename: photon,
         num_bins: [1, 10, 10, 1, 1],
-        n_voxels: 368
     },
-    SelectiveUniformNoise: {
-        noise_width: 1.0e-6,
-        cut: True,
-        exclusions: [-5, -4, -3, -2, -1]
-    },
-    RegularizeLargeLogit: {
-        noise_width: 1.0e-6,
-        cut: False,
-        exclusions: [-5,  -4,  -3,  -2,  -1]
-    }, 
-    ExclusiveLogitTransform: {delta: 1.0e-7, exclusions: [-5]},
-    StandardizeFromFile: {model_dir: None},
+    CutValues: {cut: 1.e-7, n_layers: 5},
+    ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
+    GlobalStandardizeFromFile: {model_dir: None},
     LogEnergy: {},
     ScaleEnergy: {e_min: 5.5452, e_max: 15.2492},
     AddFeaturesToCond: {split_index: 530},
-    Reshape: {shape: [1, 53, 1, 10]}
+    Reshape: {shape: [1, 53, 1, 10]},
   }
+
+finetuning:
+  backbone_cfg: ./runs/CaloCh_learnpos/ds2_data_0.99_global_nonoise_v2/config_0.yaml
+  backbone_lr: 1.e-4
+  head_lr: 5.e-4
+  embedder_lr: 5.e-4
+  map_x_embedding: false
+  map_c_embedding: false
+  reinitialize_x_embedding: false
+  reinitialize_c_embedding: false
+  reinitialize_pos_embedding: true
+  reinitialize_final_layer: true
+  interpolate: true
 
 eval_dataset: "1-photons"
 eval_mode: all
 eval_cut: 0.015
 eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/gamma_data_2.hdf5
 eval_cls_n_layer: 2
+eval_cls_resnet_layers: 18
 eval_cls_n_hidden: 512
 eval_cls_dropout: 0.0
 eval_cls_lr: 2.e-4
@@ -55,4 +61,4 @@ eval_cls_save_mem: True
 defaults:
  - default
  - training: default
- - model: cinn
+ - model: cfm/cfm_ds1_photons
