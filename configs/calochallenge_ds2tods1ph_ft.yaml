@@ -22,7 +22,6 @@ data:
         ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_photons.xml,
         xml_filename: photon,
         num_bins: [1, 10, 10, 1, 1],
-        n_voxels: 368
     },
     CutValues: {cut: 1.e-7, n_layers: 5},
     ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
@@ -51,6 +50,7 @@ eval_mode: all
 eval_cut: 0.015
 eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/gamma_data_2.hdf5
 eval_cls_n_layer: 2
+eval_cls_resnet_layers: 18
 eval_cls_n_hidden: 512
 eval_cls_dropout: 0.0
 eval_cls_lr: 2.e-4

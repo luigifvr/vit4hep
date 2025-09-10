@@ -39,6 +39,7 @@ eval_mode: all
 eval_cut: 0.015
 eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/gamma_data_2.hdf5
 eval_cls_n_layer: 2
+eval_cls_resnet_layers: 18
 eval_cls_n_hidden: 512
 eval_cls_dropout: 0.0
 eval_cls_lr: 2.e-4
