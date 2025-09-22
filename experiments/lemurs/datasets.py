@@ -84,11 +84,18 @@ class LEMURSCollator:
     """
 
     def __init__(
-        self, hdf5_train_dict, transforms, num_classes, rank=0, dtype="float32"
+        self,
+        hdf5_train_dict,
+        transforms,
+        num_classes,
+        return_us=False,
+        rank=0,
+        dtype="float32",
     ):
         self.hdf5_train_dict = hdf5_train_dict
         self.transforms = transforms
         self.num_classes = num_classes
+        self.return_us = return_us
         self.dtype = dtype
         self.rank = rank
         self.worker_id = None  # set on first call
@@ -124,15 +131,28 @@ class LEMURSCollator:
             for fn in self.transforms:
                 batch_dict = fn(batch_dict)
 
-        shower = batch_dict.pop("showers")
-        conds = torch.cat(
-            (
-                batch_dict["extra_dims"],
-                batch_dict["incident_energy"],
-                batch_dict["incident_theta"],
-                batch_dict["incident_phi"],
-                batch_dict["label"],
-            ),
-            dim=-1,
-        )
-        return shower, conds
+        if self.return_us:
+            energy_ratios = batch_dict.pop("extra_dims")
+            conds = torch.cat(
+                (
+                    batch_dict["incident_energy"],
+                    batch_dict["incident_theta"],
+                    batch_dict["incident_phi"],
+                    batch_dict["label"],
+                ),
+                dim=-1,
+            )
+            return energy_ratios, conds
+        else:
+            shower = batch_dict.pop("showers")
+            conds = torch.cat(
+                (
+                    batch_dict["extra_dims"],
+                    batch_dict["incident_energy"],
+                    batch_dict["incident_theta"],
+                    batch_dict["incident_phi"],
+                    batch_dict["label"],
+                ),
+                dim=-1,
+            )
+            return shower, conds

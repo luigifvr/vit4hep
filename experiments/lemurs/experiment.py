@@ -40,6 +40,7 @@ class LEMURS(BaseExperiment):
     def init_data(self):
         self.hdf5_dict_train = self.cfg.data.training_file_dict
         self.hdf5_dict_test = self.cfg.data.test_file_dict
+        self.num_classes = self.cfg.data.num_classes
         self.transforms = []
 
         LOGGER.info("init_data: preparing model training")
@@ -71,7 +72,7 @@ class LEMURS(BaseExperiment):
         collator = LEMURSCollator(
             hdf5_train_dict=self.hdf5_dict_train,
             transforms=self.transforms,
-            num_classes=self.train_dataset.num_classes,
+            num_classes=self.num_classes,
             dtype=self.dtype,
             rank=self.rank,
         )
@@ -130,7 +131,33 @@ class LEMURS(BaseExperiment):
     def evaluate(self):
         pass
 
-    # TODO
+    def sample_initial_conds(self):
+        Einc = torch.tensor(
+            (np.random.uniform(10**3, 10**6, size=self.cfg.n_samples)),
+            dtype=self.dtype,
+            device=self.device,
+        ).unsqueeze(1)
+
+        phi = torch.tensor(
+            (np.random.uniform(0, 2 * np.pi, size=self.cfg.n_samples)),
+            dtype=self.dtype,
+            device=self.device,
+        ).unsqueeze(1)
+
+        cos_theta = torch.tensor(
+            (
+                np.random.uniform(
+                    torch.cos(torch.tensor(0.87)),
+                    torch.cos(torch.tensor(2.27)),
+                    size=self.cfg.n_samples,
+                )
+            ),
+            dtype=self.dtype,
+            device=self.device,
+        ).unsqueeze(1)
+        theta = torch.acos(cos_theta)
+        return Einc, phi, theta
+
     @torch.inference_mode()
     def sample_n(self):
 
@@ -138,22 +165,41 @@ class LEMURS(BaseExperiment):
 
         t_0 = time.time()
 
-        Einc = torch.tensor(
-            (
-                10 ** np.random.uniform(3, 6, size=self.cfg.n_samples)
-                if self.cfg.eval_dataset in ["2", "3"]
-                else self.generate_Einc_ds1()
-            ),
+        Einc, phi, theta = self.sample_initial_conds()
+        gen_label_vector = (
+            self.cfg.data.gen_label_vector
+        )  # one-hot encoded vector, e.g. [0,1,0,0]
+        labels = torch.tensor(
+            np.tile(gen_label_vector, (self.cfg.n_samples, 1)),
             dtype=self.dtype,
             device=self.device,
-        ).unsqueeze(1)
+        )  # shape (n_samples, num_classes)
 
-        # transform Einc to basis used in training
-        dummy, transformed_cond = None, Einc
+        samples = {
+            "incident_energy": Einc,
+            "incident_phi": phi,
+            "incident_theta": theta,
+        }
+        samples["showers"] = torch.empty(
+            *self.cfg.model.shape, dtype=self.dtype, device=self.device
+        )
+        samples["extra_dims"] = torch.empty(
+            self.cfg.model.shape[0], dtype=self.dtype, device=self.device
+        )
+        samples["label"] = labels
         for fn in self.transforms:
             if hasattr(fn, "cond_transform"):
-                dummy, transformed_cond = fn(dummy, transformed_cond)
+                samples = fn(samples)
 
+        transformed_cond = torch.cat(
+            (
+                samples["incident_energy"],
+                samples["incident_theta"],
+                samples["incident_phi"],
+                samples["label"],
+            ),
+            dim=-1,
+        ).to(self.device)
         batchsize_sample = self.cfg.training.batchsize_sample
         transformed_cond_loader = DataLoader(
             dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
@@ -162,27 +208,39 @@ class LEMURS(BaseExperiment):
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
 
-            if self.cfg.sample_us:  # TODO
+            if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             else:  # optionally use truth us
-                transformed_cond = CaloChallengeDataset(
-                    self.hdf5_test,
-                    self.particle_type,
-                    self.xml_filename,
-                    transform=self.transforms,
-                    split="full",
-                    device=self.device,
-                ).energy.to(self.device)
+                transformed_cond = LEMURSDataset(
+                    self.hdf5_dict_test,
+                    dtype=self.dtype,
+                    max_files_per_worker=self.cfg.data.max_files_per_worker,
+                )
+                test_collator = LEMURSCollator(
+                    hdf5_train_dict=self.hdf5_dict_test,
+                    transforms=self.transforms,
+                    num_classes=self.num_classes,
+                    return_us=False,
+                    dtype=self.dtype,
+                    rank=self.rank,
+                )
 
             # concatenate with Einc
             transformed_cond_loader = DataLoader(
-                dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
+                dataset=transformed_cond,
+                batch_size=batchsize_sample,
+                shuffle=False,
+                collate_fn=test_collator,
             )
 
         sample = torch.vstack(
-            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
+            [
+                self.model.sample_batch(c[1].to(self.device)).cpu()
+                for c in transformed_cond_loader
+            ]
         )
+        conditions = torch.vstack([c[1] for c in transformed_cond_loader])
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
@@ -191,7 +249,7 @@ class LEMURS(BaseExperiment):
             f"after {sampling_time} s."
         )
 
-        return sample.detach().cpu(), transformed_cond.detach().cpu()
+        return sample.cpu(), conditions.cpu()
 
     def sample_us(self, transformed_cond_loader):
         """Sample u_i's from the energy model"""
@@ -209,36 +267,61 @@ class LEMURS(BaseExperiment):
             f"after {t_1 - t_0} s."
         )
 
+        u_samples_dict = {}
+        u_samples_dict["extra_dims"] = u_samples
         for fn in self.energy_model_transforms[::-1]:
             if hasattr(fn, "u_transform"):
-                u_samples, _ = fn(u_samples, None, rev=True)
+                fn.layer_keys = ["extra_dims"]
+                u_samples_dict = fn(u_samples_dict, rev=True)
         for fn in self.transforms:
             if hasattr(fn, "u_transform"):
-                u_samples, _ = fn(u_samples, None)
+                fn.layer_keys = ["extra_dims"]
+                u_samples_dict = fn(u_samples_dict)
 
-        return u_samples.to(self.dtype)
+        return u_samples_dict["extra_dims"].to(self.dtype)
 
     def plot(self):
         LOGGER.info("plot: generating samples")
         samples, conditions = self.sample_n()
 
         if self.cfg.model_type == "energy":
-            reference = CaloChallengeDataset(
+            reference = LEMURSDataset(
                 self.hdf5_test,
-                self.particle_type,
-                self.xml_filename,
-                transform=self.transforms,  # TODO: Or, apply NormalizeEByLayer popped from model transforms
-                device=self.device,
-            ).layers
+                dtype=self.dtype,
+                max_files_per_worker=self.cfg.data.max_files_per_worker,
+            )
+            test_collator = LEMURSCollator(
+                hdf5_train_dict=self.hdf5_dict_test,
+                transforms=self.transforms,
+                num_classes=self.num_classes,
+                return_us=True,
+                dtype=self.dtype,
+                rank=self.rank,
+            )
+            reference_loader = DataLoader(
+                dataset=reference,
+                batch_size=self.cfg.training.batchsize_sample,
+                shuffle=False,
+                collate_fn=test_collator,
+            )
+            reference_energy_ratios = torch.vstack(
+                [b[0] for b in reference_loader]
+            ).cpu()
 
+            samples_dict = {}
+            samples_dict["extra_dims"] = samples
+            reference_dict = {}
+            reference_dict["extra_dims"] = reference_energy_ratios
             # postprocess
             for fn in self.transforms[::-1]:
-                if fn.__class__.__name__ == "NormalizeByElayer":
+                if fn.__class__.__name__ == "LEMURSNormalizeByElayer":
                     break  # this might break plotting
-                samples, _ = fn(samples, conditions, rev=True)
-                reference, _ = fn(reference, conditions, rev=True)
+                samples_dict = fn(samples_dict, rev=True)
+                reference_dict = fn(reference_dict, rev=True)
 
             # clip u_i's (except u_0) to [0,1]
+            samples = samples_dict["extra_dims"]
+            reference = reference_dict["extra_dims"]
             samples[:, 1:] = torch.clip(samples[:, 1:], min=0.0, max=1.0)
             reference[:, 1:] = torch.clip(reference[:, 1:], min=0.0, max=1.0)
 
@@ -255,17 +338,37 @@ class LEMURS(BaseExperiment):
                     cfg=self.cfg,
                 )
         else:
+            # reshape as in LEMURS
+            samples = samples.squeeze(1)
+            samples = samples.permute(0, 3, 2, 1)
+
+            samples_dict = {}
+            samples_dict["showers"] = samples
+            samples_dict["extra_dims"] = conditions[:, : samples.shape[-1]]
+            samples_dict["incident_energy"] = conditions[
+                :, samples.shape[-1]
+            ].unsqueeze(1)
+            samples_dict["incident_theta"] = conditions[
+                :, samples.shape[-1] + 1
+            ].unsqueeze(1)
+            samples_dict["incident_phi"] = conditions[
+                :, samples.shape[-1] + 2
+            ].unsqueeze(1)
+            samples_dict["label"] = conditions[:, samples.shape[-1] + 3 :]
+
             # postprocess
             for fn in self.transforms[::-1]:
-                samples, conditions = fn(samples, conditions, rev=True)
+                samples_dict = fn(samples_dict, rev=True)
 
-            samples = samples.numpy()
-            conditions = conditions.numpy()
+            samples = samples_dict["showers"].numpy()
+            Einc = samples_dict["incident_energy"].numpy()
+            theta = samples_dict["incident_theta"].numpy()
+            phi = samples_dict["incident_phi"].numpy()
 
             self.save_sample(samples, conditions)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                evaluate.run_from_py(samples, conditions, self.cfg)
+                evaluate.run_from_py(samples, Einc, theta, phi, self.cfg)
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""

@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 import numpy as np
 import os
 
@@ -108,34 +107,22 @@ class LEMURSStandardizeUsFromFile(object):
 class LEMURSPreprocessConds(object):
     """
     Apply preprocessing steps to the conditions.
-    Log-transform incident energies and scale all conditions to [0,1].
-        alpha: Optional regularization for the log
+    Scale all conditions to [0,1]. Incident energy is in linear scale.
     """
 
-    def __init__(self, alpha=0.0):
-        self.alpha = alpha
+    def __init__(self):
         self.cond_transform = True
         self.keys = ["incident_energy", "incident_theta", "incident_phi"]
         self.scale_dict = None
 
     def __call__(self, data_dict, rev=False, rank=0):
         if rev:
-            # invert log transform
-            data_dict["incident_energy"] = (
-                torch.exp(data_dict["incident_energy"]) - self.alpha
-            )
-
             # rescale all conditions back to original range
             for key in self.keys:
                 min = self.scale_dict[key][0]
                 max = self.scale_dict[key][1]
                 data_dict[key] = data_dict[key] * (max - min) + min
         else:
-            # apply log transform to energies
-            data_dict["incident_energy"] = torch.log(
-                data_dict["incident_energy"] + self.alpha
-            )
-
             # save min and max
             if self.scale_dict is None:
                 self.scale_dict = {key: [] for key in self.keys}
