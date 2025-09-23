@@ -342,6 +342,202 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
     plt.close()
 
 
+def plot_Etot_Einc_scaled(hlfs, reference_class, arg, labels, input_names, p_label):
+    """plots Etot normalized to Einc histogram"""
+    ref_Etot_Einc = reference_class.GetEtot() / reference_class.Einc.squeeze()
+    min_energy = ref_Etot_Einc.min()
+    max_energy = ref_Etot_Einc.max()
+    bins = np.linspace(min_energy, max_energy, 31)
+    fig, ax = plt.subplots(
+        3,
+        1,
+        figsize=(4.5, 4),
+        gridspec_kw={"height_ratios": (4, 1, 1), "hspace": 0.0},
+        sharex=True,
+    )
+
+    counts_ref, bins = np.histogram(
+        reference_class.GetEtot() / reference_class.Einc.squeeze(),
+        bins=bins,
+        density=False,
+    )
+    counts_ref_norm = counts_ref / counts_ref.sum()
+    geant_error = counts_ref_norm / np.sqrt(counts_ref)
+    geant_ratio_error = geant_error / counts_ref_norm
+    geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+    geant_ratio_error[geant_ratio_error_isnan] = 0.0
+    geant_delta_err = geant_ratio_error * 100
+    ax[0].step(
+        bins,
+        dup(counts_ref_norm),
+        label="Geant4",
+        linestyle="-",
+        alpha=0.8,
+        linewidth=1.0,
+        color="k",
+        where="post",
+    )
+    ax[0].fill_between(
+        bins,
+        dup(counts_ref_norm + geant_error),
+        dup(counts_ref_norm - geant_error),
+        step="post",
+        color="k",
+        alpha=0.2,
+    )
+    ax[1].fill_between(
+        bins,
+        dup(1 - geant_error / counts_ref_norm),
+        dup(1 + geant_error / counts_ref_norm),
+        step="post",
+        color="k",
+        alpha=0.2,
+    )
+    ax[2].errorbar(
+        (bins[:-1] + bins[1:]) / 2,
+        np.zeros_like(bins[:-1]),
+        yerr=geant_delta_err,
+        ecolor="grey",
+        color="grey",
+        elinewidth=0.5,
+        linewidth=1.0,
+        fmt=".",
+        capsize=2,
+    )
+    for i in range(len(hlfs)):
+        counts, _ = np.histogram(
+            hlfs[i].GetEtot() / hlfs[i].Einc.squeeze(), bins=bins, density=False
+        )
+        counts_data, bins = np.histogram(
+            hlfs[i].GetEtot() / hlfs[i].Einc.squeeze(), bins=bins, density=False
+        )
+        counts_data_norm = counts_data / counts_data.sum()
+        ax[0].step(
+            bins,
+            dup(counts_data_norm),
+            label=labels[i],
+            where="post",
+            linewidth=1.0,
+            alpha=1.0,
+            color=colors[i],
+            linestyle="-",
+        )
+
+        y_ref_err = counts_data_norm / np.sqrt(counts)
+        ax[0].fill_between(
+            bins,
+            dup(counts_data_norm + y_ref_err),
+            dup(counts_data_norm - y_ref_err),
+            step="post",
+            color=colors[i],
+            alpha=0.2,
+        )
+
+        ratio = counts_data / counts_ref
+        ratio_err = y_ref_err / counts_ref_norm
+        ratio_isnan = np.isnan(ratio)
+        ratio[ratio_isnan] = 1.0
+        ratio_err[ratio_isnan] = 0.0
+        ax[1].step(
+            bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post"
+        )
+        ax[1].fill_between(
+            bins,
+            dup(ratio - ratio_err),
+            dup(ratio + ratio_err),
+            step="post",
+            color=colors[i],
+            alpha=0.2,
+        )
+        delta = np.fabs(ratio - 1) * 100
+        delta_err = ratio_err * 100
+        markers, caps, bars = ax[2].errorbar(
+            (bins[:-1] + bins[1:]) / 2,
+            delta,
+            yerr=delta_err,
+            ecolor=colors[i],
+            color=colors[i],
+            elinewidth=0.5,
+            linewidth=1.0,
+            fmt=".",
+            capsize=2,
+        )
+
+        seps = _separation_power(counts_ref_norm, counts_data_norm, None)
+        print("Separation power of Etot / Einc histogram: {}".format(seps))
+        with open(
+            os.path.join(
+                arg.output_dir,
+                "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+            ),
+            "a",
+        ) as f:
+            f.write("Etot / Einc: \n")
+            f.write(str(seps))
+            f.write("\n\n")
+
+    ax[1].hlines(
+        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
+    )
+    ax[1].set_yticks((0.7, 1.0, 1.3))
+    ax[1].set_ylim(0.5, 1.5)
+    ax[0].set_xlim(bins[0], bins[-1])
+
+    ax[1].axhline(0.7, c="k", ls="--", lw=0.5)
+    ax[1].axhline(1.3, c="k", ls="--", lw=0.5)
+
+    ax[2].set_ylim((0.05, 50))
+    ax[2].set_yscale("log")
+    ax[2].set_yticks([0.1, 1.0, 10.0])
+    ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+    ax[2].set_yticks(
+        [
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8,
+            0.9,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            20.0,
+            30.0,
+            40.0,
+        ],
+        minor=True,
+    )
+
+    ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+    # ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+    ax[2].set_ylabel(r"$\delta [\%]$")
+
+    ax[2].set_xlabel(r"$E_{\text{tot}} / E_{\text{inc}}$")
+    ax[0].set_ylabel(r"a.u.")
+    ax[1].set_ylabel(r"$\frac{\text{Model}}{\text{Geant4}}$")
+    ax[0].legend(
+        loc="best",
+        frameon=False,
+        title=p_label,
+        handlelength=1.2,
+        fontsize=16,
+        title_fontsize=18,
+    )
+    fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
+    filename = os.path.join(
+        arg.output_dir, "Etot_Einc_dataset_{}.pdf".format(arg.dataset)
+    )
+    fig.savefig(filename, dpi=300, format="pdf")
+    plt.close()
+
+
 def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots energy deposited in each layer"""
     filename = os.path.join(

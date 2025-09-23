@@ -141,7 +141,7 @@ class LEMURSPreprocessConds(object):
 class LEMURSScaleTotalEnergy(object):
     """
     Scale only E_tot/E_inc by a factor f.
-    The effect is the same of ScaleVoxels but
+    The effect is the same of scaling the voxels but
     it is applied in a different position in the
     preprocessing chain.
     """

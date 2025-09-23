@@ -14,7 +14,7 @@ from experiments.logger import LOGGER
 from experiments.base_experiment import BaseExperiment
 from experiments.lemurs.datasets import LEMURSDataset, LEMURSCollator
 import experiments.lemurs.transforms as transforms
-from experiments.calochallenge.challenge_files import evaluate
+from experiments.lemurs import evaluate
 from experiments.calochallenge.plots import plot_ui_dists
 
 
@@ -139,7 +139,7 @@ class LEMURS(BaseExperiment):
         ).unsqueeze(1)
 
         phi = torch.tensor(
-            (np.random.uniform(0, 2 * np.pi, size=self.cfg.n_samples)),
+            (np.random.uniform(-np.pi, np.pi, size=self.cfg.n_samples)),
             dtype=self.dtype,
             device=self.device,
         ).unsqueeze(1)

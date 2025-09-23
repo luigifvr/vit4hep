@@ -1,8 +1,7 @@
 # pylint: disable=invalid-name
-"""Main script to evaluate contributions to the Fast Calorimeter Challenge 2022
+"""
+Evaluation script for the LEMURS dataset inspired by the CaloChallenge.
 
-modified by L. Favaro, A. Ore, S. Palacios for CaloDREAM
-expanded to include the ResNet classifier
 
 input:
     - path to a folder containing .hdf5 samples.
@@ -52,9 +51,10 @@ from sklearn.metrics import roc_auc_score
 from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 
-import experiments.calochallenge.challenge_files.HighLevelFeatures as HLF
 from experiments.calochallenge.challenge_files.evaluate_plotting_helper import *
+import experiments.calochallenge.challenge_files.HighLevelFeatures as HLF
 from experiments.calochallenge.challenge_files.resnet import generate_model
+from experiments.logger import LOGGER
 
 torch.set_default_dtype(torch.float64)
 
@@ -62,8 +62,6 @@ plt.rc("font", family="serif", size=16)
 plt.rc("axes", titlesize="medium")
 plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
 plt.rc("text", usetex=True)
-# hardcoded labels for histograms
-labels = ["ViT-CFM", "latViT"]
 
 ########## Parser Setup ##########
 
@@ -484,27 +482,12 @@ def calibrate_classifier(model, calibration_data, arg):
 
 
 def check_file(given_file, arg, which=None):
-    """checks if the provided file has the expected structure based on the dataset"""
-    print(
-        "Checking if {} file has the correct form ...".format(
-            which if which is not None else "provided"
-        )
-    )
-    num_features = {"1-photons": 368, "1-pions": 533, "2": 6480, "3": 40500}[
-        arg.dataset
-    ]
-    num_events = given_file["incident_energies"].shape[0]
+    num_events = given_file["incident_energy"].shape[0]
     assert (
         given_file["showers"].shape[0] == num_events
     ), "Number of energies provided does not match number of showers, {} != {}".format(
         num_events, given_file["showers"].shape[0]
     )
-    assert (
-        given_file["showers"].shape[1] == num_features
-    ), "Showers have wrong shape, expected {}, got {}".format(
-        num_features, given_file["showers"].shape[1]
-    )
-
     print("Found {} events in the file.".format(num_events))
     print(
         "Checking if {} file has the correct form: DONE \n".format(
@@ -513,18 +496,20 @@ def check_file(given_file, arg, which=None):
     )
 
 
-def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1):
+def extract_shower_and_energy(given_file, which, max_len=-1):
     """reads .hdf5 file and returns samples and their energy"""
     print("Extracting showers from {} file ...".format(which))
-    if single_energy is not None:
-        energy_mask = given_file["incident_energies"][:] == single_energy
-        energy = given_file["incident_energies"][:][energy_mask].reshape(-1, 1)
-        shower = given_file["showers"][:][energy_mask.flatten()]
-    else:
-        shower = given_file["showers"][:max_len]
-        energy = given_file["incident_energies"][:max_len]
+    shower = given_file["showers"][:max_len]
+    energy = given_file["incident_energy"][:max_len]
+    theta = given_file["incident_theta"][:max_len]
+    phi = given_file["incident_phi"][:max_len]
     print("Extracting showers from {} file: DONE.\n".format(which))
-    return shower.astype("float32", copy=False), energy.astype("float32", copy=False)
+    return (
+        shower.astype("float32", copy=False),
+        energy.astype("float32", copy=False),
+        theta.astype("float32", copy=False),
+        phi.astype("float32", copy=False),
+    )
 
 
 def load_reference(filename):
@@ -543,22 +528,26 @@ def save_reference(ref_hlf, fname):
     print("Saving file with high-level features DONE.")
 
 
-def plot_histograms(
-    hlf_classes, reference_class, arg, labels, input_names="", p_label=""
-):
+def plot_histograms(hlf_classes, reference_class, arg, input_names="", p_label=""):
     """plots histograms based with reference file as comparison"""
-    plot_Etot_Einc(hlf_classes, reference_class, arg, labels, input_names, p_label)
-    plot_E_layers(hlf_classes, reference_class, arg, labels, input_names, p_label)
-    plot_ECEtas(hlf_classes, reference_class, arg, labels, input_names, p_label)
-    plot_ECPhis(hlf_classes, reference_class, arg, labels, input_names, p_label)
-    plot_ECWidthEtas(hlf_classes, reference_class, arg, labels, input_names, p_label)
-    plot_ECWidthPhis(hlf_classes, reference_class, arg, labels, input_names, p_label)
-    plot_sparsity(hlf_classes, reference_class, arg, labels, input_names, p_label)
+    plot_Etot_Einc_scaled(
+        hlf_classes, reference_class, arg, arg.labels, input_names, p_label
+    )
+    plot_E_layers(hlf_classes, reference_class, arg, arg.labels, input_names, p_label)
+    plot_ECEtas(hlf_classes, reference_class, arg, arg.labels, input_names, p_label)
+    plot_ECPhis(hlf_classes, reference_class, arg, arg.labels, input_names, p_label)
+    plot_ECWidthEtas(
+        hlf_classes, reference_class, arg, arg.labels, input_names, p_label
+    )
+    plot_ECWidthPhis(
+        hlf_classes, reference_class, arg, arg.labels, input_names, p_label
+    )
+    plot_sparsity(hlf_classes, reference_class, arg, arg.labels, input_names, p_label)
     plot_weighted_depth_a(
-        hlf_classes, reference_class, arg, labels, input_names, p_label
+        hlf_classes, reference_class, arg, arg.labels, input_names, p_label
     )
     plot_weighted_depth_r(
-        hlf_classes, reference_class, arg, labels, input_names, p_label
+        hlf_classes, reference_class, arg, arg.labels, input_names, p_label
     )
 
 
@@ -661,6 +650,7 @@ class args_class:
         self.mode = cfg.eval_mode
         self.cut = cfg.eval_cut
         self.reference_file = cfg.eval_hdf5_file
+        self.labels = cfg.eval_labels
         self.which_cuda = 0
 
         # ResNet classifier parameters
@@ -677,8 +667,8 @@ class args_class:
         self.save_mem = cfg.eval_cls_save_mem
 
 
-def run_from_py(sample, energy, cfg):
-    print("Running evaluation script run_from_py:")
+def run_from_py(sample, energy, theta, phi, cfg):
+    LOGGER.info("Running evaluation script:")
 
     if not os.path.isdir(cfg.run_dir + f"/eval_{cfg.run_idx}/"):
         os.makedirs(cfg.run_dir + f"/eval_{cfg.run_idx}/")
@@ -687,23 +677,18 @@ def run_from_py(sample, energy, cfg):
     args.output_dir = cfg.run_dir + f"/eval_{cfg.run_idx}/"
     print("Input sample of shape: ")
     print(sample.shape)
-    particle = {
-        "1-photons": "photon",
-        "1-pions": "pion",
-        "2": "electron",
-        "3": "electron",
-    }[args.dataset]
-    args.particle = particle
 
-    args.min_energy = {
-        "1-photons": 0.001,
-        "1-pions": 0.001,
-        "2": 0.5e-3 / 0.033,
-        "3": 0.5e-3 / 0.033,
-    }[args.dataset]
+    args.min_energy = 0.5e-3 / 0.033
+    particle = "electron"
+    args.particle = particle
+    args.num_voxels = np.prod(sample.shape[1:])
+    args.dataset = "LEMURS"
 
     hlf = HLF.HighLevelFeatures(particle, filename=cfg.data.xml_filename)
 
+    # match the CaloChallenge convention
+    sample = sample.transpose(0, 3, 2, 1)
+    sample = sample.reshape(-1, args.num_voxels)
     # Checking for negative values, nans and infinities
     print("Checking for negative values, number of negative energies: ")
     print("input: ", (sample < 0.0).sum(), "\n")
@@ -722,11 +707,18 @@ def run_from_py(sample, energy, cfg):
     args.reference_file_name = os.path.splitext(args.reference_file_name)[0]
 
     reference_file = h5py.File(args.reference_file, "r")
+    reference_file = reference_file["events"][:]
     check_file(reference_file, args, which="reference")
 
-    reference_shower, reference_energy = extract_shower_and_energy(
-        reference_file, which="reference", max_len=len(sample)
+    reference_shower, reference_energy, reference_theta, reference_phi = (
+        extract_shower_and_energy(
+            reference_file, which="reference", max_len=len(sample)
+        )
     )
+    # match the CaloChallenge convention
+    reference_shower = reference_shower.transpose(0, 3, 2, 1)
+    reference_shower = reference_shower.reshape(-1, args.num_voxels)
+
     reference_shower[reference_shower < args.cut] = 0.0
     reference_hlf = HLF.HighLevelFeatures(particle, filename=cfg.data.xml_filename)
     reference_hlf.Einc = reference_energy
@@ -784,18 +776,12 @@ def run_from_py(sample, energy, cfg):
 
     if args.mode in ["all", "no-cls", "avg-E"]:
         print("Plotting average showers for different energies ...")
-        if "1" in args.dataset:
-            target_energies = 2 ** np.linspace(8, 23, 16)
-            plot_title = [
-                "shower average at E = {} MeV".format(int(en)) for en in target_energies
-            ]
-        else:
-            target_energies = 10 ** np.linspace(3, 6, 4)
-            plot_title = []
-            for i in range(3, 7):
-                plot_title.append(
-                    "shower average for E in [{}, {}] MeV".format(10**i, 10 ** (i + 1))
-                )
+        target_energies = 10 ** np.linspace(3, 6, 4)
+        plot_title = []
+        for i in range(3, 7):
+            plot_title.append(
+                "shower average for E in [{}, {}] MeV".format(10**i, 10 ** (i + 1))
+            )
         for i in range(len(target_energies) - 1):
             filename = "average_shower_dataset_{}_E_{}.png".format(
                 args.dataset, target_energies[i]
@@ -853,14 +839,7 @@ def run_from_py(sample, energy, cfg):
                     + " see eq. 15 of 2009.03796 for its definition.\n"
                 )
         print("Plotting histograms ...")
-        if args.dataset == "1-photons":
-            p_label = r"$\gamma$ ds-1"
-        elif args.dataset == "1-pions":
-            p_label = r"$\pi^{+}$ ds-1"
-        elif args.dataset == "2":
-            p_label = r"$e^{-}$ ds-2"
-        else:
-            p_label = r"$e^{-}$ ds-3"
+        p_label = "LEMURS"
 
         plot_histograms(
             [
@@ -868,7 +847,6 @@ def run_from_py(sample, energy, cfg):
             ],
             reference_hlf,
             args,
-            labels,
             [
                 "",
             ],
@@ -880,7 +858,7 @@ def run_from_py(sample, energy, cfg):
             ],
             reference_shower,
             args,
-            labels,
+            args.labels,
             [
                 "",
             ],
@@ -972,7 +950,7 @@ def run_from_py(sample, energy, cfg):
             elif key in ["cls-resnet"]:
                 classifier = generate_model(
                     args.cls_resnet_layers,
-                    img_shape={"2": (45, 16, 9), "3": (45, 50, 18)}[args.dataset],
+                    img_shape=(45, 16, 9),
                 )
 
             classifier.to(args.device)
@@ -981,7 +959,7 @@ def run_from_py(sample, energy, cfg):
                 p.numel() for p in classifier.parameters() if p.requires_grad
             )
 
-            print("{} has {} parameters".format(args.mode, int(total_parameters)))
+            LOGGER.info("{} has {} parameters".format(args.mode, int(total_parameters)))
 
             if key == "cls-resnet":
                 optimizer = torch.optim.AdamW(
@@ -1041,8 +1019,8 @@ def run_from_py(sample, energy, cfg):
                     final_eval=True,
                     calibration_data=test_dataloader,
                 )
-            print("Final result of classifier test (AUC / JSD):")
-            print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+            LOGGER.info("Final result of classifier test (AUC / JSD):")
+            LOGGER.info("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
             with open(
                 os.path.join(
                     args.output_dir,
@@ -1054,460 +1032,3 @@ def run_from_py(sample, energy, cfg):
                     "Final result of classifier test (AUC / JSD):\n"
                     + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
                 )
-
-
-########## Main ##########
-
-
-def main(raw_args=None):
-    parser = define_parser()
-    args = parser.parse_args(raw_args)
-
-    if not os.path.isdir(args.output_dir):
-        os.makedirs(args.output_dir)
-
-    # check_file(source_file, args, which='input')
-    particle = {
-        "1-photons": "photon",
-        "1-pions": "pion",
-        "2": "electron",
-        "3": "electron",
-    }[args.dataset]
-    args.particle = particle
-    # minimal readout per voxel, ds1: from Michele, ds2/3: 0.5 keV / 0.033 scaling factor
-    args.min_energy = {
-        "1-photons": 0.001,
-        "1-pions": 0.001,
-        "2": 0.5e-3 / 0.033,
-        "3": 0.5e-3 / 0.033,
-    }[args.dataset]
-
-    # get the path of all  the input files to be evaluated
-    list_inputs = glob(args.input_file + "/*samples*.hdf5")
-    showers = []
-    energies = []
-    hlfs = []
-
-    # Using a cut everywhere
-    print("Using Everywhere a cut of {}".format(args.cut))
-
-    for n, file in enumerate(list_inputs):
-        with h5py.File(file, "r") as source_file:
-            hlfs.append(
-                HLF.HighLevelFeatures(
-                    particle,
-                    filename="src/challenge_files/binning_dataset_{}.xml".format(
-                        args.dataset.replace("-", "_")
-                    ),
-                )
-            )
-
-            shower, energy = extract_shower_and_energy(
-                source_file, which="input", single_energy=args.energy
-            )
-
-        # Checking for negative values, nans and infinities
-        print(f"Cheking input file: {file}")
-        print("Checking for negative values, number of negative energies: ")
-        print("input: ", (shower < 0.0).sum(), "\n")
-        print("Checking for nans in the generated sample, number of nans: ")
-        print("input: ", np.isnan(shower).sum(), "\n")
-        print("Checking for infs in the generated sample, number of infs: ")
-        print("input: ", np.isinf(shower).sum(), "\n")
-        np.nan_to_num(shower, copy=False, nan=0.0, neginf=0.0, posinf=0.0)
-
-        shower[shower < args.cut] = 0.0
-        showers.append(shower), energies.append(energy)
-
-    with h5py.File(args.reference_file, "r") as reference_file:
-        # check_file(reference_file, args, which='reference')
-        reference_shower, reference_energy = extract_shower_and_energy(
-            reference_file, which="reference", single_energy=args.energy
-        )
-    reference_shower[reference_shower < args.cut] = 0.0
-
-    # if os.path.exists(os.path.join(args.source_dir, args.reference_file_name + '.pkl')):
-    #   print("Loading .pkl reference")
-    #    reference_hlf = load_reference(os.path.join(args.source_dir,
-    #                                                args.reference_file_name + '.pkl'))
-    # else:
-    print(f"{args.mode=}")
-    print("Computing .pkl reference")
-    reference_hlf = HLF.HighLevelFeatures(
-        particle,
-        filename="src/challenge_files/binning_dataset_{}.xml".format(
-            args.dataset.replace("-", "_")
-        ),
-    )
-
-    print("Loaded HLF object")
-    reference_hlf.Einc = reference_energy
-    # save_reference(reference_hlf,
-    #                 os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
-
-    args.x_scale = "log"
-
-    # evaluations:
-    if args.mode in ["all", "no-cls", "avg"]:
-        for n, file in enumerate(list_inputs):
-            input_name = os.path.basename(file)
-            print(f"Plotting averages for input: {input_name}")
-            print("Plotting average shower next to reference...")
-            plot_layer_comparison(
-                hlfs[n],
-                showers[n].mean(axis=0, keepdims=True),
-                reference_hlf,
-                reference_shower.mean(axis=0, keepdims=True),
-                args,
-                input_name,
-            )
-            print("Plotting average shower next to reference: DONE.\n")
-            print("Plotting average shower...")
-            hlfs[n].DrawAverageShower(
-                showers[n],
-                filename=os.path.join(
-                    args.output_dir,
-                    "average_shower_dataset_{}_{}.png".format(args.dataset, input_name),
-                ),
-                title="Shower average",
-            )
-            if hasattr(reference_hlf, "avg_shower"):
-                pass
-            else:
-                reference_hlf.avg_shower = reference_shower.mean(axis=0, keepdims=True)
-                # save_reference(reference_hlf,
-                #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
-            reference_hlf.DrawAverageShower(
-                reference_hlf.avg_shower,
-                filename=os.path.join(
-                    args.output_dir,
-                    "reference_average_shower_dataset_{}.png".format(args.dataset),
-                ),
-                title="Shower average reference dataset",
-            )
-            print("Plotting average shower: DONE.\n")
-
-            print("Plotting randomly selected reference and generated shower: ")
-            hlfs[n].DrawSingleShower(
-                showers[n][:5],
-                filename=os.path.join(
-                    args.output_dir,
-                    "single_shower_dataset_{}_{}.png".format(args.dataset, input_name),
-                ),
-                title="Single shower",
-            )
-        reference_hlf.DrawSingleShower(
-            reference_shower[:5],
-            filename=os.path.join(
-                args.output_dir,
-                "reference_single_shower_dataset_{}.png".format(args.dataset),
-            ),
-            title="Reference single shower",
-        )
-
-    if args.mode in ["all", "no-cls", "avg-E"]:
-        for n, file in enumerate(list_inputs):
-            input_name = os.path.basename(file)
-            print(
-                f"Plotting average showers for different energies for input {input_name}..."
-            )
-            if "1" in args.dataset:
-                target_energies = 2 ** np.linspace(8, 23, 16)
-                plot_title = [
-                    "shower average at E = {} MeV".format(int(en))
-                    for en in target_energies
-                ]
-            else:
-                target_energies = 10 ** np.linspace(3, 6, 4)
-                plot_title = []
-                for i in range(3, 7):
-                    plot_title.append(
-                        "shower average for E in [{}, {}] MeV".format(
-                            10**i, 10 ** (i + 1)
-                        )
-                    )
-            for i in range(len(target_energies) - 1):
-                filename = "average_shower_dataset_{}_E_{}_{}.png".format(
-                    args.dataset, target_energies[i], input_name
-                )
-                which_showers = (
-                    (energy >= target_energies[i]) & (energy < target_energies[i + 1])
-                ).squeeze()
-                hlfs[n].DrawAverageShower(
-                    showers[n][which_showers],
-                    filename=os.path.join(args.output_dir, filename),
-                    title=plot_title[i],
-                )
-                if hasattr(reference_hlf, "avg_shower_E"):
-                    pass
-                else:
-                    reference_hlf.avg_shower_E = {}
-                if target_energies[i] in reference_hlf.avg_shower_E:
-                    pass
-                else:
-                    which_showers = (
-                        (reference_hlf.Einc >= target_energies[i])
-                        & (reference_hlf.Einc < target_energies[i + 1])
-                    ).squeeze()
-                    reference_hlf.avg_shower_E[target_energies[i]] = reference_shower[
-                        which_showers
-                    ].mean(axis=0, keepdims=True)
-                    # save_reference(reference_hlf,
-                    #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
-
-                reference_hlf.DrawAverageShower(
-                    reference_hlf.avg_shower_E[target_energies[i]],
-                    filename=os.path.join(args.output_dir, "reference_" + filename),
-                    title="reference " + plot_title[i],
-                )
-
-            print("Plotting average shower for different energies: DONE.\n")
-
-    if args.mode in ["all", "no-cls", "hist-p", "hist-chi", "hist"]:
-        print("Calculating high-level features for histograms ...")
-        if reference_hlf.E_tot is None:
-            reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
-        input_names = []
-        for n, file in enumerate(list_inputs):
-            hlfs[n].CalculateFeatures(showers[n])
-            hlfs[n].Einc = energies[n]
-
-            input_name = os.path.basename(file)
-            input_names.append(input_name)
-            with open(
-                os.path.join(
-                    args.output_dir,
-                    "histogram_chi2_{}_{}.txt".format(args.dataset, input_name),
-                ),
-                "w",
-            ) as f:
-                f.write(
-                    f"List of chi2 of the plotted histograms of {input_name},"
-                    + " see eq. 15 of 2009.03796 for its definition.\n"
-                )
-
-        print("Plotting histograms ...")
-        if args.dataset == "1-photons":
-            p_label = r"$\gamma$ DS-1"
-        elif args.dataset == "1-pions":
-            p_label = r"$\pi^{+}$ DS-1"
-        elif args.dataset == "2":
-            p_label = r"$e^{+}$ DS-2"
-        else:
-            p_label = r"$e^{+}$ DS-3"
-
-        plot_histograms(hlfs, reference_hlf, args, labels, input_names, p_label)
-        plot_cell_dist(showers, reference_shower, args, labels, input_names, p_label)
-        print("Plotting histograms: DONE. \n")
-
-    print("at classification branch")
-    if args.mode in [
-        "all",
-        "all-cls",
-        "cls-low",
-        "cls-high",
-        "cls-low-normed",
-        "cls-resnet",
-    ]:
-        print("in classification branch")
-        if args.mode in ["all", "all-cls"]:
-            list_cls = ["cls-low", "cls-high"]
-        else:
-            list_cls = [args.mode]
-
-        for n, file in enumerate(list_inputs):
-            input_name = os.path.basename(file)
-            print(
-                "Calculating high-level features for classifier for input {input_name}..."
-            )
-
-            print("Using {} as cut for the showers ...".format(args.cut))
-            # set a cut on low energy voxels !only low level!
-            cut = args.cut
-
-            hlfs[n].CalculateFeatures(showers[n])
-            hlfs[n].Einc = energies[n]
-
-            if reference_hlf.E_tot is None:
-                reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
-
-            print("Calculating high-level features for classifer: DONE.\n")
-            for key in list_cls:
-                if (args.mode in ["cls-low", "cls-resnet"]) or (
-                    key in ["cls-low", "cls-resnet"]
-                ):
-                    source_array = prepare_low_data_for_classifier(
-                        showers[n],
-                        energies[n],
-                        hlfs[n],
-                        0.0,
-                        cut=cut,
-                        normed=False,
-                        single_energy=args.energy,
-                    )
-                    reference_array = prepare_low_data_for_classifier(
-                        reference_shower,
-                        reference_energy,
-                        reference_hlf,
-                        1.0,
-                        cut=cut,
-                        normed=False,
-                        single_energy=args.energy,
-                    )
-                elif (args.mode in ["cls-low-normed"]) or (key in ["cls-low-normed"]):
-                    source_array = prepare_low_data_for_classifier(
-                        showers[n],
-                        energies[n],
-                        hlfs[n],
-                        0.0,
-                        cut=cut,
-                        normed=True,
-                        single_energy=args.energy,
-                    )
-                    reference_array = prepare_low_data_for_classifier(
-                        reference_shower,
-                        reference_energy,
-                        reference_hlf,
-                        1.0,
-                        cut=cut,
-                        normed=True,
-                        single_energy=args.energy,
-                    )
-                elif (args.mode in ["cls-high"]) or (key in ["cls-high"]):
-                    source_array = prepare_high_data_for_classifier(
-                        showers[n],
-                        energies[n],
-                        hlfs[n],
-                        0.0,
-                        cut=cut,
-                        single_energy=args.energy,
-                    )
-                    reference_array = prepare_high_data_for_classifier(
-                        reference_shower,
-                        reference_energy,
-                        reference_hlf,
-                        1.0,
-                        cut=cut,
-                        single_energy=args.energy,
-                    )
-
-                train_data, test_data, val_data = ttv_split(
-                    source_array, reference_array
-                )
-
-                # set up device
-                args.device = torch.device(
-                    "cuda:" + str(args.which_cuda)
-                    if torch.cuda.is_available() and not args.no_cuda
-                    else "cpu"
-                )
-                print("Using {}".format(args.device))
-
-                if key in ["all", "cls-low", "cls-low-normed", "cls-high"]:
-                    # set up DNN classifier
-                    input_dim = train_data.shape[1] - 1
-                    DNN_kwargs = {
-                        "num_layer": args.cls_n_layer,
-                        "num_hidden": args.cls_n_hidden,
-                        "input_dim": input_dim,
-                        "dropout_probability": args.cls_dropout_probability,
-                    }
-                    classifier = DNN(**DNN_kwargs)
-                elif key in ["cls-resnet"]:
-                    classifier = generate_model(
-                        args.cls_resnet_layers,
-                        img_shape={"2": (45, 16, 9), "3": (45, 50, 18)}[args.dataset],
-                    )
-                classifier.to(args.device)
-                print(classifier)
-                total_parameters = sum(
-                    p.numel() for p in classifier.parameters() if p.requires_grad
-                )
-
-                print("{} has {} parameters".format(args.mode, int(total_parameters)))
-
-                if key == "cls-resnet":
-                    optimizer = torch.optim.AdamW(
-                        classifier.parameters(), lr=args.cls_resnet_lr
-                    )
-                else:
-                    optimizer = torch.optim.Adam(
-                        classifier.parameters(), lr=args.cls_lr
-                    )
-
-                if args.save_mem:
-                    train_data = TensorDataset(
-                        torch.tensor(train_data, dtype=torch.get_default_dtype())
-                    )
-                    test_data = TensorDataset(
-                        torch.tensor(test_data, dtype=torch.get_default_dtype())
-                    )
-                    val_data = TensorDataset(
-                        torch.tensor(val_data, dtype=torch.get_default_dtype())
-                    )
-                else:
-                    train_data = TensorDataset(
-                        torch.tensor(train_data, dtype=torch.get_default_dtype()).to(
-                            args.device
-                        )
-                    )
-                    test_data = TensorDataset(
-                        torch.tensor(test_data, dtype=torch.get_default_dtype()).to(
-                            args.device
-                        )
-                    )
-                    val_data = TensorDataset(
-                        torch.tensor(val_data, dtype=torch.get_default_dtype()).to(
-                            args.device
-                        )
-                    )
-
-                train_dataloader = DataLoader(
-                    train_data, batch_size=args.cls_batch_size, shuffle=True
-                )
-                test_dataloader = DataLoader(
-                    test_data, batch_size=args.cls_batch_size, shuffle=False
-                )
-                val_dataloader = DataLoader(
-                    val_data, batch_size=args.cls_batch_size, shuffle=False
-                )
-
-                train_and_evaluate_cls(
-                    classifier, train_dataloader, test_dataloader, optimizer, args
-                )
-                classifier = load_classifier(classifier, args)
-
-                with torch.inference_mode():
-                    print("Now looking at independent dataset:")
-                    eval_acc, eval_auc, eval_JSD = evaluate_cls(
-                        classifier,
-                        val_dataloader,
-                        args,
-                        final_eval=True,
-                        calibration_data=test_dataloader,
-                    )
-                print(
-                    f"Final result of classifier test {key} for {input_name} (AUC / JSD):"
-                )
-                print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
-                with open(
-                    os.path.join(
-                        args.output_dir,
-                        "classifier_{}_{}_{}_{}.txt".format(
-                            args.mode, key, args.dataset, input_name
-                        ),
-                    ),
-                    "a",
-                ) as f:
-                    f.write(
-                        "Final result of classifier test (AUC / JSD):\n"
-                        + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
-                    )
-
-
-if __name__ == "__main__":
-    main()

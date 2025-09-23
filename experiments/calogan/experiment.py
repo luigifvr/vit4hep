@@ -259,7 +259,6 @@ class CaloGAN(BaseExperiment):
             samples_dict["layer_0"] = samples[:, bin_edges[0] : bin_edges[1]]
             samples_dict["layer_1"] = samples[:, bin_edges[1] : bin_edges[2]]
             samples_dict["layer_2"] = samples[:, bin_edges[2] : bin_edges[3]]
-            print(samples[:, bin_edges[0] : bin_edges[1]].shape)
             # postprocess
             for fn in self.transforms[::-1]:
                 samples_dict = fn(samples_dict, rev=True)

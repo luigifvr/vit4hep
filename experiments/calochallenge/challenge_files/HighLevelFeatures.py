@@ -4,7 +4,6 @@ Class that handles the specific binning geometry based on the provided file
 and computes all relevant high-level features
 """
 import os
-import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
