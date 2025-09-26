@@ -4,7 +4,6 @@ Class that handles the specific binning geometry based on the provided file
 and computes all relevant high-level features
 """
 import os
-import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -46,6 +45,7 @@ class HighLevelFeatures:
         self.weighted_depth_r = {}
         self.weighted_depth_ga = {}
         self.weighted_depth_gr = {}
+        self.Eradial = {}
         self.particle = particle
         self.colors = cm.gnuplot2(np.linspace(0.2, 0.8, 3))
         if self.particle == "photon":
@@ -121,6 +121,17 @@ class HighLevelFeatures:
             weighted_r += self._calculate_WeightedDepth(energy_sum, l)
         return weighted_r / (total_energy_r + 1.0e-8)
 
+    def _calculate_Eradial(self, energy_calo, n):
+        angular_bins = self.num_alpha[0]
+        for k in range(len(self.relevantLayers)):
+            layer_sum = 0
+            data_layer = energy_calo[:, self.bin_edges[k] : self.bin_edges[k + 1]]
+            angular_sum = data_layer[:, n * angular_bins : (n + 1) * angular_bins].sum(
+                axis=-1
+            )
+            layer_sum = +angular_sum
+        return layer_sum
+
     def GetGroupedWeightedDepths(self, energy_calo, l=5):
         n_groups = len(self.relevantLayers) / l
         j = 0
@@ -145,6 +156,10 @@ class HighLevelFeatures:
 
         for n in range(self.num_alpha[0]):
             self.weighted_depth_r[n] = self.CalculateWeightedDepthR(energy_calo, n)
+
+    def CalculateEradial(self, energy_calo):
+        for n in range(len(self.r_edges[0]) - 1):
+            self.Eradial[n] = self._calculate_Eradial(energy_calo, n)
 
     def CalculateFeatures(self, data):
         """Computes all high-level features for the given data"""
@@ -177,6 +192,7 @@ class HighLevelFeatures:
                 )
         self.GetWeightedDepths(data)
         self.GetGroupedWeightedDepths(data)
+        self.CalculateEradial(data)
 
     def _DrawSingleLayer(
         self,
@@ -367,6 +383,9 @@ class HighLevelFeatures:
 
     def GetGroupedWeightedDepthA(self):
         return self.weighted_depth_ga
+
+    def GetEradial(self):
+        return self.Eradial
 
     def DrawAverageShower(self, data, filename=None, title=None):
         """plots average of provided showers"""

@@ -12,15 +12,15 @@ from omegaconf import OmegaConf
 # Other functions of project
 from experiments.logger import LOGGER
 from experiments.base_experiment import BaseExperiment
-from experiments.calogan.datasets import CaloGANDataset
-import experiments.calogan.transforms as transforms
-from experiments.calogan.evaluate import eval_calogan_lowlevel
+from experiments.lemurs.datasets import LEMURSDataset, LEMURSCollator
+import experiments.lemurs.transforms as transforms
+from experiments.lemurs import evaluate
 from experiments.calochallenge.plots import plot_ui_dists
 
 
-class CaloGAN(BaseExperiment):
+class LEMURS(BaseExperiment):
     """
-    Train a generative model on the CaloGAN datasets.
+    Train a generative model on the CaloChallenge datasets.
     Structure:
 
     init_data()          : Read in data parameters and prepare the datasets
@@ -38,8 +38,9 @@ class CaloGAN(BaseExperiment):
     """
 
     def init_data(self):
-        self.hdf5_train = self.cfg.data.training_file
-        self.hdf5_test = self.cfg.data.test_file
+        self.hdf5_dict_train = self.cfg.data.training_file_dict
+        self.hdf5_dict_test = self.cfg.data.test_file_dict
+        self.num_classes = self.cfg.data.num_classes
         self.transforms = []
 
         LOGGER.info("init_data: preparing model training")
@@ -48,33 +49,35 @@ class CaloGAN(BaseExperiment):
                 kwargs["model_dir"] = self.cfg.run_dir
             self.transforms.append(getattr(transforms, name)(**kwargs))
         LOGGER.info("init_data: list of preprocessing steps:")
-        for idx, transform in enumerate(self.transforms):
+        for _, transform in enumerate(self.transforms):
             LOGGER.info(f"{transform.__class__.__name__}")
 
-        self.train_dataset = CaloGANDataset(
-            self.hdf5_train,
-            transform=self.transforms,
-            return_us=self.cfg.data.return_us,
-            device=self.device,
+        self.train_dataset = LEMURSDataset(
+            self.hdf5_dict_train,
             dtype=self.dtype,
-            rank=self.rank,
+            max_files_per_worker=self.cfg.data.max_files_per_worker,
         )
 
-        self.val_dataset = CaloGANDataset(
-            self.hdf5_train,
-            transform=self.transforms,
-            return_us=self.cfg.data.return_us,
-            device=self.device,
+        self.val_dataset = LEMURSDataset(
+            self.hdf5_dict_test,
             dtype=self.dtype,
-            rank=self.rank,
+            max_files_per_worker=self.cfg.data.max_files_per_worker,
         )
-
-        self.layer_boundaries = self.train_dataset.bin_edges
 
     def init_physics(self):
         pass
 
     def _init_dataloader(self):
+        # instantiate collate_fn
+        collator = LEMURSCollator(
+            hdf5_train_dict=self.hdf5_dict_train,
+            transforms=self.transforms,
+            num_classes=self.num_classes,
+            return_us=self.cfg.data.return_us,
+            dtype=self.dtype,
+            rank=self.rank,
+        )
+
         self.batch_size = (
             self.cfg.training.batchsize // self.world_size
             if self.world_size > 1
@@ -96,12 +99,18 @@ class CaloGAN(BaseExperiment):
             batch_size=self.batch_size,
             sampler=self.train_dist_sampler,
             pin_memory=True,
+            num_workers=4,
+            persistent_workers=True,
+            collate_fn=collator,
         )
         self.val_loader = DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
             sampler=self.val_dist_sampler,
             pin_memory=True,
+            num_workers=4,
+            persistent_workers=True,
+            collate_fn=collator,
         )
 
         LOGGER.info(
@@ -123,6 +132,33 @@ class CaloGAN(BaseExperiment):
     def evaluate(self):
         pass
 
+    def sample_initial_conds(self):
+        Einc = torch.tensor(
+            (np.random.uniform(10**3, 10**6, size=self.cfg.n_samples)),
+            dtype=self.dtype,
+            device=self.device,
+        ).unsqueeze(1)
+
+        phi = torch.tensor(
+            (np.random.uniform(-np.pi, np.pi, size=self.cfg.n_samples)),
+            dtype=self.dtype,
+            device=self.device,
+        ).unsqueeze(1)
+
+        cos_theta = torch.tensor(
+            (
+                np.random.uniform(
+                    torch.cos(torch.tensor(0.87)),
+                    torch.cos(torch.tensor(2.27)),
+                    size=self.cfg.n_samples,
+                )
+            ),
+            dtype=self.dtype,
+            device=self.device,
+        ).unsqueeze(1)
+        theta = torch.acos(cos_theta)
+        return Einc, phi, theta
+
     @torch.inference_mode()
     def sample_n(self):
 
@@ -130,17 +166,41 @@ class CaloGAN(BaseExperiment):
 
         t_0 = time.time()
 
-        Einc = torch.rand((self.cfg.n_samples, 1)) * 99 + 1
-        Einc = Einc.to(device=self.device, dtype=self.dtype)
+        Einc, phi, theta = self.sample_initial_conds()
+        gen_label_vector = (
+            self.cfg.data.gen_label_vector
+        )  # one-hot encoded vector, e.g. [0,1,0,0]
+        labels = torch.tensor(
+            np.tile(gen_label_vector, (self.cfg.n_samples, 1)),
+            dtype=self.dtype,
+            device=self.device,
+        )  # shape (n_samples, num_classes)
 
-        samples_dict = {}
-        samples_dict["energy"] = Einc
-        # transform Einc to basis used in training
+        samples = {
+            "incident_energy": Einc,
+            "incident_phi": phi,
+            "incident_theta": theta,
+        }
+        samples["showers"] = torch.empty(
+            *self.cfg.model.shape, dtype=self.dtype, device=self.device
+        )
+        samples["extra_dims"] = torch.empty(
+            self.cfg.model.shape[0], dtype=self.dtype, device=self.device
+        )
+        samples["label"] = labels
         for fn in self.transforms:
             if hasattr(fn, "cond_transform"):
-                samples_dict = fn(samples_dict)
+                samples = fn(samples)
 
-        transformed_cond = samples_dict["energy"]
+        transformed_cond = torch.cat(
+            (
+                samples["incident_energy"],
+                samples["incident_theta"],
+                samples["incident_phi"],
+                samples["label"],
+            ),
+            dim=-1,
+        ).to(self.device)
         batchsize_sample = self.cfg.training.batchsize_sample
         transformed_cond_loader = DataLoader(
             dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
@@ -153,21 +213,43 @@ class CaloGAN(BaseExperiment):
                 u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             else:  # optionally use truth us
-                transformed_cond = CaloGANDataset(
-                    self.hdf5_test,
-                    transform=self.transforms,
-                    return_us=self.cfg.data.return_us,
-                    device=self.device,
-                ).energy.to(self.device)
+                transformed_cond = LEMURSDataset(
+                    self.hdf5_dict_test,
+                    dtype=self.dtype,
+                    max_files_per_worker=self.cfg.data.max_files_per_worker,
+                )
+                test_collator = LEMURSCollator(
+                    hdf5_train_dict=self.hdf5_dict_test,
+                    transforms=self.transforms,
+                    num_classes=self.num_classes,
+                    return_us=False,
+                    dtype=self.dtype,
+                    rank=self.rank,
+                )
 
             # concatenate with Einc
             transformed_cond_loader = DataLoader(
-                dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
+                dataset=transformed_cond,
+                batch_size=batchsize_sample,
+                shuffle=False,
+                collate_fn=test_collator,
             )
 
-        sample = torch.vstack(
-            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
-        )
+            sample = torch.vstack(
+                [
+                    self.model.sample_batch(c[1].to(self.device)).cpu()
+                    for c in transformed_cond_loader
+                ]
+            )
+            conditions = torch.vstack([c[1] for c in transformed_cond_loader])
+        else:
+            sample = torch.vstack(
+                [
+                    self.model.sample_batch(c.to(self.device)).cpu()
+                    for c in transformed_cond_loader
+                ]
+            )
+            conditions = transformed_cond
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
@@ -175,7 +257,8 @@ class CaloGAN(BaseExperiment):
             f"sample_n: Finished generating {len(sample)} samples "
             f"after {sampling_time} s."
         )
-        return sample, transformed_cond.cpu()
+
+        return sample.cpu(), conditions.cpu()
 
     def sample_us(self, transformed_cond_loader):
         """Sample u_i's from the energy model"""
@@ -211,29 +294,55 @@ class CaloGAN(BaseExperiment):
         samples, conditions = self.sample_n()
 
         if self.cfg.model_type == "energy":
-            reference = CaloGANDataset(
-                self.hdf5_test,
-                transform=self.transforms,  # TODO: Or, apply NormalizeEByLayer popped from model transforms
-                return_us=self.cfg.data.return_us,
-                device=self.device,
+            reference = LEMURSDataset(
+                self.hdf5_dict_test,
+                dtype=self.dtype,
+                max_files_per_worker=self.cfg.data.max_files_per_worker,
             )
+            test_collator = LEMURSCollator(
+                hdf5_train_dict=self.hdf5_dict_test,
+                transforms=self.transforms,
+                num_classes=self.num_classes,
+                return_us=True,
+                dtype=self.dtype,
+                rank=self.rank,
+            )
+            reference_loader = DataLoader(
+                dataset=reference,
+                batch_size=self.cfg.training.batchsize_sample,
+                shuffle=False,
+                collate_fn=test_collator,
+            )
+            reference_energy_ratios = torch.vstack(
+                [b[0] for b in reference_loader]
+            ).cpu()
+            reference_conditions = torch.vstack([b[1] for b in reference_loader]).cpu()
+
             samples_dict = {}
             samples_dict["extra_dims"] = samples
-            samples_dict["energy"] = conditions
+            samples_dict["incident_energy"] = conditions[:, 0].unsqueeze(1)
+            samples_dict["incident_theta"] = conditions[:, 1].unsqueeze(1)
+            samples_dict["incident_phi"] = conditions[:, 2].unsqueeze(1)
+            samples_dict["label"] = conditions[:, 3:]
+
             reference_dict = {}
-            reference_dict["extra_dims"] = reference.layers
-            reference_dict["energy"] = reference.energy
+            reference_dict["extra_dims"] = reference_energy_ratios
+            reference_dict["incident_energy"] = reference_conditions[:, 0].unsqueeze(1)
+            reference_dict["incident_theta"] = reference_conditions[:, 1].unsqueeze(1)
+            reference_dict["incident_phi"] = reference_conditions[:, 2].unsqueeze(1)
+            reference_dict["label"] = reference_conditions[:, 3:]
             # postprocess
             for fn in self.transforms[::-1]:
-                if fn.__class__.__name__ == "NormalizeLayerEnergyGAN":
+                if fn.__class__.__name__ == "LEMURSNormalizeByElayer":
                     break  # this might break plotting
-                fn.layer_keys = ["extra_dims"]
-                samples_dict = fn(samples_dict, rev=True)
-                reference_dict = fn(reference_dict, rev=True)
+                if hasattr(fn, "u_transform"):
+                    fn.keys = ["extra_dims"]
+                    samples_dict = fn(samples_dict, rev=True)
+                    reference_dict = fn(reference_dict, rev=True)
 
+            # clip u_i's (except u_0) to [0,1]
             samples = samples_dict["extra_dims"]
             reference = reference_dict["extra_dims"]
-            # clip u_i's (except u_0) to [0,1]
             samples[:, 1:] = torch.clip(samples[:, 1:], min=0.0, max=1.0)
             reference[:, 1:] = torch.clip(reference[:, 1:], min=0.0, max=1.0)
 
@@ -250,35 +359,37 @@ class CaloGAN(BaseExperiment):
                     cfg=self.cfg,
                 )
         else:
-            bin_edges = self.cfg.data.bin_edges
-            samples = samples.reshape(samples.shape[0], -1)
+            # reshape as in LEMURS
+            samples = samples.squeeze(1)
+            samples = samples.permute(0, 3, 2, 1)
 
             samples_dict = {}
-            samples_dict["energy"] = conditions[:, 0]
-            samples_dict["extra_dims"] = conditions[:, 1:]
-            samples_dict["layer_0"] = samples[:, bin_edges[0] : bin_edges[1]]
-            samples_dict["layer_1"] = samples[:, bin_edges[1] : bin_edges[2]]
-            samples_dict["layer_2"] = samples[:, bin_edges[2] : bin_edges[3]]
+            samples_dict["showers"] = samples
+            samples_dict["extra_dims"] = conditions[:, : samples.shape[-1]]
+            samples_dict["incident_energy"] = conditions[
+                :, samples.shape[-1]
+            ].unsqueeze(1)
+            samples_dict["incident_theta"] = conditions[
+                :, samples.shape[-1] + 1
+            ].unsqueeze(1)
+            samples_dict["incident_phi"] = conditions[
+                :, samples.shape[-1] + 2
+            ].unsqueeze(1)
+            samples_dict["label"] = conditions[:, samples.shape[-1] + 3 :]
+
             # postprocess
             for fn in self.transforms[::-1]:
                 samples_dict = fn(samples_dict, rev=True)
 
-            samples = (
-                torch.hstack(
-                    (
-                        samples_dict["layer_0"],
-                        samples_dict["layer_1"],
-                        samples_dict["layer_2"],
-                    ),
-                )
-                .detach()
-                .cpu()
-                .numpy()
-            )
+            samples = samples_dict["showers"].numpy()
+            Einc = samples_dict["incident_energy"].numpy()
+            theta = samples_dict["incident_theta"].numpy()
+            phi = samples_dict["incident_phi"].numpy()
 
+            self.save_sample(samples, conditions)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                eval_calogan_lowlevel(samples, self.cfg)
+                evaluate.run_from_py(samples, Einc, theta, phi, self.cfg)
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""

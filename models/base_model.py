@@ -205,8 +205,8 @@ class CFM(BaseModel):
     def _batch_loss(self, x):
         # get input and conditions
         x, c = x[0], x[1]
-        x = x.to(self.device, self.dtype)
-        c = c.to(self.device, self.dtype)
+        x = x.to(self.device, self.dtype, non_blocking=True)
+        c = c.to(self.device, self.dtype, non_blocking=True)
 
         t = self.time_distribution.sample([x.shape[0]] + [1] * (x.dim() - 1))
         t = t.to(self.device, self.dtype)
