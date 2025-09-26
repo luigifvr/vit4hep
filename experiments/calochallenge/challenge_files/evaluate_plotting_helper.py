@@ -2315,6 +2315,438 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
             plt.close()
 
 
+def plot_z_profile(hlfs, reference_class, arg, labels, input_names, p_label):
+    """plots energy profile in the z direction"""
+    filename = os.path.join(
+        arg.output_dir, "profile_energy_z_dataset_{}.pdf".format(arg.dataset)
+    )
+
+    ref_layer_energies = reference_class.GetElayers()
+    ref_means = np.array([ref_layer_energies[key].mean() for key in ref_layer_energies])
+    ref_stds = np.array([ref_layer_energies[key].std() for key in ref_layer_energies])
+    ref_n_samples = len(ref_layer_energies[next(iter(ref_layer_energies))])
+    ref_sem = ref_stds / np.sqrt(ref_n_samples)  # Standard Error of the Mean
+
+    hlfs_means = []
+    hlfs_sem = []
+    for hlf in hlfs:
+        hlf_layer_energies = hlf.GetElayers()
+        means = np.array([hlf_layer_energies[key].mean() for key in hlf_layer_energies])
+        stds = np.array([hlf_layer_energies[key].std() for key in hlf_layer_energies])
+        n_samples = len(hlf_layer_energies[next(iter(hlf_layer_energies))])
+        sem = stds / np.sqrt(n_samples)
+        hlfs_means.append(means)
+        hlfs_sem.append(sem)
+
+    with PdfPages(filename) as pdf:
+        fig, ax = plt.subplots(
+            3,
+            1,
+            figsize=(4.5, 4),
+            gridspec_kw={"height_ratios": (4, 1, 1), "hspace": 0.0},
+            sharex=True,
+        )
+        x_bins = np.arange(0, len(ref_means) + 1, 1)
+
+        ax[0].step(
+            x_bins,
+            dup(ref_means),
+            label="Geant4",
+            linestyle="-",
+            alpha=0.8,
+            linewidth=1.0,
+            color="k",
+            where="post",
+        )
+        ax[0].fill_between(
+            x_bins,
+            dup(ref_means - ref_sem),
+            dup(ref_means + ref_sem),
+            step="post",
+            color="k",
+            alpha=0.2,
+        )
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ref_ratio_err = ref_sem / ref_means
+            ref_ratio_err[np.isnan(ref_ratio_err)] = 0.0
+
+        ax[1].fill_between(
+            x_bins,
+            dup(1 - ref_ratio_err),
+            dup(1 + ref_ratio_err),
+            step="post",
+            color="k",
+            alpha=0.2,
+        )
+        ax[2].errorbar(
+            x_bins[:-1] + 0.5,  # Center the error bars on the steps
+            np.zeros_like(ref_means),
+            yerr=ref_ratio_err * 100,
+            ecolor="grey",
+            color="grey",
+            elinewidth=0.5,
+            linewidth=1.0,
+            fmt=".",
+            capsize=2,
+        )
+
+        for i in range(len(hlfs)):
+            gen_means = hlfs_means[i]
+            gen_sem = hlfs_sem[i]
+
+            ax[0].step(
+                x_bins,
+                dup(gen_means),
+                label=labels[i],
+                where="post",
+                linewidth=1.0,
+                alpha=1.0,
+                color=colors[i],
+                linestyle="-",
+            )
+            ax[0].fill_between(
+                x_bins,
+                dup(gen_means - gen_sem),
+                dup(gen_means + gen_sem),
+                step="post",
+                color=colors[i],
+                alpha=0.2,
+            )
+
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ratio = gen_means / ref_means
+                ratio_err = ratio * np.sqrt(
+                    (gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2
+                )
+                ratio[np.isnan(ratio)] = 1.0
+                ratio_err[np.isnan(ratio_err)] = 0.0
+
+            ax[1].step(
+                x_bins,
+                dup(ratio),
+                linewidth=1.0,
+                alpha=1.0,
+                color=colors[i],
+                where="post",
+            )
+            ax[1].fill_between(
+                x_bins,
+                dup(ratio - ratio_err),
+                dup(ratio + ratio_err),
+                step="post",
+                color=colors[i],
+                alpha=0.2,
+            )
+
+            delta = np.fabs(ratio - 1) * 100
+            delta_err = ratio_err * 100
+            _, _, _ = ax[2].errorbar(
+                x_bins[:-1] + 0.5,  # Center the error bars
+                delta,
+                yerr=delta_err,
+                ecolor=colors[i],
+                color=colors[i],
+                elinewidth=0.5,
+                linewidth=1.0,
+                fmt=".",
+                capsize=2,
+            )
+
+            seps = _separation_power(ref_means, gen_means, None)
+            print(f"Separation power of z profile: {seps}")
+            with open(
+                os.path.join(
+                    arg.output_dir,
+                    "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                ),
+                "a",
+            ) as f:
+                f.write("z profile: \n")
+                f.write(str(seps))
+                f.write("\n\n")
+
+        ax[1].hlines(
+            1.0,
+            x_bins[0],
+            x_bins[-1],
+            linewidth=1.0,
+            alpha=0.8,
+            linestyle="-",
+            color="k",
+        )
+        ax[1].set_yticks((0.7, 1.0, 1.3))
+        ax[1].set_ylim(0.5, 1.5)
+        ax[0].set_xlim(x_bins[0], x_bins[-1])
+
+        ax[1].axhline(0.7, c="k", ls="--", lw=0.5)
+        ax[1].axhline(1.3, c="k", ls="--", lw=0.5)
+
+        ax[2].set_ylim((0.05, 50))
+        ax[2].set_yscale("log")
+        ax[2].set_yticks([0.1, 1.0, 10.0])
+        ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+        ax[2].set_yticks(
+            [
+                0.2,
+                0.3,
+                0.4,
+                0.5,
+                0.6,
+                0.7,
+                0.8,
+                0.9,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0,
+                9.0,
+                20.0,
+                30.0,
+                40.0,
+            ],
+            minor=True,
+        )
+
+        ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+        ax[2].set_ylabel(r"$\delta [\%]$")
+
+        ax[0].set_ylabel(r"$\langle E \rangle$ [a.u.]")
+        ax[1].set_ylabel(r"$\frac{\text{Model}}{\text{Geant4}}$")
+        ax[2].set_xlabel(r"$z$ layer number")
+        ax[0].set_yscale("log")
+        ax[0].legend(
+            loc="lower right",
+            frameon=False,
+            title=p_label,
+            handlelength=1.2,
+            fontsize=16,
+            title_fontsize=18,
+        )
+        fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
+        plt.savefig(pdf, dpi=300, format="pdf")
+        plt.close()
+
+
+def plot_r_profile(hlfs, reference_class, arg, labels, input_names, p_label):
+    """plots energy profile in the radial direction"""
+    filename = os.path.join(
+        arg.output_dir, "profile_energy_r_dataset_{}.pdf".format(arg.dataset)
+    )
+
+    ref_layer_energies = reference_class.GetEradial()
+    ref_means = np.array([ref_layer_energies[key].mean() for key in ref_layer_energies])
+    ref_stds = np.array([ref_layer_energies[key].std() for key in ref_layer_energies])
+    ref_n_samples = len(ref_layer_energies[next(iter(ref_layer_energies))])
+    ref_sem = ref_stds / np.sqrt(ref_n_samples)  # Standard Error of the Mean
+
+    hlfs_means = []
+    hlfs_sem = []
+    for hlf in hlfs:
+        hlf_layer_energies = hlf.GetEradial()
+        means = np.array([hlf_layer_energies[key].mean() for key in hlf_layer_energies])
+        stds = np.array([hlf_layer_energies[key].std() for key in hlf_layer_energies])
+        n_samples = len(hlf_layer_energies[next(iter(hlf_layer_energies))])
+        sem = stds / np.sqrt(n_samples)
+        hlfs_means.append(means)
+        hlfs_sem.append(sem)
+
+    with PdfPages(filename) as pdf:
+        fig, ax = plt.subplots(
+            3,
+            1,
+            figsize=(4.5, 4),
+            gridspec_kw={"height_ratios": (4, 1, 1), "hspace": 0.0},
+            sharex=True,
+        )
+        x_bins = np.arange(0, len(ref_means) + 1, 1)
+
+        ax[0].step(
+            x_bins,
+            dup(ref_means),
+            label="Geant4",
+            linestyle="-",
+            alpha=0.8,
+            linewidth=1.0,
+            color="k",
+            where="post",
+        )
+        ax[0].fill_between(
+            x_bins,
+            dup(ref_means - ref_sem),
+            dup(ref_means + ref_sem),
+            step="post",
+            color="k",
+            alpha=0.2,
+        )
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ref_ratio_err = ref_sem / ref_means
+            ref_ratio_err[np.isnan(ref_ratio_err)] = 0.0
+
+        ax[1].fill_between(
+            x_bins,
+            dup(1 - ref_ratio_err),
+            dup(1 + ref_ratio_err),
+            step="post",
+            color="k",
+            alpha=0.2,
+        )
+        ax[2].errorbar(
+            x_bins[:-1] + 0.5,  # Center the error bars on the steps
+            np.zeros_like(ref_means),
+            yerr=ref_ratio_err * 100,
+            ecolor="grey",
+            color="grey",
+            elinewidth=0.5,
+            linewidth=1.0,
+            fmt=".",
+            capsize=2,
+        )
+
+        for i in range(len(hlfs)):
+            gen_means = hlfs_means[i]
+            gen_sem = hlfs_sem[i]
+
+            ax[0].step(
+                x_bins,
+                dup(gen_means),
+                label=labels[i],
+                where="post",
+                linewidth=1.0,
+                alpha=1.0,
+                color=colors[i],
+                linestyle="-",
+            )
+            ax[0].fill_between(
+                x_bins,
+                dup(gen_means - gen_sem),
+                dup(gen_means + gen_sem),
+                step="post",
+                color=colors[i],
+                alpha=0.2,
+            )
+
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ratio = gen_means / ref_means
+                ratio_err = ratio * np.sqrt(
+                    (gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2
+                )
+                ratio[np.isnan(ratio)] = 1.0
+                ratio_err[np.isnan(ratio_err)] = 0.0
+
+            ax[1].step(
+                x_bins,
+                dup(ratio),
+                linewidth=1.0,
+                alpha=1.0,
+                color=colors[i],
+                where="post",
+            )
+            ax[1].fill_between(
+                x_bins,
+                dup(ratio - ratio_err),
+                dup(ratio + ratio_err),
+                step="post",
+                color=colors[i],
+                alpha=0.2,
+            )
+
+            delta = np.fabs(ratio - 1) * 100
+            delta_err = ratio_err * 100
+            _, _, _ = ax[2].errorbar(
+                x_bins[:-1] + 0.5,  # Center the error bars
+                delta,
+                yerr=delta_err,
+                ecolor=colors[i],
+                color=colors[i],
+                elinewidth=0.5,
+                linewidth=1.0,
+                fmt=".",
+                capsize=2,
+            )
+
+            seps = _separation_power(ref_means, gen_means, None)
+            print(f"Separation power of z profile: {seps}")
+            with open(
+                os.path.join(
+                    arg.output_dir,
+                    "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                ),
+                "a",
+            ) as f:
+                f.write("r profile: \n")
+                f.write(str(seps))
+                f.write("\n\n")
+
+        ax[1].hlines(
+            1.0,
+            x_bins[0],
+            x_bins[-1],
+            linewidth=1.0,
+            alpha=0.8,
+            linestyle="-",
+            color="k",
+        )
+        ax[1].set_yticks((0.7, 1.0, 1.3))
+        ax[1].set_ylim(0.5, 1.5)
+        ax[0].set_xlim(x_bins[0], x_bins[-1])
+
+        ax[1].axhline(0.7, c="k", ls="--", lw=0.5)
+        ax[1].axhline(1.3, c="k", ls="--", lw=0.5)
+
+        ax[2].set_ylim((0.05, 50))
+        ax[2].set_yscale("log")
+        ax[2].set_yticks([0.1, 1.0, 10.0])
+        ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+        ax[2].set_yticks(
+            [
+                0.2,
+                0.3,
+                0.4,
+                0.5,
+                0.6,
+                0.7,
+                0.8,
+                0.9,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0,
+                9.0,
+                20.0,
+                30.0,
+                40.0,
+            ],
+            minor=True,
+        )
+
+        ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+        ax[2].set_ylabel(r"$\delta [\%]$")
+
+        ax[0].set_ylabel(r"$\langle E \rangle$ [a.u.]")
+        ax[1].set_ylabel(r"$\frac{\text{Model}}{\text{Geant4}}$")
+        ax[2].set_xlabel(r"$r$ layer number")
+        ax[0].set_yscale("log")
+        ax[0].legend(
+            loc="lower right",
+            frameon=False,
+            title=p_label,
+            handlelength=1.2,
+            fontsize=16,
+            title_fontsize=18,
+        )
+        fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
+        plt.savefig(pdf, dpi=300, format="pdf")
+        plt.close()
+
+
 def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_label):
     """plots voxel energies across all layers"""
     fig, ax = plt.subplots(

@@ -549,6 +549,8 @@ def plot_histograms(hlf_classes, reference_class, arg, input_names="", p_label="
     plot_weighted_depth_r(
         hlf_classes, reference_class, arg, arg.labels, input_names, p_label
     )
+    plot_z_profile(hlf_classes, reference_class, arg, arg.labels, input_names, p_label)
+    plot_r_profile(hlf_classes, reference_class, arg, arg.labels, input_names, p_label)
 
 
 def eval_ui_dists(source_array, reference_array, cfg):
@@ -890,8 +892,6 @@ def run_from_py(sample, energy, theta, phi, cfg):
 
         if reference_hlf.E_tot is None:
             reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
         print("Calculating high-level features for classifer: DONE.\n")
         for key in list_cls:

@@ -174,25 +174,17 @@ class LEMURSExclusiveLogitTransform(object):
         self.keys = ["showers", "extra_dims"]
 
     def __call__(self, data_dict, rev=False, rank=0):
-        shower = data_dict["showers"]
-        extra_dims = data_dict["extra_dims"]
-        if rev:
-            if self.rescale:
-                trafo_showers = logit(shower, alpha=self.delta, inv=True)
-                trafo_extra_dims = logit(extra_dims, alpha=self.delta, inv=True)
+        for key in self.keys:
+            if rev:
+                if self.rescale:
+                    data_dict[key] = logit(data_dict[key], alpha=self.delta, inv=True)
+                else:
+                    data_dict[key] = torch.special.expit(data_dict[key])
             else:
-                trafo_showers = torch.special.expit(shower)
-                trafo_extra_dims = torch.special.expit(extra_dims)
-        else:
-            if self.rescale:
-                trafo_showers = logit(shower, alpha=self.delta)
-                trafo_extra_dims = logit(extra_dims, alpha=self.delta)
-            else:
-                trafo_showers = torch.logit(shower, eps=self.delta)
-                trafo_extra_dims = torch.logit(extra_dims, eps=self.delta)
-
-        data_dict["showers"] = trafo_showers
-        data_dict["extra_dims"] = trafo_extra_dims
+                if self.rescale:
+                    data_dict[key] = logit(data_dict[key], alpha=self.delta)
+                else:
+                    data_dict[key] = torch.logit(data_dict[key], eps=self.delta)
         return data_dict
 
 

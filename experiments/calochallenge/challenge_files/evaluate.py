@@ -99,6 +99,7 @@ def define_parser():
             "cls-low",
             "cls-low-normed",
             "cls-high",
+            "cls-resnet",
         ],
         help=(
             "What metric to evaluate: "
@@ -171,6 +172,18 @@ def define_parser():
         "--cls_lr",
         type=float,
         default=2e-4,
+        help="Learning rate of the classifier, default is 2e-4.",
+    )
+    parser.add_argument(
+        "--cls_resnet_lr",
+        type=float,
+        default=2e-4,
+        help="Learning rate of the classifier, default is 2e-4.",
+    )
+    parser.add_argument(
+        "--cls_resnet_epochs",
+        type=float,
+        default=50,
         help="Learning rate of the classifier, default is 2e-4.",
     )
 
@@ -1096,7 +1109,7 @@ def main(raw_args=None):
             hlfs.append(
                 HLF.HighLevelFeatures(
                     particle,
-                    filename="src/challenge_files/binning_dataset_{}.xml".format(
+                    filename="experiments/calochallenge/challenge_files/binning_dataset_{}.xml".format(
                         args.dataset.replace("-", "_")
                     ),
                 )
@@ -1135,7 +1148,7 @@ def main(raw_args=None):
     print("Computing .pkl reference")
     reference_hlf = HLF.HighLevelFeatures(
         particle,
-        filename="src/challenge_files/binning_dataset_{}.xml".format(
+        filename="experiments/calochallenge/challenge_files/binning_dataset_{}.xml".format(
             args.dataset.replace("-", "_")
         ),
     )
@@ -1313,7 +1326,7 @@ def main(raw_args=None):
     ]:
         print("in classification branch")
         if args.mode in ["all", "all-cls"]:
-            list_cls = ["cls-low", "cls-high"]
+            list_cls = ["cls-low", "cls-high", "cls-resnet"]
         else:
             list_cls = [args.mode]
 
@@ -1431,7 +1444,7 @@ def main(raw_args=None):
                 print("{} has {} parameters".format(args.mode, int(total_parameters)))
 
                 if key == "cls-resnet":
-                    optimizer = torch.optim.AdamW(
+                    optimizer = torch.optim.Adam(
                         classifier.parameters(), lr=args.cls_resnet_lr
                     )
                 else:
