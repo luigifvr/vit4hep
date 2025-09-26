@@ -73,6 +73,7 @@ class LEMURS(BaseExperiment):
             hdf5_train_dict=self.hdf5_dict_train,
             transforms=self.transforms,
             num_classes=self.num_classes,
+            return_us=self.cfg.data.return_us,
             dtype=self.dtype,
             rank=self.rank,
         )
@@ -234,13 +235,21 @@ class LEMURS(BaseExperiment):
                 collate_fn=test_collator,
             )
 
-        sample = torch.vstack(
-            [
-                self.model.sample_batch(c[1].to(self.device)).cpu()
-                for c in transformed_cond_loader
-            ]
-        )
-        conditions = torch.vstack([c[1] for c in transformed_cond_loader])
+            sample = torch.vstack(
+                [
+                    self.model.sample_batch(c[1].to(self.device)).cpu()
+                    for c in transformed_cond_loader
+                ]
+            )
+            conditions = torch.vstack([c[1] for c in transformed_cond_loader])
+        else:
+            sample = torch.vstack(
+                [
+                    self.model.sample_batch(c.to(self.device)).cpu()
+                    for c in transformed_cond_loader
+                ]
+            )
+            conditions = transformed_cond
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
@@ -286,7 +295,7 @@ class LEMURS(BaseExperiment):
 
         if self.cfg.model_type == "energy":
             reference = LEMURSDataset(
-                self.hdf5_test,
+                self.hdf5_dict_test,
                 dtype=self.dtype,
                 max_files_per_worker=self.cfg.data.max_files_per_worker,
             )
@@ -307,17 +316,29 @@ class LEMURS(BaseExperiment):
             reference_energy_ratios = torch.vstack(
                 [b[0] for b in reference_loader]
             ).cpu()
+            reference_conditions = torch.vstack([b[1] for b in reference_loader]).cpu()
 
             samples_dict = {}
             samples_dict["extra_dims"] = samples
+            samples_dict["incident_energy"] = conditions[:, 0].unsqueeze(1)
+            samples_dict["incident_theta"] = conditions[:, 1].unsqueeze(1)
+            samples_dict["incident_phi"] = conditions[:, 2].unsqueeze(1)
+            samples_dict["label"] = conditions[:, 3:]
+
             reference_dict = {}
             reference_dict["extra_dims"] = reference_energy_ratios
+            reference_dict["incident_energy"] = reference_conditions[:, 0].unsqueeze(1)
+            reference_dict["incident_theta"] = reference_conditions[:, 1].unsqueeze(1)
+            reference_dict["incident_phi"] = reference_conditions[:, 2].unsqueeze(1)
+            reference_dict["label"] = reference_conditions[:, 3:]
             # postprocess
             for fn in self.transforms[::-1]:
                 if fn.__class__.__name__ == "LEMURSNormalizeByElayer":
                     break  # this might break plotting
-                samples_dict = fn(samples_dict, rev=True)
-                reference_dict = fn(reference_dict, rev=True)
+                if hasattr(fn, "u_transform"):
+                    fn.keys = ["extra_dims"]
+                    samples_dict = fn(samples_dict, rev=True)
+                    reference_dict = fn(reference_dict, rev=True)
 
             # clip u_i's (except u_0) to [0,1]
             samples = samples_dict["extra_dims"]
