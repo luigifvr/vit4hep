@@ -12,6 +12,7 @@ class BaseModel(nn.Module):
     convert to and from patches, as well as a forward method.
     The child class has to define the network architecture in self.net.
     """
+
     def __init__(self, shape):
         super().__init__()
 

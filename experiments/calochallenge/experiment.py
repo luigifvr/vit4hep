@@ -4,6 +4,7 @@ import torch
 import os, time
 import warnings
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 import os
 import h5py
 from hydra.utils import instantiate
@@ -14,8 +15,8 @@ from experiments.logger import LOGGER
 from experiments.base_experiment import BaseExperiment
 from experiments.calochallenge.datasets import CaloChallengeDataset
 import experiments.calochallenge.transforms as transforms
-from experiments.calochallenge.challenge_files import evaluate
-from experiments.calochallenge.plots import plot_ui_dists
+from experiments.calo_utils.ugr_evaluation import evaluate
+from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
 
 
 class CaloChallenge(BaseExperiment):
@@ -90,15 +91,22 @@ class CaloChallenge(BaseExperiment):
             else self.cfg.training.batchsize
         )
 
-        self.train_dist_sampler = torch.utils.data.distributed.DistributedSampler(
-            self.train_dataset,
-            num_replicas=self.world_size,
-            rank=self.rank,
-            shuffle=True,
-        )
-        self.val_dist_sampler = torch.utils.data.distributed.DistributedSampler(
-            self.val_dataset, num_replicas=self.world_size, rank=self.rank, shuffle=True
-        )
+        if self.world_size > 1:
+            self.train_dist_sampler = DistributedSampler(
+                self.train_dataset,
+                num_replicas=self.world_size,
+                rank=self.rank,
+                shuffle=True,
+            )
+            self.val_dist_sampler = DistributedSampler(
+                self.val_dataset,
+                num_replicas=self.world_size,
+                rank=self.rank,
+                shuffle=True,
+            )
+        else:
+            self.train_dist_sampler = None
+            self.val_dist_sampler = None
 
         self.train_loader = DataLoader(
             self.train_dataset,
@@ -163,7 +171,7 @@ class CaloChallenge(BaseExperiment):
         Einc = torch.tensor(
             (
                 10 ** np.random.uniform(3, 6, size=self.cfg.n_samples)
-                if self.cfg.eval_dataset in ["2", "3"]
+                if self.cfg.evaluation.eval_dataset in ["2", "3"]
                 else self.generate_Einc_ds1()
             ),
             dtype=self.dtype,

@@ -29,16 +29,18 @@ def experiment(rank, world_size, cfg):
 
         exp = CaloChallenge(cfg, rank, world_size)
     elif cfg.exp_type == "calochallenge_ft_cfm":
-        from experiments.calochallenge.experiment import CaloChallengeFTCFM
+        from experiments.calochallenge.calochallenge_cfm.experiment_finetuning import (
+            CaloChallengeFTCFM,
+        )
 
         exp = CaloChallengeFTCFM(cfg, rank, world_size)
     elif cfg.exp_type == "calogan":
-        from experiments.calogan.experiment import CaloGAN, CaloGANFTCFM
+        from experiments.calogan.experiment import CaloGAN
 
         exp = CaloGAN(cfg, rank, world_size)
     elif cfg.exp_type == "calogan_ft_cfm":
-        from experiments.calogan.experiment import CaloGANFTCFM
-        
+        from experiments.calogan.experiment_finetuning import CaloGANFTCFM
+
         exp = CaloGANFTCFM(cfg, rank, world_size)
     elif cfg.exp_type == "lemurs":
         from experiments.lemurs.experiment import LEMURS
