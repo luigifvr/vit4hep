@@ -5,13 +5,28 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from experiments.logger import LOGGER
 from experiments.calo_utils.ugr_evaluation.evaluate import (
-    args_class,
-    ttv_split,
     DNN,
+    ttv_split,
     train_and_evaluate_cls,
     evaluate_cls,
     load_classifier,
 )
+
+
+class args_class:
+    def __init__(self, cfg):
+        cfg = cfg.evaluation
+        self.dataset = cfg.eval_dataset
+        self.mode = cfg.eval_mode
+        self.which_cuda = 0
+
+        self.cls_n_layer = cfg.eval_cls_n_layer
+        self.cls_n_hidden = cfg.eval_cls_n_hidden
+        self.cls_dropout_probability = cfg.eval_cls_dropout
+        self.cls_lr = cfg.eval_cls_lr
+        self.cls_batch_size = cfg.eval_cls_batch_size
+        self.cls_n_epochs = cfg.eval_cls_n_epochs
+        self.save_mem = cfg.eval_cls_save_mem
 
 
 def eval_ui_dists(source_array, reference_array, cfg):
