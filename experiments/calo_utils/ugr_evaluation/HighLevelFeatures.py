@@ -11,7 +11,7 @@ from matplotlib.colors import LogNorm as LN
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
-from experiments.calochallenge.challenge_files.XMLHandler import XMLHandler
+from experiments.calo_utils.ugr_evaluation.XMLHandler import XMLHandler
 
 
 class HighLevelFeatures:

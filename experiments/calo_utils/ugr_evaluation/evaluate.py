@@ -52,9 +52,9 @@ from sklearn.metrics import roc_auc_score
 from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 
-import experiments.calochallenge.challenge_files.HighLevelFeatures as HLF
-from experiments.calochallenge.challenge_files.evaluate_plotting_helper import *
-from experiments.calochallenge.challenge_files.resnet import generate_model
+import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
+from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
+from experiments.calo_utils.ugr_evaluation.resnet import generate_model
 
 torch.set_default_dtype(torch.float64)
 
@@ -63,7 +63,7 @@ plt.rc("axes", titlesize="medium")
 plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
 plt.rc("text", usetex=True)
 # hardcoded labels for histograms
-labels = ["ViT-CFM", "latViT"]
+labels = ["ViT-cINN", "latViT"]
 
 ########## Parser Setup ##########
 
@@ -540,22 +540,6 @@ def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1)
     return shower.astype("float32", copy=False), energy.astype("float32", copy=False)
 
 
-def load_reference(filename):
-    """Load existing pickle with high-level features for reference in plots"""
-    print("Loading file with high-level features.")
-    with open(filename, "rb") as file:
-        hlf_ref = pickle.load(file)
-    return hlf_ref
-
-
-def save_reference(ref_hlf, fname):
-    """Saves high-level features class to file"""
-    print("Saving file with high-level features.")
-    with open(fname, "wb") as file:
-        pickle.dump(ref_hlf, file)
-    print("Saving file with high-level features DONE.")
-
-
 def plot_histograms(
     hlf_classes, reference_class, arg, labels, input_names="", p_label=""
 ):
@@ -575,101 +559,12 @@ def plot_histograms(
     )
 
 
-def eval_ui_dists(source_array, reference_array, cfg):
-    if not os.path.isdir(cfg.run_dir + f"/eval_{cfg.run_idx}/"):
-        os.makedirs(cfg.run_dir + f"/eval_{cfg.run_idx}/")
-
-    args = args_class(cfg)
-    args.output_dir = cfg.run_dir + f"/eval_{cfg.run_idx}/"
-
-    if not os.path.isdir(args.output_dir):
-        os.makedirs(args.output_dir)
-
-    # add label in source array
-    source_array = np.concatenate(
-        (source_array, np.zeros(source_array.shape[0]).reshape(-1, 1)), axis=1
-    )
-    reference_array = np.concatenate(
-        (reference_array, np.ones(reference_array.shape[0]).reshape(-1, 1)), axis=1
-    )
-    train_data, test_data, val_data = ttv_split(source_array, reference_array)
-
-    # set up device
-    args.device = torch.device(
-        "cuda:" + str(args.which_cuda) if torch.cuda.is_available() else "cpu"
-    )
-    print("Using {}".format(args.device))
-
-    # set up DNN classifier
-    input_dim = train_data.shape[1] - 1
-    DNN_kwargs = {
-        "num_layer": args.cls_n_layer,  # 2
-        "num_hidden": args.cls_n_hidden,  # 512
-        "input_dim": input_dim,
-        "dropout_probability": args.cls_dropout_probability,
-    }  # 0
-    classifier = DNN(**DNN_kwargs)
-    classifier.to(args.device)
-    print(classifier)
-    total_parameters = sum(
-        p.numel() for p in classifier.parameters() if p.requires_grad
-    )
-
-    print("{} has {} parameters".format(args.mode, int(total_parameters)))
-
-    optimizer = torch.optim.Adam(classifier.parameters(), lr=args.cls_lr)
-
-    train_data = TensorDataset(
-        torch.tensor(train_data, dtype=torch.get_default_dtype()).to(args.device)
-    )
-    test_data = TensorDataset(
-        torch.tensor(test_data, dtype=torch.get_default_dtype()).to(args.device)
-    )
-    val_data = TensorDataset(
-        torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device)
-    )
-
-    train_dataloader = DataLoader(
-        train_data, batch_size=args.cls_batch_size, shuffle=True
-    )
-    test_dataloader = DataLoader(
-        test_data, batch_size=args.cls_batch_size, shuffle=False
-    )
-    val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
-
-    train_and_evaluate_cls(
-        classifier, train_dataloader, test_dataloader, optimizer, args
-    )
-    classifier = load_classifier(classifier, args)
-
-    with torch.inference_mode():
-        print("Now looking at independent dataset:")
-        eval_acc, eval_auc, eval_JSD = evaluate_cls(
-            classifier,
-            val_dataloader,
-            args,
-            final_eval=True,
-            calibration_data=test_dataloader,
-        )
-    print("Final result of classifier test (AUC / JSD):")
-    print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
-    with open(
-        os.path.join(
-            args.output_dir, "classifier_{}_{}.txt".format(args.mode, args.dataset)
-        ),
-        "a",
-    ) as f:
-        f.write(
-            "Final result of classifier test (AUC / JSD):\n"
-            + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
-        )
-
-
 ########## Alternative Main ############
 
 
 class args_class:
     def __init__(self, cfg):
+        cfg = cfg.evaluation
         self.dataset = cfg.eval_dataset
         self.mode = cfg.eval_mode
         self.cut = cfg.eval_cut
@@ -925,8 +820,6 @@ def run_from_py(sample, energy, cfg):
 
         if reference_hlf.E_tot is None:
             reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
         print("Calculating high-level features for classifer: DONE.\n")
         for key in list_cls:
@@ -1139,11 +1032,6 @@ def main(raw_args=None):
         )
     reference_shower[reference_shower < args.cut] = 0.0
 
-    # if os.path.exists(os.path.join(args.source_dir, args.reference_file_name + '.pkl')):
-    #   print("Loading .pkl reference")
-    #    reference_hlf = load_reference(os.path.join(args.source_dir,
-    #                                                args.reference_file_name + '.pkl'))
-    # else:
     print(f"{args.mode=}")
     print("Computing .pkl reference")
     reference_hlf = HLF.HighLevelFeatures(
@@ -1155,8 +1043,6 @@ def main(raw_args=None):
 
     print("Loaded HLF object")
     reference_hlf.Einc = reference_energy
-    # save_reference(reference_hlf,
-    #                 os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
     args.x_scale = "log"
 
@@ -1188,8 +1074,6 @@ def main(raw_args=None):
                 pass
             else:
                 reference_hlf.avg_shower = reference_shower.mean(axis=0, keepdims=True)
-                # save_reference(reference_hlf,
-                #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
             reference_hlf.DrawAverageShower(
                 reference_hlf.avg_shower,
                 filename=os.path.join(
@@ -1265,8 +1149,6 @@ def main(raw_args=None):
                     reference_hlf.avg_shower_E[target_energies[i]] = reference_shower[
                         which_showers
                     ].mean(axis=0, keepdims=True)
-                    # save_reference(reference_hlf,
-                    #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
                 reference_hlf.DrawAverageShower(
                     reference_hlf.avg_shower_E[target_energies[i]],
@@ -1280,8 +1162,6 @@ def main(raw_args=None):
         print("Calculating high-level features for histograms ...")
         if reference_hlf.E_tot is None:
             reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
         input_names = []
         for n, file in enumerate(list_inputs):
             hlfs[n].CalculateFeatures(showers[n])
@@ -1345,8 +1225,6 @@ def main(raw_args=None):
 
             if reference_hlf.E_tot is None:
                 reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
             print("Calculating high-level features for classifer: DONE.\n")
             for key in list_cls:

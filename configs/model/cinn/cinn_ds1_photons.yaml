@@ -1,32 +1,30 @@
-_target_: experiments.calochallenge.model.CaloChallengeCINN
+_target_: experiments.calochallenge.calochallenge_cinn.model.CaloChallengeCINN
 in_channels: 1
-shape: [45, 50, 18]
-patch_shape: [3, 10, 3]
+shape: [53, 1, 10]
+patch_shape: [1, 1, 5]
 
 coupling_block: CaloRQSplineFrEIA
 nblocks: 10
 is_spatial: [False, False, False, False, False, False, False, False, False, False]
 cinn_kwargs: 
   bins: 10
-  min_bin_sizes: [0.01, 0.01]
-  default_domain: [-4.0, 20.0, -20.0, 20.0] # (left, right, bottom, top)
+  min_bin_sizes: [0.001, 0.001]
+  default_domain: [-8.0, 8.0, -8.0, 8.0]
   identity_tails: False
   domain_clamping: null
 
 vit_kwargs:
   dim: 1
-  condition_dim: 46
-  hidden_dim: 320
+  condition_dim: 6
   out_channels: 1
+  hidden_dim: 240
   depth: 3
   num_heads: 4
-  mlp_ratio: 4.0
+  mlp_ratio: 2.0
   attn_drop: 0
   proj_drop: 0
-  pos_embedding_coords: cartesian
   learn_pos_embed: True
+  temperature: 10000
   causal_attn: False
-  cos_attn: False
-  final_conv: False
   checkpoint_grads: False
   use_torch_sdpa: False  # use xformers instead

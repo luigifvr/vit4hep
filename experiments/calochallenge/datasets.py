@@ -71,6 +71,14 @@ class CaloChallengeDataset(Dataset):
         LOGGER.info(
             f"datasets: boundaries of dataset are ({self.min_bounds}, {self.max_bounds})"
         )
+        # Only relevant for cINN: default bounds are (-8, 8)
+        out_of_bounds = torch.logical_or(self.layers < -8, self.layers > 8).any(
+            dim=(1, 2, 3)
+        )
+        num_out_of_bounds = torch.sum(out_of_bounds)
+        fraction = num_out_of_bounds / self.layers.shape[0]
+        LOGGER.info(f"{self.layers.shape[0], num_out_of_bounds}")
+        LOGGER.info(f"Fraction of showers outside (-8, 8): {fraction:.2f})")
 
     def __len__(self):
         return len(self.energy)

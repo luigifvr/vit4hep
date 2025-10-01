@@ -1,12 +1,8 @@
 import torch
-import torch.nn.functional as F
 import numpy as np
 import os
-import torch.distributions as dist
 
-from experiments.calochallenge.challenge_files import *
-from experiments.calochallenge.challenge_files import XMLHandler
-from itertools import pairwise
+from experiments.calochallenge.transforms import logit
 
 
 class GlobalStandardizeFromFileGAN(object):

@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import math
 
+from experiments.logger import LOGGER
+
 
 class MLPTransformer(nn.Module):
     """
@@ -109,8 +111,6 @@ class MLPTransformer(nn.Module):
         """
         forward method of our Resnet
         """
-        self.kl = 0
-
         if condition is None:
             embedding = self.transformer.decoder(
                 self.compute_embedding(x, n_components=self.dims_in, t=t),

@@ -1,28 +1,35 @@
 import os
-
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 
-from experiments.calogan.utils import load_data
+from experiments.logger import LOGGER
 from experiments.calo_utils.ugr_evaluation.evaluate import (
     DNN,
     ttv_split,
-    load_classifier,
     train_and_evaluate_cls,
     evaluate_cls,
+    load_classifier,
 )
 
-torch.set_default_dtype(torch.float64)
 
-plt.rc("font", family="serif", size=16)
-plt.rc("axes", titlesize="medium")
-plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
-plt.rc("text", usetex=True)
+class args_class:
+    def __init__(self, cfg):
+        cfg = cfg.evaluation
+        self.dataset = cfg.eval_dataset
+        self.mode = cfg.eval_mode
+        self.which_cuda = 0
+
+        self.cls_n_layer = cfg.eval_cls_n_layer
+        self.cls_n_hidden = cfg.eval_cls_n_hidden
+        self.cls_dropout_probability = cfg.eval_cls_dropout
+        self.cls_lr = cfg.eval_cls_lr
+        self.cls_batch_size = cfg.eval_cls_batch_size
+        self.cls_n_epochs = cfg.eval_cls_n_epochs
+        self.save_mem = cfg.eval_cls_save_mem
 
 
-def eval_calogan_lowlevel(source_array, cfg):
+def eval_ui_dists(source_array, reference_array, cfg):
     if not os.path.isdir(cfg.run_dir + f"/eval_{cfg.run_idx}/"):
         os.makedirs(cfg.run_dir + f"/eval_{cfg.run_idx}/")
 
@@ -31,15 +38,6 @@ def eval_calogan_lowlevel(source_array, cfg):
 
     if not os.path.isdir(args.output_dir):
         os.makedirs(args.output_dir)
-
-    reference_data = load_data(args.reference_file)
-    reference_array = np.hstack(
-        (
-            reference_data["layer_0"].reshape(-1, 288),
-            reference_data["layer_1"].reshape(-1, 144),
-            reference_data["layer_2"].reshape(-1, 72),
-        ),
-    )
 
     # add label in source array
     source_array = np.concatenate(
@@ -63,7 +61,7 @@ def eval_calogan_lowlevel(source_array, cfg):
         "num_hidden": args.cls_n_hidden,  # 512
         "input_dim": input_dim,
         "dropout_probability": args.cls_dropout_probability,
-    }
+    }  # 0
     classifier = DNN(**DNN_kwargs)
     classifier.to(args.device)
     print(classifier)
@@ -107,8 +105,8 @@ def eval_calogan_lowlevel(source_array, cfg):
             final_eval=True,
             calibration_data=test_dataloader,
         )
-    print("Final result of classifier test (AUC / JSD):")
-    print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+    LOGGER.info("Final result of classifier test (AUC / JSD):")
+    LOGGER.info("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
     with open(
         os.path.join(
             args.output_dir, "classifier_{}_{}.txt".format(args.mode, args.dataset)
@@ -119,20 +117,3 @@ def eval_calogan_lowlevel(source_array, cfg):
             "Final result of classifier test (AUC / JSD):\n"
             + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
         )
-
-
-class args_class:
-    def __init__(self, cfg):
-        cfg = cfg.evaluation
-        self.dataset = cfg.eval_dataset
-        self.mode = cfg.eval_mode
-        self.reference_file = cfg.eval_hdf5_file
-        self.which_cuda = 0
-
-        self.cls_n_layer = cfg.eval_cls_n_layer
-        self.cls_n_hidden = cfg.eval_cls_n_hidden
-        self.cls_dropout_probability = cfg.eval_cls_dropout
-        self.cls_lr = cfg.eval_cls_lr
-        self.cls_batch_size = cfg.eval_cls_batch_size
-        self.cls_n_epochs = cfg.eval_cls_n_epochs
-        self.save_mem = cfg.eval_cls_save_mem

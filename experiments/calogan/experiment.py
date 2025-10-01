@@ -1,9 +1,9 @@
 # standard python libraries
-import numpy as np
 import torch
 import os, time
 import warnings
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 import os
 import h5py
 from hydra.utils import instantiate
@@ -15,7 +15,8 @@ from experiments.base_experiment import BaseExperiment
 from experiments.calogan.datasets import CaloGANDataset
 import experiments.calogan.transforms as transforms
 from experiments.calogan.evaluate import eval_calogan_lowlevel
-from experiments.calochallenge.plots import plot_ui_dists
+from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
+from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
 
 
 class CaloGAN(BaseExperiment):
@@ -40,6 +41,7 @@ class CaloGAN(BaseExperiment):
     def init_data(self):
         self.hdf5_train = self.cfg.data.training_file
         self.hdf5_test = self.cfg.data.test_file
+        self.return_us = self.cfg.data.return_us
         self.transforms = []
 
         LOGGER.info("init_data: preparing model training")
@@ -54,7 +56,7 @@ class CaloGAN(BaseExperiment):
         self.train_dataset = CaloGANDataset(
             self.hdf5_train,
             transform=self.transforms,
-            return_us=self.cfg.data.return_us,
+            return_us=self.return_us,
             device=self.device,
             dtype=self.dtype,
             rank=self.rank,
@@ -63,7 +65,7 @@ class CaloGAN(BaseExperiment):
         self.val_dataset = CaloGANDataset(
             self.hdf5_train,
             transform=self.transforms,
-            return_us=self.cfg.data.return_us,
+            return_us=self.return_us,
             device=self.device,
             dtype=self.dtype,
             rank=self.rank,
@@ -81,15 +83,22 @@ class CaloGAN(BaseExperiment):
             else self.cfg.training.batchsize
         )
 
-        self.train_dist_sampler = torch.utils.data.distributed.DistributedSampler(
-            self.train_dataset,
-            num_replicas=self.world_size,
-            rank=self.rank,
-            shuffle=True,
-        )
-        self.val_dist_sampler = torch.utils.data.distributed.DistributedSampler(
-            self.val_dataset, num_replicas=self.world_size, rank=self.rank, shuffle=True
-        )
+        if self.world_size > 1:
+            self.train_dist_sampler = DistributedSampler(
+                self.train_dataset,
+                num_replicas=self.world_size,
+                rank=self.rank,
+                shuffle=True,
+            )
+            self.val_dist_sampler = DistributedSampler(
+                self.val_dataset,
+                num_replicas=self.world_size,
+                rank=self.rank,
+                shuffle=True,
+            )
+        else:
+            self.train_dist_sampler = None
+            self.val_dist_sampler = None
 
         self.train_loader = DataLoader(
             self.train_dataset,
@@ -156,7 +165,7 @@ class CaloGAN(BaseExperiment):
                 transformed_cond = CaloGANDataset(
                     self.hdf5_test,
                     transform=self.transforms,
-                    return_us=self.cfg.data.return_us,
+                    return_us=self.return_us,
                     device=self.device,
                 ).energy.to(self.device)
 
@@ -214,7 +223,7 @@ class CaloGAN(BaseExperiment):
             reference = CaloGANDataset(
                 self.hdf5_test,
                 transform=self.transforms,  # TODO: Or, apply NormalizeEByLayer popped from model transforms
-                return_us=self.cfg.data.return_us,
+                return_us=self.return_us,
                 device=self.device,
             )
             samples_dict = {}
@@ -244,7 +253,7 @@ class CaloGAN(BaseExperiment):
                     reference.detach().cpu().numpy(),
                     cfg=self.cfg,
                 )
-                evaluate.eval_ui_dists(
+                eval_ui_dists(
                     samples.detach().cpu().numpy(),
                     reference.detach().cpu().numpy(),
                     cfg=self.cfg,

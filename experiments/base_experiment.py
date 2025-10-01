@@ -477,8 +477,9 @@ class BaseExperiment:
         # recycle trainloader
         def cycle(iterable):
             epoch = 0
+            set_epoch = getattr(self.train_loader.sampler, "set_epoch", lambda _: None)
             while True:
-                self.train_loader.sampler.set_epoch(epoch)
+                set_epoch(epoch)
                 for x in iterable:
                     yield x
                 epoch += 1

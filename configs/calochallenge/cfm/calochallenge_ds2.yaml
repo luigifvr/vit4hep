@@ -18,7 +18,8 @@ data:
         xml_file: electron
     },
     ScaleTotalEnergy: {n_layers: 45, factor: 0.35},
-    ExclusiveLogitTransform: {delta: 1.0e-7, rescale: False, exclusions: [-45]},
+    CutValues: {cut: 1.e-7, n_layers: 45},
+    ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
     GlobalStandardizeFromFile: {model_dir: None},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
@@ -28,20 +29,24 @@ data:
 
 finetuning: false
 
-eval_dataset: "2"
-eval_mode: all
-eval_cut: 0.015
-eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5
-eval_cls_n_layer: 2
-eval_cls_resnet_layers: 18
-eval_cls_n_hidden: 512
-eval_cls_dropout: 0.0
-eval_cls_lr: 2.e-4
-eval_cls_batch_size: 1000
-eval_cls_n_epochs: 100
-eval_cls_save_mem: True
+evaluation:
+  eval_dataset: "2"
+  eval_mode: all
+  eval_cut: 0.015
+  eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5
+  eval_cls_n_layer: 2
+  eval_cls_n_hidden: 2048
+  eval_cls_dropout: 0.0
+  eval_cls_lr: 2.e-4
+  eval_cls_batch_size: 1000
+  eval_cls_n_epochs: 50
+  eval_cls_save_mem: True
+  # ResNet
+  eval_cls_resnet_layers: 18
+  eval_cls_resnet_lr: 2.e-4
+  eval_cls_resnet_n_epochs: 50
 
 defaults:
- - default
- - training: default
- - model: cfm/cfm_ds2_electrons
+ - /default
+ - /training: default
+ - /model: cfm/cfm_ds2_electrons
