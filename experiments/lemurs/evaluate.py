@@ -38,22 +38,26 @@ additional options for the classifier start with --cls_ and can be found below.
 
 import argparse
 import os
-import pickle
-from glob import glob
 
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
-from sklearn.calibration import calibration_curve
-from sklearn.isotonic import IsotonicRegression
 
-from experiments.calochallenge.challenge_files.evaluate_plotting_helper import *
-import experiments.calochallenge.challenge_files.HighLevelFeatures as HLF
-from experiments.calochallenge.challenge_files.resnet import generate_model
+from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
+import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
+from experiments.calo_utils.ugr_evaluation.resnet import generate_model
+from experiments.calo_utils.ugr_evaluation.evaluate import (
+    DNN,
+    prepare_low_data_for_classifier,
+    prepare_high_data_for_classifier,
+    ttv_split,
+    load_classifier,
+    train_and_evaluate_cls,
+    evaluate_cls,
+    check_file,
+)
 from experiments.logger import LOGGER
 
 torch.set_default_dtype(torch.float64)
@@ -186,316 +190,6 @@ def define_parser():
     return parser
 
 
-########## Functions and Classes ##########
-
-
-class DNN(torch.nn.Module):
-    """NN for vanilla classifier. Does not have sigmoid activation in last layer, should
-    be used with torch.nn.BCEWithLogitsLoss()
-    """
-
-    def __init__(self, num_layer, num_hidden, input_dim, dropout_probability=0.0):
-        super(DNN, self).__init__()
-
-        self.dpo = dropout_probability
-
-        self.inputlayer = torch.nn.Linear(input_dim, num_hidden)
-        self.outputlayer = torch.nn.Linear(num_hidden, 1)
-
-        all_layers = [self.inputlayer, torch.nn.LeakyReLU(), torch.nn.Dropout(self.dpo)]
-        for _ in range(num_layer):
-            all_layers.append(torch.nn.Linear(num_hidden, num_hidden))
-            all_layers.append(torch.nn.LeakyReLU())
-            all_layers.append(torch.nn.Dropout(self.dpo))
-
-        all_layers.append(self.outputlayer)
-        self.layers = torch.nn.Sequential(*all_layers)
-
-    def forward(self, x):
-        """Forward pass through the DNN"""
-        x = self.layers(x)
-        return x
-
-
-def prepare_low_data_for_classifier(
-    voxel_orig, E_inc_orig, hlf_class, label, cut=0.0, normed=False, single_energy=None
-):
-    """takes hdf5_file, extracts Einc and voxel energies, appends label, returns array"""
-    voxel = voxel_orig.copy()
-    E_inc = E_inc_orig.copy()
-    if normed:
-        E_norm_rep = []
-        E_norm = []
-        for idx, layer_id in enumerate(hlf_class.GetElayers()):
-            E_norm_rep.append(
-                np.repeat(
-                    hlf_class.GetElayers()[layer_id].reshape(-1, 1),
-                    hlf_class.num_voxel[idx],
-                    axis=1,
-                )
-            )
-            E_norm.append(hlf_class.GetElayers()[layer_id].reshape(-1, 1))
-        E_norm_rep = np.concatenate(E_norm_rep, axis=1)
-        E_norm = np.concatenate(E_norm, axis=1)
-    if normed:
-        voxel = voxel / (E_norm_rep + 1e-16)
-        ret = np.concatenate(
-            [
-                np.log10(E_inc),
-                voxel,
-                np.log10(E_norm + 1e-8),
-                label * np.ones_like(E_inc),
-            ],
-            axis=1,
-        )
-    else:
-        voxel = voxel / E_inc
-        ret = np.concatenate(
-            [np.log10(E_inc), voxel, label * np.ones_like(E_inc)], axis=1
-        )
-    return ret
-
-
-def prepare_high_data_for_classifier(
-    voxel_orig, E_inc_orig, hlf_class, label, cut=0.0, single_energy=None
-):
-    """takes hdf5_file, extracts high-level features, appends label, returns array"""
-    E_inc = E_inc_orig.copy()
-    E_tot = hlf_class.GetEtot()
-    E_layer = []
-    for layer_id in hlf_class.GetElayers():
-        E_layer.append(hlf_class.GetElayers()[layer_id].reshape(-1, 1))
-    EC_etas = []
-    EC_phis = []
-    Width_etas = []
-    Width_phis = []
-    for layer_id in hlf_class.layersBinnedInAlpha:
-        EC_etas.append(hlf_class.GetECEtas()[layer_id].reshape(-1, 1))
-        EC_phis.append(hlf_class.GetECPhis()[layer_id].reshape(-1, 1))
-        Width_etas.append(hlf_class.GetWidthEtas()[layer_id].reshape(-1, 1))
-        Width_phis.append(hlf_class.GetWidthPhis()[layer_id].reshape(-1, 1))
-    E_layer = np.concatenate(E_layer, axis=1)
-    EC_etas = np.concatenate(EC_etas, axis=1)
-    EC_phis = np.concatenate(EC_phis, axis=1)
-    Width_etas = np.concatenate(Width_etas, axis=1)
-    Width_phis = np.concatenate(Width_phis, axis=1)
-    ret = np.concatenate(
-        [
-            np.log10(E_inc),
-            np.log10(E_layer + 1e-8),
-            EC_etas / 1e2,
-            EC_phis / 1e2,
-            Width_etas / 1e2,
-            Width_phis / 1e2,
-            label * np.ones_like(E_inc),
-        ],
-        axis=1,
-    )
-    return ret
-
-
-def ttv_split(data1, data2, split=np.array([0.6, 0.2, 0.2])):
-    """splits data1 and data2 in train/test/val according to split,
-    returns shuffled and merged arrays
-    """
-    # assert len(data1) == len(data2)
-    if len(data1) < len(data2):
-        data2 = data2[: len(data1)]
-    elif len(data1) > len(data2):
-        data1 = data1[: len(data2)]
-    else:
-        assert len(data1) == len(data2)
-    num_events = (len(data1) * split).astype(int)
-    np.random.shuffle(data1)
-    np.random.shuffle(data2)
-    train1, test1, val1 = np.split(data1, num_events.cumsum()[:-1])
-    train2, test2, val2 = np.split(data2, num_events.cumsum()[:-1])
-    train = np.concatenate([train1, train2], axis=0)
-    test = np.concatenate([test1, test2], axis=0)
-    val = np.concatenate([val1, val2], axis=0)
-    np.random.shuffle(train)
-    np.random.shuffle(test)
-    np.random.shuffle(val)
-    print(len(train), len(test), len(val))
-    return train, test, val
-
-
-def load_classifier(constructed_model, parser_args):
-    """loads a saved model"""
-    filename = parser_args.mode + "_" + parser_args.dataset + ".pt"
-    checkpoint = torch.load(
-        os.path.join(parser_args.output_dir, filename), map_location=parser_args.device
-    )
-    constructed_model.load_state_dict(checkpoint["model_state_dict"])
-    constructed_model.to(parser_args.device)
-    constructed_model.eval()
-    print("classifier loaded successfully")
-    return constructed_model
-
-
-def train_and_evaluate_cls(model, data_train, data_test, optim, arg):
-    """train the model and evaluate along the way"""
-    best_eval_acc = float("-inf")
-    arg.best_epoch = -1
-    if model.__class__.__name__ == "ResNet":
-        n_epochs = arg.cls_resnet_epochs
-    else:
-        n_epochs = arg.cls_n_epochs
-    try:
-        for i in range(n_epochs):
-            train_cls(model, data_train, optim, i, arg)
-            with torch.inference_mode():
-                eval_acc, _, _ = evaluate_cls(model, data_test, arg)
-            if eval_acc > best_eval_acc:
-                best_eval_acc = eval_acc
-                arg.best_epoch = i + 1
-                filename = arg.mode + "_" + arg.dataset + ".pt"
-                torch.save(
-                    {"model_state_dict": model.state_dict()},
-                    os.path.join(arg.output_dir, filename),
-                )
-            if eval_acc == 1.0:
-                break
-    except KeyboardInterrupt:
-        # training can be cut short with ctrl+c, for example if overfitting between train/test set
-        # is clearly visible
-        pass
-
-
-def train_cls(model, data_train, optim, epoch, arg):
-    """train one step"""
-    model.train()
-    for i, data_batch in enumerate(data_train):
-        if arg.save_mem:
-            data_batch = data_batch[0].to(arg.device)
-        else:
-            data_batch = data_batch[0]
-        input_vector, target_vector = data_batch[:, :-1], data_batch[:, -1]
-        output_vector = model(input_vector)
-        criterion = torch.nn.BCEWithLogitsLoss()
-        loss = criterion(output_vector, target_vector.unsqueeze(1))
-
-        optim.zero_grad(set_to_none=True)
-        loss.backward()
-        optim.step()
-
-        if i % (len(data_train) // 2) == 0:
-            print(
-                "Epoch {:3d} / {}, step {:4d} / {}; loss {:.4f}".format(
-                    epoch + 1, arg.cls_n_epochs, i, len(data_train), loss.item()
-                )
-            )
-        # PREDICTIONS
-        pred = torch.round(torch.sigmoid(output_vector.detach()))
-        target = torch.round(target_vector.detach())
-        if i == 0:
-            res_true = target
-            res_pred = pred
-        else:
-            res_true = torch.cat((res_true, target), 0)
-            res_pred = torch.cat((res_pred, pred), 0)
-
-    print("Accuracy on training set is", accuracy_score(res_true.cpu(), res_pred.cpu()))
-
-
-def evaluate_cls(model, data_test, arg, final_eval=False, calibration_data=None):
-    """evaluate on test set"""
-    model.eval()
-    for j, data_batch in enumerate(data_test):
-        if arg.save_mem:
-            data_batch = data_batch[0].to(arg.device)
-        else:
-            data_batch = data_batch[0]
-        input_vector, target_vector = data_batch[:, :-1], data_batch[:, -1]
-        output_vector = model(input_vector)
-        pred = output_vector.reshape(-1)
-        target = target_vector.double()
-        if j == 0:
-            result_true = target
-            result_pred = pred
-        else:
-            result_true = torch.cat((result_true, target), 0)
-            result_pred = torch.cat((result_pred, pred), 0)
-    BCE = torch.nn.BCEWithLogitsLoss()(result_pred, result_true)
-    result_pred = torch.sigmoid(result_pred).cpu().numpy()
-    result_true = result_true.cpu().numpy()
-    eval_acc = accuracy_score(result_true, np.round(result_pred))
-    print("Accuracy on test set is", eval_acc)
-    eval_auc = roc_auc_score(result_true, result_pred)
-    print("AUC on test set is", eval_auc)
-    JSD = -BCE + np.log(2.0)
-    print(
-        "BCE loss of test set is {:.4f}, JSD of the two dists is {:.4f}".format(
-            BCE, JSD / np.log(2.0)
-        )
-    )
-    if final_eval:
-        prob_true, prob_pred = calibration_curve(result_true, result_pred, n_bins=10)
-        print("unrescaled calibration curve:", prob_true, prob_pred)
-        calibrator = calibrate_classifier(model, calibration_data, arg)
-        rescaled_pred = calibrator.predict(result_pred)
-        eval_acc = accuracy_score(result_true, np.round(rescaled_pred))
-        print("Rescaled accuracy is", eval_acc)
-        eval_auc = roc_auc_score(result_true, rescaled_pred)
-        print("rescaled AUC of dataset is", eval_auc)
-        prob_true, prob_pred = calibration_curve(result_true, rescaled_pred, n_bins=10)
-        print("rescaled calibration curve:", prob_true, prob_pred)
-        # calibration was done after sigmoid, therefore only BCELoss() needed here:
-        BCE = torch.nn.BCELoss()(
-            torch.tensor(rescaled_pred, dtype=torch.get_default_dtype()),
-            torch.tensor(result_true, dtype=torch.get_default_dtype()),
-        )
-        JSD = -BCE.cpu().numpy() + np.log(2.0)
-        otp_str = (
-            "rescaled BCE loss of test set is {:.4f}, "
-            + "rescaled JSD of the two dists is {:.4f}"
-        )
-        print(otp_str.format(BCE, JSD / np.log(2.0)))
-    return eval_acc, eval_auc, JSD / np.log(2.0)
-
-
-def calibrate_classifier(model, calibration_data, arg):
-    """reads in calibration data and performs a calibration with isotonic regression"""
-    model.eval()
-    assert calibration_data is not None, "Need calibration data for calibration!"
-    for j, data_batch in enumerate(calibration_data):
-        if arg.save_mem:
-            data_batch = data_batch[0].to(arg.device)
-        else:
-            data_batch = data_batch[0]
-        input_vector, target_vector = data_batch[:, :-1], data_batch[:, -1]
-        output_vector = model(input_vector)
-        pred = torch.sigmoid(output_vector).reshape(-1)
-        target = target_vector.to(torch.float64)
-        if j == 0:
-            result_true = target
-            result_pred = pred
-        else:
-            result_true = torch.cat((result_true, target), 0)
-            result_pred = torch.cat((result_pred, pred), 0)
-    result_true = result_true.cpu().numpy()
-    result_pred = result_pred.cpu().numpy()
-    iso_reg = IsotonicRegression(
-        out_of_bounds="clip", y_min=1e-6, y_max=1.0 - 1e-6
-    ).fit(result_pred, result_true)
-    return iso_reg
-
-
-def check_file(given_file, arg, which=None):
-    num_events = given_file["incident_energy"].shape[0]
-    assert (
-        given_file["showers"].shape[0] == num_events
-    ), "Number of energies provided does not match number of showers, {} != {}".format(
-        num_events, given_file["showers"].shape[0]
-    )
-    print("Found {} events in the file.".format(num_events))
-    print(
-        "Checking if {} file has the correct form: DONE \n".format(
-            which if which is not None else "provided"
-        )
-    )
-
-
 def extract_shower_and_energy(given_file, which, max_len=-1):
     """reads .hdf5 file and returns samples and their energy"""
     print("Extracting showers from {} file ...".format(which))
@@ -510,22 +204,6 @@ def extract_shower_and_energy(given_file, which, max_len=-1):
         theta.astype("float32", copy=False),
         phi.astype("float32", copy=False),
     )
-
-
-def load_reference(filename):
-    """Load existing pickle with high-level features for reference in plots"""
-    print("Loading file with high-level features.")
-    with open(filename, "rb") as file:
-        hlf_ref = pickle.load(file)
-    return hlf_ref
-
-
-def save_reference(ref_hlf, fname):
-    """Saves high-level features class to file"""
-    print("Saving file with high-level features.")
-    with open(fname, "wb") as file:
-        pickle.dump(ref_hlf, file)
-    print("Saving file with high-level features DONE.")
 
 
 def plot_histograms(hlf_classes, reference_class, arg, input_names="", p_label=""):
@@ -553,101 +231,12 @@ def plot_histograms(hlf_classes, reference_class, arg, input_names="", p_label="
     plot_r_profile(hlf_classes, reference_class, arg, arg.labels, input_names, p_label)
 
 
-def eval_ui_dists(source_array, reference_array, cfg):
-    if not os.path.isdir(cfg.run_dir + f"/eval_{cfg.run_idx}/"):
-        os.makedirs(cfg.run_dir + f"/eval_{cfg.run_idx}/")
-
-    args = args_class(cfg)
-    args.output_dir = cfg.run_dir + f"/eval_{cfg.run_idx}/"
-
-    if not os.path.isdir(args.output_dir):
-        os.makedirs(args.output_dir)
-
-    # add label in source array
-    source_array = np.concatenate(
-        (source_array, np.zeros(source_array.shape[0]).reshape(-1, 1)), axis=1
-    )
-    reference_array = np.concatenate(
-        (reference_array, np.ones(reference_array.shape[0]).reshape(-1, 1)), axis=1
-    )
-    train_data, test_data, val_data = ttv_split(source_array, reference_array)
-
-    # set up device
-    args.device = torch.device(
-        "cuda:" + str(args.which_cuda) if torch.cuda.is_available() else "cpu"
-    )
-    print("Using {}".format(args.device))
-
-    # set up DNN classifier
-    input_dim = train_data.shape[1] - 1
-    DNN_kwargs = {
-        "num_layer": args.cls_n_layer,  # 2
-        "num_hidden": args.cls_n_hidden,  # 512
-        "input_dim": input_dim,
-        "dropout_probability": args.cls_dropout_probability,
-    }  # 0
-    classifier = DNN(**DNN_kwargs)
-    classifier.to(args.device)
-    print(classifier)
-    total_parameters = sum(
-        p.numel() for p in classifier.parameters() if p.requires_grad
-    )
-
-    print("{} has {} parameters".format(args.mode, int(total_parameters)))
-
-    optimizer = torch.optim.Adam(classifier.parameters(), lr=args.cls_lr)
-
-    train_data = TensorDataset(
-        torch.tensor(train_data, dtype=torch.get_default_dtype()).to(args.device)
-    )
-    test_data = TensorDataset(
-        torch.tensor(test_data, dtype=torch.get_default_dtype()).to(args.device)
-    )
-    val_data = TensorDataset(
-        torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device)
-    )
-
-    train_dataloader = DataLoader(
-        train_data, batch_size=args.cls_batch_size, shuffle=True
-    )
-    test_dataloader = DataLoader(
-        test_data, batch_size=args.cls_batch_size, shuffle=False
-    )
-    val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
-
-    train_and_evaluate_cls(
-        classifier, train_dataloader, test_dataloader, optimizer, args
-    )
-    classifier = load_classifier(classifier, args)
-
-    with torch.inference_mode():
-        print("Now looking at independent dataset:")
-        eval_acc, eval_auc, eval_JSD = evaluate_cls(
-            classifier,
-            val_dataloader,
-            args,
-            final_eval=True,
-            calibration_data=test_dataloader,
-        )
-    print("Final result of classifier test (AUC / JSD):")
-    print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
-    with open(
-        os.path.join(
-            args.output_dir, "classifier_{}_{}.txt".format(args.mode, args.dataset)
-        ),
-        "a",
-    ) as f:
-        f.write(
-            "Final result of classifier test (AUC / JSD):\n"
-            + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
-        )
-
-
 ########## Alternative Main ############
 
 
 class args_class:
     def __init__(self, cfg):
+        cfg = cfg.evaluate
         self.dataset = cfg.eval_dataset
         self.mode = cfg.eval_mode
         self.cut = cfg.eval_cut

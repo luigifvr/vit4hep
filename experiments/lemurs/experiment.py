@@ -14,8 +14,9 @@ from experiments.logger import LOGGER
 from experiments.base_experiment import BaseExperiment
 from experiments.lemurs.datasets import LEMURSDataset, LEMURSCollator
 import experiments.lemurs.transforms as transforms
-from experiments.lemurs import evaluate
-from experiments.calochallenge.plots import plot_ui_dists
+from experiments.lemurs.evaluate import run_from_py
+from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
+from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
 
 
 class LEMURS(BaseExperiment):
@@ -353,7 +354,7 @@ class LEMURS(BaseExperiment):
                     reference.detach().cpu().numpy(),
                     cfg=self.cfg,
                 )
-                evaluate.eval_ui_dists(
+                eval_ui_dists(
                     samples.detach().cpu().numpy(),
                     reference.detach().cpu().numpy(),
                     cfg=self.cfg,
@@ -389,7 +390,7 @@ class LEMURS(BaseExperiment):
             self.save_sample(samples, conditions)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                evaluate.run_from_py(samples, Einc, theta, phi, self.cfg)
+                run_from_py(samples, Einc, theta, phi, self.cfg)
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""

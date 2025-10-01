@@ -540,22 +540,6 @@ def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1)
     return shower.astype("float32", copy=False), energy.astype("float32", copy=False)
 
 
-def load_reference(filename):
-    """Load existing pickle with high-level features for reference in plots"""
-    print("Loading file with high-level features.")
-    with open(filename, "rb") as file:
-        hlf_ref = pickle.load(file)
-    return hlf_ref
-
-
-def save_reference(ref_hlf, fname):
-    """Saves high-level features class to file"""
-    print("Saving file with high-level features.")
-    with open(fname, "wb") as file:
-        pickle.dump(ref_hlf, file)
-    print("Saving file with high-level features DONE.")
-
-
 def plot_histograms(
     hlf_classes, reference_class, arg, labels, input_names="", p_label=""
 ):
@@ -836,8 +820,6 @@ def run_from_py(sample, energy, cfg):
 
         if reference_hlf.E_tot is None:
             reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
         print("Calculating high-level features for classifer: DONE.\n")
         for key in list_cls:
@@ -1050,11 +1032,6 @@ def main(raw_args=None):
         )
     reference_shower[reference_shower < args.cut] = 0.0
 
-    # if os.path.exists(os.path.join(args.source_dir, args.reference_file_name + '.pkl')):
-    #   print("Loading .pkl reference")
-    #    reference_hlf = load_reference(os.path.join(args.source_dir,
-    #                                                args.reference_file_name + '.pkl'))
-    # else:
     print(f"{args.mode=}")
     print("Computing .pkl reference")
     reference_hlf = HLF.HighLevelFeatures(
@@ -1066,8 +1043,6 @@ def main(raw_args=None):
 
     print("Loaded HLF object")
     reference_hlf.Einc = reference_energy
-    # save_reference(reference_hlf,
-    #                 os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
     args.x_scale = "log"
 
@@ -1099,8 +1074,6 @@ def main(raw_args=None):
                 pass
             else:
                 reference_hlf.avg_shower = reference_shower.mean(axis=0, keepdims=True)
-                # save_reference(reference_hlf,
-                #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
             reference_hlf.DrawAverageShower(
                 reference_hlf.avg_shower,
                 filename=os.path.join(
@@ -1176,8 +1149,6 @@ def main(raw_args=None):
                     reference_hlf.avg_shower_E[target_energies[i]] = reference_shower[
                         which_showers
                     ].mean(axis=0, keepdims=True)
-                    # save_reference(reference_hlf,
-                    #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
                 reference_hlf.DrawAverageShower(
                     reference_hlf.avg_shower_E[target_energies[i]],
@@ -1191,8 +1162,6 @@ def main(raw_args=None):
         print("Calculating high-level features for histograms ...")
         if reference_hlf.E_tot is None:
             reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
         input_names = []
         for n, file in enumerate(list_inputs):
             hlfs[n].CalculateFeatures(showers[n])
@@ -1256,8 +1225,6 @@ def main(raw_args=None):
 
             if reference_hlf.E_tot is None:
                 reference_hlf.CalculateFeatures(reference_shower)
-            # save_reference(reference_hlf,
-            #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
             print("Calculating high-level features for classifer: DONE.\n")
             for key in list_cls:
