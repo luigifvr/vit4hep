@@ -4,6 +4,8 @@ import torch
 import os, time
 import warnings
 from torch.utils.data import DataLoader
+
+from torch.utils.data.distributed import DistributedSampler
 import os
 import h5py
 from hydra.utils import instantiate
@@ -42,6 +44,8 @@ class LEMURS(BaseExperiment):
         self.hdf5_dict_train = self.cfg.data.training_file_dict
         self.hdf5_dict_test = self.cfg.data.test_file_dict
         self.num_classes = self.cfg.data.num_classes
+        self.max_files_per_worker = self.cfg.data.max_files_per_worker
+        self.return_us = self.cfg.data.return_us
         self.transforms = []
 
         LOGGER.info("init_data: preparing model training")
@@ -56,13 +60,13 @@ class LEMURS(BaseExperiment):
         self.train_dataset = LEMURSDataset(
             self.hdf5_dict_train,
             dtype=self.dtype,
-            max_files_per_worker=self.cfg.data.max_files_per_worker,
+            max_files_per_worker=self.max_files_per_worker,
         )
 
         self.val_dataset = LEMURSDataset(
             self.hdf5_dict_test,
             dtype=self.dtype,
-            max_files_per_worker=self.cfg.data.max_files_per_worker,
+            max_files_per_worker=self.max_files_per_worker,
         )
 
     def init_physics(self):
@@ -74,7 +78,7 @@ class LEMURS(BaseExperiment):
             hdf5_train_dict=self.hdf5_dict_train,
             transforms=self.transforms,
             num_classes=self.num_classes,
-            return_us=self.cfg.data.return_us,
+            return_us=self.return_us,
             dtype=self.dtype,
             rank=self.rank,
         )
@@ -85,13 +89,13 @@ class LEMURS(BaseExperiment):
             else self.cfg.training.batchsize
         )
 
-        self.train_dist_sampler = torch.utils.data.distributed.DistributedSampler(
+        self.train_dist_sampler = DistributedSampler(
             self.train_dataset,
             num_replicas=self.world_size,
             rank=self.rank,
             shuffle=True,
         )
-        self.val_dist_sampler = torch.utils.data.distributed.DistributedSampler(
+        self.val_dist_sampler = DistributedSampler(
             self.val_dataset, num_replicas=self.world_size, rank=self.rank, shuffle=True
         )
 
@@ -100,7 +104,7 @@ class LEMURS(BaseExperiment):
             batch_size=self.batch_size,
             sampler=self.train_dist_sampler,
             pin_memory=True,
-            num_workers=4,
+            num_workers=8,
             persistent_workers=True,
             collate_fn=collator,
         )
@@ -109,7 +113,7 @@ class LEMURS(BaseExperiment):
             batch_size=self.batch_size,
             sampler=self.val_dist_sampler,
             pin_memory=True,
-            num_workers=4,
+            num_workers=8,
             persistent_workers=True,
             collate_fn=collator,
         )
@@ -134,14 +138,25 @@ class LEMURS(BaseExperiment):
         pass
 
     def sample_initial_conds(self):
+        gen_Einc = self.cfg.data.gen_Einc
+        gen_theta = self.cfg.data.gen_theta
+        gen_phi = self.cfg.data.gen_phi
         Einc = torch.tensor(
-            (np.random.uniform(10**3, 10**6, size=self.cfg.n_samples)),
+            (
+                np.random.uniform(gen_Einc[0], gen_Einc[1], size=self.cfg.n_samples)
+                if len(gen_Einc) == 2
+                else np.ones(self.cfg.n_samples) * gen_Einc
+            ),
             dtype=self.dtype,
             device=self.device,
         ).unsqueeze(1)
 
         phi = torch.tensor(
-            (np.random.uniform(-np.pi, np.pi, size=self.cfg.n_samples)),
+            (
+                np.random.uniform(-np.pi, np.pi, size=self.cfg.n_samples)
+                if gen_phi is None
+                else np.ones(self.cfg.n_samples) * gen_phi
+            ),
             dtype=self.dtype,
             device=self.device,
         ).unsqueeze(1)
@@ -153,6 +168,8 @@ class LEMURS(BaseExperiment):
                     torch.cos(torch.tensor(2.27)),
                     size=self.cfg.n_samples,
                 )
+                if len(gen_theta) == 2
+                else np.ones(self.cfg.n_samples) * torch.cos(torch.tensor(gen_theta))
             ),
             dtype=self.dtype,
             device=self.device,
@@ -217,7 +234,7 @@ class LEMURS(BaseExperiment):
                 transformed_cond = LEMURSDataset(
                     self.hdf5_dict_test,
                     dtype=self.dtype,
-                    max_files_per_worker=self.cfg.data.max_files_per_worker,
+                    max_files_per_worker=self.max_files_per_worker,
                 )
                 test_collator = LEMURSCollator(
                     hdf5_train_dict=self.hdf5_dict_test,

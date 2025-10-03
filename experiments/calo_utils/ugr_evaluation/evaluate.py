@@ -503,9 +503,13 @@ def check_file(given_file, arg, which=None):
             which if which is not None else "provided"
         )
     )
-    num_features = {"1-photons": 368, "1-pions": 533, "2": 6480, "3": 40500}[
-        arg.dataset
-    ]
+    num_features = {
+        "1-photons": 368,
+        "1-pions": 533,
+        "2": 6480,
+        "3": 40500,
+        "LEMURS": 6480,
+    }[arg.dataset]
     num_events = given_file["incident_energies"].shape[0]
     assert (
         given_file["showers"].shape[0] == num_events
@@ -600,6 +604,7 @@ def run_from_py(sample, energy, cfg):
         "1-pions": "pion",
         "2": "electron",
         "3": "electron",
+        "LEMURS": "gamma",
     }[args.dataset]
     args.particle = particle
 
@@ -608,6 +613,7 @@ def run_from_py(sample, energy, cfg):
         "1-pions": 0.001,
         "2": 0.5e-3 / 0.033,
         "3": 0.5e-3 / 0.033,
+        "LEMURS": 0.5e-3 / 0.033,
     }[args.dataset]
 
     hlf = HLF.HighLevelFeatures(particle, filename=cfg.data.xml_filename)
@@ -767,8 +773,10 @@ def run_from_py(sample, energy, cfg):
             p_label = r"$\pi^{+}$ ds-1"
         elif args.dataset == "2":
             p_label = r"$e^{-}$ ds-2"
-        else:
+        elif args.dataset == "3":
             p_label = r"$e^{-}$ ds-3"
+        else:
+            p_label = r"$LEMURS$"
 
         plot_histograms(
             [
@@ -878,7 +886,11 @@ def run_from_py(sample, energy, cfg):
             elif key in ["cls-resnet"]:
                 classifier = generate_model(
                     args.cls_resnet_layers,
-                    img_shape={"2": (45, 16, 9), "3": (45, 50, 18)}[args.dataset],
+                    img_shape={
+                        "2": (45, 16, 9),
+                        "3": (45, 50, 18),
+                        "LEMURS": (45, 16, 9),
+                    }[args.dataset],
                 )
 
             classifier.to(args.device)

@@ -56,7 +56,6 @@ from experiments.calo_utils.ugr_evaluation.evaluate import (
     load_classifier,
     train_and_evaluate_cls,
     evaluate_cls,
-    check_file,
 )
 from experiments.logger import LOGGER
 
@@ -236,7 +235,7 @@ def plot_histograms(hlf_classes, reference_class, arg, input_names="", p_label="
 
 class args_class:
     def __init__(self, cfg):
-        cfg = cfg.evaluate
+        cfg = cfg.evaluation
         self.dataset = cfg.eval_dataset
         self.mode = cfg.eval_mode
         self.cut = cfg.eval_cut
@@ -299,7 +298,6 @@ def run_from_py(sample, energy, theta, phi, cfg):
 
     reference_file = h5py.File(args.reference_file, "r")
     reference_file = reference_file["events"][:]
-    check_file(reference_file, args, which="reference")
 
     reference_shower, reference_energy, reference_theta, reference_phi = (
         extract_shower_and_energy(

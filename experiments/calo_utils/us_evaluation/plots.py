@@ -227,11 +227,13 @@ def plot_ui_dists(
         fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
         if cfg is not None:
-            if not os.path.isdir(cfg.run_dir + f"/eval/"):
-                os.makedirs(cfg.run_dir + f"/eval/")
+            if not os.path.isdir(cfg.run_dir + f"/eval_{cfg.run_idx}/"):
+                os.makedirs(cfg.run_dir + f"/eval_{cfg.run_idx}/")
 
             fig.savefig(
-                cfg.run_dir + "/eval/" + f"u{i}_dist.pdf", dpi=200, bbox_inches="tight"
+                cfg.run_dir + f"/eval_{cfg.run_idx}/" + f"u{i}_dist.pdf",
+                dpi=200,
+                bbox_inches="tight",
             )
         else:
             plt.show()
