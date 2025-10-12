@@ -30,23 +30,33 @@ def plot_ui_dists(
             gridspec_kw={"height_ratios": (4, 1, 1), "hspace": 0.0},
             sharex=True,
         )
+        combined_data = np.hstack([ref, gen])
 
-        # set binning
         if quantile_bins:
-            total = np.hstack([ref])
+            # Use quantiles of the combined data for robust binning that covers both distributions.
+            # This prevents generated data from falling into overflow bins.
             quantiles = np.linspace(0, 1, num_bins + 1)
-            bins = np.quantile(
-                total,
-                (
-                    quantiles[skip_quantiles:-skip_quantiles]
-                    if skip_quantiles
-                    else quantiles
-                ),
-            )
+            if skip_quantiles > 0:
+                quantiles = quantiles[skip_quantiles:-skip_quantiles]
+
+            bins = np.quantile(combined_data, quantiles)
+            # Ensure bins are unique to avoid errors with np.histogram
+            bins = np.unique(bins)
         else:
-            if xlim == "auto":
-                xlim = ref.min(), ref.max()
-            bins = np.linspace(xlim[0], (2 if i == 0 else 1) * xlim[1], num_bins)
+            # Determine range automatically from the data if not specified.
+            if xlim == "auto" or i == 0:
+                data_min = combined_data.min()
+                data_max = combined_data.max()
+            else:
+                data_min, data_max = xlim
+            if i == 0:
+                data_min = data_min
+                upper_bound = data_max
+            else:
+                upper_bound = 1.05
+
+            bins = np.linspace(data_min, upper_bound, num_bins)
+
         bin_centers = (bins[1:] + bins[:-1]) / 2
         bin_widths = bins[1:] - bins[:-1]
 
@@ -210,7 +220,6 @@ def plot_ui_dists(
 
         ax[0].set_ylabel(r"a.u.")
         ax[2].set_xlabel(f"$u_{{{i}}}$")
-        ax[0].set_xlim(*xlim)
         ax[0].set_yscale("log")
         ax[1].set_ylabel(r"$\frac{\text{Model}}{\text{Geant}}$")
 
