@@ -285,6 +285,7 @@ class CaloChallenge(BaseExperiment):
                     cfg=self.cfg,
                 )
         else:
+            samples = samples.squeeze(1)  # remove channel dimension
             # postprocess
             for fn in self.transforms[::-1]:
                 samples, conditions = fn(samples, conditions, rev=True)

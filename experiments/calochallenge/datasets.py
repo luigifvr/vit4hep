@@ -61,7 +61,7 @@ class CaloChallengeDataset(Dataset):
             self.layers = self.layers[...]
             self.energy = self.energy[...]
 
-        self.layers = self.layers.to(dtype)
+        self.layers = self.layers.unsqueeze(1).to(dtype)  # add channel dimension
         self.energy = self.energy.to(dtype)
 
         self.min_bounds = self.layers.min()
@@ -73,7 +73,7 @@ class CaloChallengeDataset(Dataset):
         )
         # Only relevant for cINN: default bounds are (-8, 8)
         out_of_bounds = torch.logical_or(self.layers < -8, self.layers > 8).any(
-            dim=(1, 2, 3)
+            dim=(1, 2)
         )
         num_out_of_bounds = torch.sum(out_of_bounds)
         fraction = num_out_of_bounds / self.layers.shape[0]

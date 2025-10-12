@@ -37,45 +37,25 @@ class CaloChallengeCFM(CFM):
 
         self.net = net
 
-    def from_patches(self, x, dim=3):
-        if dim == 3:
-            x = rearrange(
-                x,
-                "b (l a r) (p1 p2 p3 c) -> b c (l p1) (a p2) (r p3)",
-                **dict(
-                    zip(
-                        ("l", "a", "r", "p1", "p2", "p3"),
-                        self.num_patches + self.patch_shape,
-                    )
-                ),
-            )
-        elif dim == 2:
-            x = rearrange(
-                x,
-                "b (a r) (p1 p2 c) -> b c (a p1) (r p2)",
-                **dict(
-                    zip(("a", "r", "p1", "p2"), self.num_patches + self.patch_shape)
-                ),
-            )
-        else:
-            raise ValueError(self.dim)
+    def from_patches(self, x):
+        x = rearrange(
+            x,
+            "b (l a r) (p1 p2 p3 c) -> b c (l p1) (a p2) (r p3)",
+            **dict(
+                zip(
+                    ("l", "a", "r", "p1", "p2", "p3"),
+                    self.num_patches + self.patch_shape,
+                )
+            ),
+        )
         return x
 
-    def to_patches(self, x, dim=3):
-        if dim == 3:
-            x = rearrange(
-                x,
-                "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
-                **dict(zip(("p1", "p2", "p3"), self.patch_shape)),
-            )
-        elif dim == 2:
-            x = rearrange(
-                x,
-                "b c (a p1) (r p2) -> b (a r) (p1 p2 c)",
-                **dict(zip(("p1", "p2"), self.patch_shape)),
-            )
-        else:
-            raise ValueError(dim)
+    def to_patches(self, x):
+        x = rearrange(
+            x,
+            "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
+            **dict(zip(("p1", "p2", "p3"), self.patch_shape)),
+        )
         return x
 
     def forward(self, x, t, c):
@@ -111,3 +91,82 @@ class CaloChallengeCFM(CFM):
         )[-1]
 
         return sample
+
+
+class CaloChallengeCFM_DS1(CaloChallengeCFM):
+    def __init__(
+        self,
+        net,
+        list_shape,
+        list_edges,
+        patch_shape,
+        in_channels=1,
+        time_distribution="uniform",
+        trajectory="linear",
+        odeint_kwargs=None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            None,
+            patch_shape,
+            in_channels,
+            time_distribution,
+            trajectory,
+            odeint_kwargs,
+            *args,
+            **kwargs,
+        )
+
+        self.list_shape = list(list_shape)
+        self.list_edges = list(list_edges)
+
+        self.num_patches_per_dim = []
+        self.num_patches_per_layer = []
+        for shape in self.list_shape:
+            num_patches_dim = (
+                (shape[0] // self.patch_shape[0]),
+                (shape[1] // self.patch_shape[1]),
+                (shape[2] // self.patch_shape[2]),
+            )
+            num_patches = num_patches_dim[0] * num_patches_dim[1] * num_patches_dim[2]
+            self.num_patches_per_dim.append(num_patches_dim)
+            self.num_patches_per_layer.append(num_patches)
+
+        for i, s in enumerate(self.list_shape):
+            for l, m in zip(s, patch_shape):
+                assert (
+                    l % m == 0
+                ), f"Input size ({l}) should be divisible by patch size ({m}) in axis {i}."
+
+        self.net = net
+        self.net.num_patches = self.num_patches_per_dim
+
+    def from_patches(self, x):
+        x_split = list(torch.split(x, self.num_patches_per_layer, dim=1))
+
+        for k in range(len(self.num_patches_per_layer)):
+            x_split[k] = rearrange(
+                x_split[k],
+                "b (l a r) (p1 p2 p3 c) -> b c (l p1) (a p2) (r p3)",
+                **dict(zip(("l", "a", "r"), self.num_patches_per_dim[k])),
+                **dict(zip(("p1", "p2", "p3"), self.patch_shape)),
+                c=self.in_channels,
+            )
+
+            x_split[k] = x_split[k].flatten(start_dim=2)
+
+        x_reconstructed = torch.cat(x_split, dim=2)
+        return x_reconstructed
+
+    def to_patches(self, x):
+        x_split = list(torch.split(x, self.list_edges, dim=2))
+        for k, shape in enumerate(self.list_shape):
+            x_split[k] = x_split[k].reshape(-1, self.in_channels, *shape)
+            x_split[k] = rearrange(
+                x_split[k],
+                "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
+                **dict(zip(("p1", "p2", "p3"), self.patch_shape)),
+            )
+        x = torch.cat(x_split, dim=1)
+        return x
