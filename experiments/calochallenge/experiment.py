@@ -15,8 +15,9 @@ from experiments.logger import LOGGER
 from experiments.base_experiment import BaseExperiment
 from experiments.calochallenge.datasets import CaloChallengeDataset
 import experiments.calochallenge.transforms as transforms
-from experiments.calo_utils.ugr_evaluation import evaluate
+from experiments.calo_utils.ugr_evaluation.evaluate import run_from_py
 from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
+from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
 
 
 class CaloChallenge(BaseExperiment):
@@ -279,12 +280,13 @@ class CaloChallenge(BaseExperiment):
                     reference.detach().cpu().numpy(),
                     cfg=self.cfg,
                 )
-                evaluate.eval_ui_dists(
+                eval_ui_dists(
                     samples.detach().cpu().numpy(),
                     reference.detach().cpu().numpy(),
                     cfg=self.cfg,
                 )
         else:
+            samples = samples.squeeze(1)  # remove channel dimension
             # postprocess
             for fn in self.transforms[::-1]:
                 samples, conditions = fn(samples, conditions, rev=True)
@@ -295,7 +297,7 @@ class CaloChallenge(BaseExperiment):
             self.save_sample(samples, conditions)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                evaluate.run_from_py(samples, conditions, self.cfg)
+                run_from_py(samples, conditions, self.cfg)
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""

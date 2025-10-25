@@ -763,6 +763,10 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
         for key in reference_class.GetECEtas().keys():
             if arg.dataset in ["2", "3"]:
                 lim = (-30.0, 30.0)
+            elif arg.dataset in ["LEMURS"]:
+                min = reference_class.GetECEtas()[key].min()
+                max = reference_class.GetECEtas()[key].max()
+                lim = (min - 5.0, max + 5.0)
             elif key in [12, 13]:
                 lim = (-500.0, 500.0)
             else:
@@ -985,6 +989,10 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
         for key in reference_class.GetECPhis().keys():
             if arg.dataset in ["2", "3"]:
                 lim = (-30.0, 30.0)
+            elif arg.dataset in ["LEMURS"]:
+                min = reference_class.GetECPhis()[key].min()
+                max = reference_class.GetECPhis()[key].max()
+                lim = (min - 5.0, max + 5.0)
             elif key in [12, 13]:
                 lim = (-500.0, 500.0)
             else:
@@ -1207,6 +1215,10 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
         for key in reference_class.GetWidthEtas().keys():
             if arg.dataset in ["2", "3"]:
                 lim = (0.0, 30.0)
+            elif arg.dataset in ["LEMURS"]:
+                min = reference_class.GetWidthEtas()[key].min()
+                max = reference_class.GetWidthEtas()[key].max()
+                lim = (min - 5.0, max + 5.0)
             elif key in [12, 13]:
                 lim = (0.0, 400.0)
             else:
@@ -1429,6 +1441,10 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
         for key in reference_class.GetWidthPhis().keys():
             if arg.dataset in ["2", "3"]:
                 lim = (0.0, 30.0)
+            elif arg.dataset in ["LEMURS"]:
+                min = reference_class.GetWidthPhis()[key].min()
+                max = reference_class.GetWidthPhis()[key].max()
+                lim = (min - 5.0, max + 5.0)
             elif key in [12, 13]:
                 lim = (0.0, 400.0)
             else:

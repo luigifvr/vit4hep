@@ -110,30 +110,25 @@ class LEMURSPreprocessConds(object):
     Scale all conditions to [0,1]. Incident energy is in linear scale.
     """
 
-    def __init__(self):
+    def __init__(
+        self, scale_E=[1e3, 1e6], scale_theta=[0.87, 2.27], scale_phi=[0, 3.1416]
+    ):
         self.cond_transform = True
         self.keys = ["incident_energy", "incident_theta", "incident_phi"]
-        self.scale_dict = None
+        self.rescaling = [scale_E, scale_theta, scale_phi]
 
     def __call__(self, data_dict, rev=False, rank=0):
         if rev:
             # rescale all conditions back to original range
-            for key in self.keys:
-                min = self.scale_dict[key][0]
-                max = self.scale_dict[key][1]
+            for n, key in enumerate(self.keys):
+                min = self.rescaling[n][0]
+                max = self.rescaling[n][1]
                 data_dict[key] = data_dict[key] * (max - min) + min
         else:
-            # save min and max
-            if self.scale_dict is None:
-                self.scale_dict = {key: [] for key in self.keys}
-                for key in self.keys:
-                    self.scale_dict[key].append(data_dict[key].min().item())
-                    self.scale_dict[key].append(data_dict[key].max().item())
-
-            # scale all conditions to [0,1]
-            for key in self.keys:
-                min = self.scale_dict[key][0]
-                max = self.scale_dict[key][1]
+            # Rescale all conditions
+            for n, key in enumerate(self.keys):
+                min = self.rescaling[n][0]
+                max = self.rescaling[n][1]
                 data_dict[key] = (data_dict[key] - min) / (max - min)
         return data_dict
 
@@ -211,70 +206,6 @@ class LEMURSCutValues(object):
         return data_dict
 
 
-# class LEMURSNormalizeByElayer(object):
-#     """
-#     Normalize each shower by the layer energy
-#     This will change the shower shape to N_voxels+N_layers
-#     """
-
-#     def __init__(self, cut=0.0, eps=1.0e-10):
-#         self.eps = eps
-#         self.cut = cut
-
-#     def __call__(self, data_dict, rev=False, rank=0):
-#         shower = data_dict["showers"]
-#         energy = data_dict["incident_energy"]
-#         n_layers = shower.shape[-1] # number of layers is last dim
-#         if rev:
-#             # select u features
-#             us = data_dict["extra_dims"]
-
-#             # clip u_{i>0} into [0,1]
-#             us[:, (-self.n_layers + 1) :] = torch.clip(
-#                 us[:, (-self.n_layers + 1) :],
-#                 min=torch.tensor(0.0, device=shower.device),
-#                 max=torch.tensor(1.0, device=shower.device),
-#             )
-
-#             # calculate unnormalised energies from the u's
-#             layer_Es = []
-#             total_E = torch.multiply(energy.flatten(), us[:, 0])  # Einc * u_0
-#             cum_sum = torch.zeros_like(total_E)
-#             for i in range(us.shape[-1] - 1):
-#                 layer_E = (total_E - cum_sum) * us[:, i + 1]
-#                 layer_Es.append(layer_E)
-#                 cum_sum += layer_E
-#             layer_Es.append(total_E - cum_sum)
-#             layer_Es = torch.vstack(layer_Es).T
-
-#             # Normalize each layer and multiply it with its original energy
-#             for layer in range(n_layers):
-#                 layer_E = shower[..., layer].sum(dim=(1, 2)).reshape(-1, 1)
-#                 shower[..., layer] /= layer_E.reshape(-1, 1, 1) + self.eps
-#                 mask = shower[..., layer] <= self.cut
-#                 layer[mask] = 0.0  # apply normalized cut
-#                 shower[..., layer] *= layer_Es[:, [layer]].reshape(-1, 1, 1)  # scale to layer energy
-#         else:
-#             # compute layer energies
-#             layer_Es = []
-#             for layer in range(n_layers):
-#                 layer_E = shower[..., layer].sum(dim=(1, 2)).reshape(-1, 1)
-#                 shower[..., layer] /= layer_E.reshape(-1, 1, 1) + self.eps  # normalize to unity
-#                 layer_Es.append(layer_E)  # store layer energy
-#             layer_Es = torch.cat(layer_Es, dim=1).to(shower.device)
-
-#             # compute generalized extra dimensions
-#             extra_dims = [torch.sum(layer_Es, dim=1, keepdim=True) / energy]
-#             for l in range(layer_Es.shape[1] - 1):
-#                 remaining_E = torch.sum(layer_Es[:, l:], dim=1, keepdim=True)
-#                 extra_dim = layer_Es[:, [l]] / (remaining_E + self.eps)
-#                 extra_dims.append(extra_dim)
-#             extra_dims = torch.cat(extra_dims, dim=1)
-
-
-#             data_dict["extra_dims"] = extra_dims
-#         data_dict["showers"] = shower
-#         return data_dict
 class LEMURSNormalizeByElayer(object):
     """
     Normalize each shower by the layer energy.
@@ -291,18 +222,12 @@ class LEMURSNormalizeByElayer(object):
         B, H, W, L = shower.shape  # Batch, Height, Width, Layers
 
         if rev:
-            # This part is more complex to fully vectorize due to the
-            # sequential dependency in calculating layer energies from u's.
-            # However, we can still optimize it significantly.
             us = data_dict["extra_dims"]
             energy = data_dict["incident_energy"]
 
             # Clip u_{i>0} into [0,1]
             us[:, 1:] = torch.clamp(us[:, 1:], min=0.0, max=1.0)
 
-            # Calculate unnormalised energies from the u's
-            # This is a reverse cumulative product, which is tricky to vectorize.
-            # A loop is often the clearest way to implement this specific logic.
             layer_Es = []
             total_E = energy.flatten() * us[:, 0]
             remaining_E = total_E.clone()
@@ -313,11 +238,9 @@ class LEMURSNormalizeByElayer(object):
             layer_Es.append(remaining_E)  # The last layer's energy
             layer_Es = torch.stack(layer_Es, dim=1)
 
-            # Reshape for broadcasting: (B, 1, 1, L)
             layer_Es_reshaped = layer_Es.view(B, 1, 1, L)
 
             # Normalize each layer and multiply it with its original energy
-            # This part can be vectorized.
             layer_sums = shower.sum(dim=(1, 2), keepdim=True) + self.eps
             shower /= layer_sums
 
@@ -328,18 +251,8 @@ class LEMURSNormalizeByElayer(object):
             shower *= layer_Es_reshaped  # scale all layers at once
 
         else:
-            # --- Vectorized Forward Pass ---
-
-            # 1. Compute all layer energies at once.
-            # shower shape: (B, H, W, L) -> layer_Es shape: (B, L)
             layer_Es = shower.sum(dim=(1, 2))
-
-            # 2. Normalize all layers at once using broadcasting.
-            # Reshape layer_Es to (B, 1, 1, L) to divide the (B, H, W, L) shower tensor.
             shower /= layer_Es.view(B, 1, 1, L) + self.eps
-
-            # 3. Compute generalized extra dimensions (u's) without loops.
-            # u_0: Total deposited energy / incident energy
             u_0 = layer_Es.sum(dim=1, keepdim=True) / (
                 data_dict["incident_energy"] + self.eps
             )
@@ -351,8 +264,6 @@ class LEMURSNormalizeByElayer(object):
 
             # Calculate u_i for i > 0. Shape: (B, L-1)
             us_rest = layer_Es[:, :-1] / (remaining_E[:, :-1] + self.eps)
-
-            # Concatenate u_0 with the rest of the u's
             extra_dims = torch.cat([u_0, us_rest], dim=1)
 
             data_dict["extra_dims"] = extra_dims

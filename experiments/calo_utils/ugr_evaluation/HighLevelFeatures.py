@@ -123,13 +123,13 @@ class HighLevelFeatures:
 
     def _calculate_Eradial(self, energy_calo, n):
         angular_bins = self.num_alpha[0]
+        layer_sum = 0
         for k in range(len(self.relevantLayers)):
-            layer_sum = 0
             data_layer = energy_calo[:, self.bin_edges[k] : self.bin_edges[k + 1]]
             angular_sum = data_layer[:, n * angular_bins : (n + 1) * angular_bins].sum(
                 axis=-1
             )
-            layer_sum = +angular_sum
+            layer_sum += angular_sum
         return layer_sum
 
     def GetGroupedWeightedDepths(self, energy_calo, l=5):

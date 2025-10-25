@@ -56,7 +56,6 @@ from experiments.calo_utils.ugr_evaluation.evaluate import (
     load_classifier,
     train_and_evaluate_cls,
     evaluate_cls,
-    check_file,
 )
 from experiments.logger import LOGGER
 
@@ -231,12 +230,203 @@ def plot_histograms(hlf_classes, reference_class, arg, input_names="", p_label="
     plot_r_profile(hlf_classes, reference_class, arg, arg.labels, input_names, p_label)
 
 
+def plot_conditions(sample_conds, ref_conds, arg, labels, input_names, p_label):
+    filename = os.path.join(arg.output_dir, "conditions.pdf")
+    with PdfPages(filename) as pdf:
+        for n in range(sample_conds.shape[1]):
+            fig, ax = plt.subplots(
+                3,
+                1,
+                figsize=(4.5, 4),
+                gridspec_kw={"height_ratios": (4, 1, 1), "hspace": 0.0},
+                sharex=True,
+            )
+            combined = np.concatenate((sample_conds[:, n], ref_conds[:, n]))
+            data_min = combined.min()
+            data_max = combined.max()
+            bins = np.linspace(data_min - 1, data_max + 1, 41)
+
+            counts_ref, bins = np.histogram(ref_conds[:, n], bins=bins, density=False)
+            bin_width = bins[1] - bins[0]
+            counts_ref_norm = counts_ref / counts_ref.sum()
+            geant_error = counts_ref_norm / np.sqrt(counts_ref)
+            geant_ratio_error = geant_error / counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.0
+            geant_delta_err = geant_ratio_error * 100
+            ax[0].step(
+                bins,
+                dup(counts_ref_norm),
+                label="Geant4",
+                linestyle="-",
+                alpha=0.8,
+                linewidth=1.0,
+                color="k",
+                where="post",
+            )
+            ax[0].fill_between(
+                bins,
+                dup(counts_ref_norm + geant_error),
+                dup(counts_ref_norm - geant_error),
+                step="post",
+                color="k",
+                alpha=0.2,
+            )
+            ax[1].fill_between(
+                bins,
+                dup(1 - geant_ratio_error),
+                dup(1 + geant_ratio_error),
+                step="post",
+                color="k",
+                alpha=0.2,
+            )
+            ax[2].errorbar(
+                (bins[:-1] + bins[1:]) / 2,
+                np.zeros_like(bins[:-1]),
+                yerr=geant_delta_err,
+                ecolor="grey",
+                color="grey",
+                elinewidth=0.5,
+                linewidth=1.0,
+                fmt=".",
+                capsize=2,
+            )
+            counts, _ = np.histogram(sample_conds[:, n], bins=bins, density=False)
+            counts_data, bins = np.histogram(
+                sample_conds[:, n], bins=bins, density=False
+            )
+            counts_data_norm = counts_data / counts_data.sum()
+            ax[0].step(
+                bins,
+                dup(counts_data_norm),
+                label=labels[0],
+                where="post",
+                linewidth=1.0,
+                alpha=1.0,
+                color="tab:blue",
+                linestyle="-",
+            )
+            y_ref_err = counts_data_norm / np.sqrt(counts)
+            ax[0].fill_between(
+                bins,
+                dup(counts_data_norm + y_ref_err),
+                dup(counts_data_norm - y_ref_err),
+                step="post",
+                color="tab:blue",
+                alpha=0.2,
+            )
+
+            ratio = counts_data / counts_ref
+            ratio_err = y_ref_err / counts_ref_norm
+            ratio_isnan = np.isnan(ratio)
+            ratio[ratio_isnan] = 1.0
+            ratio_err[ratio_isnan] = 0.0
+            ax[1].step(
+                bins,
+                dup(ratio),
+                linewidth=1.0,
+                alpha=1.0,
+                color="tab:blue",
+                where="post",
+            )
+            ax[1].fill_between(
+                bins,
+                dup(ratio - ratio_err),
+                dup(ratio + ratio_err),
+                step="post",
+                color="tab:blue",
+                alpha=0.2,
+            )
+
+            delta = np.fabs(ratio - 1) * 100
+            delta_err = ratio_err * 100
+            markers, caps, bars = ax[2].errorbar(
+                (bins[:-1] + bins[1:]) / 2,
+                delta,
+                yerr=delta_err,
+                ecolor="tab:blue",
+                color="tab:blue",
+                elinewidth=0.5,
+                linewidth=1.0,
+                fmt=".",
+                capsize=2,
+            )
+
+            ax[1].hlines(
+                1.0,
+                bins[0],
+                bins[-1],
+                linewidth=1.0,
+                alpha=0.8,
+                linestyle="-",
+                color="k",
+            )
+            ax[1].set_yticks((0.7, 1.0, 1.3))
+            ax[1].set_ylim(0.5, 1.5)
+            ax[0].set_xlim(bins[0] - bin_width, bins[-1] + bin_width)
+
+            ax[1].axhline(0.7, c="k", ls="--", lw=0.5)
+            ax[1].axhline(1.3, c="k", ls="--", lw=0.5)
+
+            ax[2].set_ylim((0.05, 50))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks(
+                [
+                    0.2,
+                    0.3,
+                    0.4,
+                    0.5,
+                    0.6,
+                    0.7,
+                    0.8,
+                    0.9,
+                    2.0,
+                    3.0,
+                    4.0,
+                    5.0,
+                    6.0,
+                    7.0,
+                    8.0,
+                    9.0,
+                    20.0,
+                    30.0,
+                    40.0,
+                ],
+                minor=True,
+            )
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            # ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+
+            # ax[0].set_title("Energy deposited in layer {}".format(key))
+            ax[0].set_ylabel(r"a.u.")
+            ax[1].set_ylabel(r"$\frac{\text{Model}}{\text{Geant4}}$")
+            ax[2].set_xlabel(f"cond {n}")
+            ax[0].set_yscale("log")
+            ax[0].legend(
+                loc="lower right",
+                frameon=False,
+                title=p_label,
+                handlelength=1.2,
+                fontsize=16,
+                title_fontsize=18,
+            )
+            fig.tight_layout(
+                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
+            )
+            plt.savefig(pdf, dpi=300, format="pdf")
+            plt.close()
+
+
 ########## Alternative Main ############
 
 
 class args_class:
     def __init__(self, cfg):
-        cfg = cfg.evaluate
+        cfg = cfg.evaluation
         self.dataset = cfg.eval_dataset
         self.mode = cfg.eval_mode
         self.cut = cfg.eval_cut
@@ -292,6 +482,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
     # Using a cut everywhere
     print("Using Everywhere a cut of {}".format(args.cut))
     sample[sample < args.cut] = 0.0
+    sample_conds = np.concatenate((energy, theta, phi), axis=1)
 
     # get reference folder and name of file
     args.source_dir, args.reference_file_name = os.path.split(args.reference_file)
@@ -299,7 +490,6 @@ def run_from_py(sample, energy, theta, phi, cfg):
 
     reference_file = h5py.File(args.reference_file, "r")
     reference_file = reference_file["events"][:]
-    check_file(reference_file, args, which="reference")
 
     reference_shower, reference_energy, reference_theta, reference_phi = (
         extract_shower_and_energy(
@@ -313,6 +503,9 @@ def run_from_py(sample, energy, theta, phi, cfg):
     reference_shower[reference_shower < args.cut] = 0.0
     reference_hlf = HLF.HighLevelFeatures(particle, filename=cfg.data.xml_filename)
     reference_hlf.Einc = reference_energy
+    reference_conds = np.concatenate(
+        (reference_energy, reference_theta, reference_phi), axis=1
+    )
 
     args.x_scale = "log"
 
@@ -455,6 +648,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
             ],
             p_label,
         )
+        plot_conditions(sample_conds, reference_conds, args, args.labels, [""], p_label)
         print("Plotting histograms: DONE. \n")
 
     if args.mode in [

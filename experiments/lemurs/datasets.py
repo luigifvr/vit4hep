@@ -88,6 +88,7 @@ class LEMURSCollator:
         hdf5_train_dict,
         transforms,
         num_classes,
+        gen_label=None,
         return_us=False,
         rank=0,
         dtype="float32",
@@ -95,6 +96,7 @@ class LEMURSCollator:
         self.hdf5_train_dict = hdf5_train_dict
         self.transforms = transforms
         self.num_classes = num_classes
+        self.gen_label = gen_label
         self.return_us = return_us
         self.dtype = dtype
         self.rank = rank
@@ -122,9 +124,16 @@ class LEMURSCollator:
         }
         class_indices = [item["class_idx"] for item in raw_batch]
 
-        labels = torch.nn.functional.one_hot(
-            torch.tensor(class_indices), self.num_classes
-        ).float()
+        if self.gen_label is not None:
+            labels = (
+                torch.tensor(self.gen_label)
+                .repeat(len(class_indices), 1)
+                .to(self.dtype, non_blocking=True)
+            )
+        else:
+            labels = torch.nn.functional.one_hot(
+                torch.tensor(class_indices), self.num_classes
+            ).float()
         batch_dict["label"] = labels
 
         if self.transforms:

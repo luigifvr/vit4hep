@@ -55,7 +55,7 @@ class CaloGANDataset(Dataset):
                     self.data_dict["layer_2"],
                 ),
             )
-            self.layers = self.layers.reshape((self.layers.shape[0], 1, -1, 1, 6))
+            self.layers = self.layers.unsqueeze(1)
             self.energy = torch.hstack(
                 (self.data_dict["energy"], self.data_dict["extra_dims"]),
             )
