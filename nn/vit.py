@@ -66,7 +66,7 @@ class ViT(nn.Module):
             "causal_attn": False,
             "checkpoint_grads": False,
             "patch_dim": 12,
-            "num_patches": [15, 4, 9],
+            "num_patches": [[15, 4, 9]],
             "use_torch_sdpa": True,
         }
 
@@ -84,11 +84,11 @@ class ViT(nn.Module):
 
         # initialize position embeddings
         if self.learn_pos_embed:
-            self.pos_embed_freqs = nn.Parameter(torch.randn(self.hidden_dim // 2))
-            l, a, r = self.num_patches
-            self.register_buffer("lgrid", torch.arange(l) / l)
-            self.register_buffer("agrid", torch.arange(a) / a)
-            self.register_buffer("rgrid", torch.arange(r) / r)
+            self.pos_embed_freqs = nn.Parameter(torch.randn(self.hidden_dim // 6))
+            pos_z, pos_y, pos_x = self.create_meshgrid()
+            self.register_buffer("pos_z", pos_z)
+            self.register_buffer("pos_y", pos_y)
+            self.register_buffer("pos_x", pos_x)
         else:
             self.register_buffer(
                 "pos_embed",
@@ -140,12 +140,32 @@ class ViT(nn.Module):
         # custom weight initialization
         self.initialize_weights()
 
+    def create_meshgrid(self):
+        pos_z, pos_y, pos_x = [], [], []
+        sum_l = sum([num_patches_elem[0] for num_patches_elem in self.num_patches])
+        sum_lgrid = torch.arange(sum_l) / sum_l
+        for n, num_patches_elem in enumerate(self.num_patches):
+            _, a, r = num_patches_elem
+            lgrid = sum_lgrid[
+                sum([self.num_patches[i][0] for i in range(n)]) : sum(
+                    [self.num_patches[i][0] for i in range(n + 1)]
+                )
+            ]
+            agrid = torch.arange(a) / a
+            rgrid = torch.arange(r) / r
+            z, y, x = torch.meshgrid(
+                lgrid, agrid, rgrid, indexing="ij"
+            )  # shape (l, a, r)
+            pos_z.append(z.flatten())
+            pos_y.append(y.flatten())
+            pos_x.append(x.flatten())
+        return torch.cat(pos_z), torch.cat(pos_y), torch.cat(pos_x)
+
     def learnable_pos_embedding(self):  # TODO
-        wz, wy, wx = (self.pos_embed_freqs * 2 * math.pi).chunk(3)
-        z, y, x = torch.meshgrid(self.lgrid, self.agrid, self.rgrid, indexing="ij")
-        z = z.flatten()[:, None] * wz[None, :]
-        y = y.flatten()[:, None] * wy[None, :]
-        x = x.flatten()[:, None] * wx[None, :]
+        w = self.pos_embed_freqs * 2 * math.pi
+        z = self.pos_z[:, None] * w[None, :]
+        y = self.pos_y[:, None] * w[None, :]
+        x = self.pos_x[:, None] * w[None, :]
         pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim=1)
         return pe
 
@@ -377,9 +397,9 @@ class TimestepEmbedder(nn.Module):
         half = dim // 2
         freqs = torch.exp(
             -math.log(max_period)
-            * torch.arange(start=0, end=half, dtype=torch.float32)
+            * torch.arange(start=0, end=half, dtype=t.dtype, device=t.device)
             / half
-        ).to(device=t.device)
+        )
         args = t.float() * freqs[None]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
         if dim % 2:
