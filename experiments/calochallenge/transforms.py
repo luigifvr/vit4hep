@@ -4,8 +4,8 @@ import numpy as np
 import os
 import torch.distributions as dist
 
-from experiments.calochallenge.challenge_files import *
-from experiments.calochallenge.challenge_files import XMLHandler
+from experiments.calo_utils.ugr_evaluation import *
+from experiments.calo_utils.ugr_evaluation import XMLHandler
 from itertools import pairwise
 
 
@@ -42,6 +42,7 @@ class GlobalStandardizeFromFile(object):
 
         self.dtype = torch.get_default_dtype()
         self.u_transform = True
+        self.eps = torch.logit(torch.tensor(1.0e-6))
         try:
             # load from file
             self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
@@ -61,8 +62,9 @@ class GlobalStandardizeFromFile(object):
             )
         else:
             if not self.written:
-                self.mean = shower.mean()
-                self.std = shower.std()
+                nonzero_mask = (shower > self.eps) & (shower < -self.eps)
+                self.mean = (shower[nonzero_mask]).mean()
+                self.std = (shower[nonzero_mask]).std()
                 if rank == 0:
                     self.write()
                 self.written = True
@@ -502,12 +504,14 @@ class AddAngularBins(object):
     xml_filename: path to the XML file
     ptype: particle type (e.g. "electron")
     num_bins: list with current number of angular bins per layer
+    add_bins: list with desired number of angular bins per layer
     """
 
-    def __init__(self, xml_filename, ptype, num_bins):
+    def __init__(self, xml_filename, ptype, num_bins, add_bins):
         self.xml = XMLHandler.XMLHandler(xml_filename, ptype)
         self.layer_boundaries = np.unique(self.xml.GetBinEdges())
         self.num_bins = np.array(num_bins)
+        self.add_bins = np.array(add_bins)
         self.n_voxels = self.layer_boundaries[-1]
 
     def __call__(self, shower, energy, rev=False, rank=0):
@@ -518,7 +522,7 @@ class AddAngularBins(object):
             transformed = []
             for l, (start, end) in enumerate(pairwise(self.new_layer_boundaries)):
                 alpha_bins = self.num_bins[l]
-                add_alpha_bins = self.num_bins.max() // alpha_bins
+                add_alpha_bins = self.add_bins[l] // alpha_bins
                 layer = shower[:, start:end]
                 layer, _ = layer.reshape(
                     shower.shape[0], -1, alpha_bins, add_alpha_bins
@@ -536,7 +540,7 @@ class AddAngularBins(object):
             ]
             for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
                 alpha_bins = self.num_bins[l]
-                add_alpha_bins = self.num_bins.max() // alpha_bins - 1
+                add_alpha_bins = self.add_bins[l] // alpha_bins - 1
                 layer = shower[:, start:end].reshape(shower.shape[0], -1, alpha_bins)
                 pad_left = add_alpha_bins // 2
                 pad_right = add_alpha_bins - add_alpha_bins // 2
