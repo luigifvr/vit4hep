@@ -119,6 +119,7 @@ class LEMURS(BaseExperiment):
             num_workers=8,
             persistent_workers=True,
             collate_fn=collator,
+            prefetch_factor=4,
         )
         self.val_loader = DataLoader(
             self.val_dataset,
@@ -128,6 +129,7 @@ class LEMURS(BaseExperiment):
             num_workers=8,
             persistent_workers=True,
             collate_fn=collator,
+            prefetch_factor=4,
         )
 
         LOGGER.info(
@@ -158,7 +160,7 @@ class LEMURS(BaseExperiment):
             (
                 np.random.uniform(gen_Einc[0], gen_Einc[1], size=n_samples)
                 if len(gen_Einc) == 2
-                else np.ones(n_samples) * gen_Einc
+                else np.ones(n_samples) * gen_Einc[0]
             ),
             dtype=self.dtype,
             device=self.device,
@@ -168,7 +170,7 @@ class LEMURS(BaseExperiment):
             (
                 np.random.uniform(-np.pi, np.pi, size=n_samples)
                 if gen_phi is None
-                else np.ones(n_samples) * gen_phi
+                else np.ones(n_samples) * gen_phi[0]
             ),
             dtype=self.dtype,
             device=self.device,
@@ -182,7 +184,7 @@ class LEMURS(BaseExperiment):
                     size=n_samples,
                 )
                 if len(gen_theta) == 2
-                else np.ones(n_samples) * torch.cos(torch.tensor(gen_theta))
+                else np.ones(n_samples) * np.cos(gen_theta[0])
             ),
             dtype=self.dtype,
             device=self.device,

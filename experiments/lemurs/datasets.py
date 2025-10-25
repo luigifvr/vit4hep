@@ -128,7 +128,7 @@ class LEMURSCollator:
             labels = (
                 torch.tensor(self.gen_label)
                 .repeat(len(class_indices), 1)
-                .to(self.dtype)
+                .to(self.dtype, non_blocking=True)
             )
         else:
             labels = torch.nn.functional.one_hot(
