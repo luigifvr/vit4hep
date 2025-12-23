@@ -122,13 +122,11 @@ class HighLevelFeatures:
         return weighted_r / (total_energy_r + 1.0e-8)
 
     def _calculate_Eradial(self, energy_calo, n):
-        angular_bins = self.num_alpha[0]
+        radial_bins = len(self.r_edges[0]) - 1
         layer_sum = 0
         for k in range(len(self.relevantLayers)):
             data_layer = energy_calo[:, self.bin_edges[k] : self.bin_edges[k + 1]]
-            angular_sum = data_layer[:, n * angular_bins : (n + 1) * angular_bins].sum(
-                axis=-1
-            )
+            angular_sum = data_layer[:, n::radial_bins].sum(axis=-1)
             layer_sum += angular_sum
         return layer_sum
 
