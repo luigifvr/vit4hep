@@ -38,6 +38,8 @@ class LEMURS(BaseExperiment):
     sample_n()           : Generate n_samples from the trained model, either energy ratios or full normalized showers
     plot()               : First generate full shower, then make plots and evaluate
     save_sample()        : Save generated samples in the correct format
+    load_sample()        : Load generated samples from the correct format
+    eval_sample()        : Evaluate saved sample using the evaluation script
     load_energy_model()  : Load an external energy model if sample_us
     """
 
@@ -226,7 +228,6 @@ class LEMURS(BaseExperiment):
                 samples["incident_energy"],
                 samples["incident_theta"],
                 samples["incident_phi"],
-                samples["label"],
             ),
             dim=-1,
         ).to(self.device)
@@ -240,7 +241,9 @@ class LEMURS(BaseExperiment):
 
             if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
-                transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
+                transformed_cond = torch.cat(
+                    [u_samples, transformed_cond, labels], dim=1
+                )
                 # concatenate with Einc
                 transformed_cond_loader = DataLoader(
                     dataset=transformed_cond,
@@ -452,6 +455,26 @@ class LEMURS(BaseExperiment):
         for key in samples_dict.keys():
             save_file.create_dataset(key, data=samples_dict[key], compression="gzip")
         save_file.close()
+
+    def eval_sample(self, dirname=""):
+        samples, energies, theta, phi = self.load_sample(dirname=dirname)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            run_from_py(samples, energies, theta, phi, self.cfg)
+
+    def load_sample(self, dirname=""):
+        """Load sample from the correct format"""
+        if dirname == "":
+            dirname = self.cfg.run_dir + f"/samples_{self.cfg.run_idx}.hdf5"
+        LOGGER.info(f"load_sample: loading samples from {dirname}")
+        load_file = h5py.File(dirname, "r")
+        file = load_file["events"][:]
+        samples = file["showers"]
+        energies = file["incident_energy"]
+        theta = file["incident_theta"]
+        phi = file["incident_phi"]
+        load_file.close()
+        return samples, energies, theta, phi
 
     def load_energy_model(self):
         # initialize model

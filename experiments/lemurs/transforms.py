@@ -21,11 +21,12 @@ class LEMURSGlobalStandardizeFromFile(object):
         create: whether or not to calculate and save mean/std based on first call
     """
 
-    def __init__(self, model_dir):
+    def __init__(self, model_dir, eps=1.0e-6):
 
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
+        self.eps = torch.logit(torch.tensor(eps))
 
         self.dtype = torch.get_default_dtype()
         self.u_transform = True
@@ -49,8 +50,9 @@ class LEMURSGlobalStandardizeFromFile(object):
         else:
             if not self.written:
                 shower = torch.cat([data_dict[key].flatten() for key in self.keys])
-                self.mean = shower.mean()
-                self.std = shower.std()
+                nonzero_mask = (shower > self.eps) & (shower < -self.eps)
+                self.mean = (shower[nonzero_mask]).mean()
+                self.std = (shower[nonzero_mask]).std()
                 if rank == 0:
                     self.write()
                 self.written = True
@@ -111,7 +113,7 @@ class LEMURSPreprocessConds(object):
     """
 
     def __init__(
-        self, scale_E=[1e3, 1e6], scale_theta=[0.87, 2.27], scale_phi=[0, 3.1416]
+        self, scale_E=[1e3, 1e6], scale_theta=[0.87, 2.27], scale_phi=[-3.1416, 3.1416]
     ):
         self.cond_transform = True
         self.keys = ["incident_energy", "incident_theta", "incident_phi"]
@@ -125,6 +127,7 @@ class LEMURSPreprocessConds(object):
                 max = self.rescaling[n][1]
                 data_dict[key] = data_dict[key] * (max - min) + min
         else:
+            # data_dict["incident_theta"] = torch.cos(data_dict["incident_theta"])
             # Rescale all conditions
             for n, key in enumerate(self.keys):
                 min = self.rescaling[n][0]

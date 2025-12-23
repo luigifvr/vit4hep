@@ -147,7 +147,6 @@ class LEMURSCollator:
                     batch_dict["incident_energy"],
                     batch_dict["incident_theta"],
                     batch_dict["incident_phi"],
-                    batch_dict["label"],
                 ),
                 dim=-1,
             )
