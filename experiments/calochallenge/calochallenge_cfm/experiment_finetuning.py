@@ -3,7 +3,11 @@ from omegaconf import OmegaConf, open_dict
 import torch
 import torch.nn as nn
 from torch_ema import ExponentialMovingAverage
+import time
+import numpy as np
+from torch.utils.data import DataLoader
 
+from experiments.calochallenge.datasets import CaloChallengeDataset
 from experiments.logger import LOGGER
 from experiments.calochallenge.experiment import CaloChallenge
 from experiments.misc import remove_module_from_state_dict
@@ -22,7 +26,7 @@ class CaloChallengeFTCFM(CaloChallenge):
         self.backbone_cfg = OmegaConf.load(backbone_cfg)
 
         self.model_num_patches = self.cfg.model.net.param.num_patches
-        self.model_patch_dim = self.cfg.model.net.param.patch_dim  # ft patch dim
+        self.model_patch_dim = self.cfg.model.net.param.patch_dim
         self.model_condition_dim = self.cfg.model.net.param.condition_dim
         with open_dict(self.cfg):
             self.cfg.model.net = self.backbone_cfg.model.net
@@ -32,6 +36,10 @@ class CaloChallengeFTCFM(CaloChallenge):
         super().init_model()
 
         if self.warm_start:
+            with open_dict(self.cfg):
+                self.cfg.model.net.param.num_patches = self.model_num_patches
+                self.cfg.model.net.param.patch_dim = self.model_patch_dim
+                self.cfg.model.net.param.condition_dim = self.model_condition_dim
             return
 
         # load pretrained network
@@ -67,8 +75,7 @@ class CaloChallengeFTCFM(CaloChallenge):
 
     def add_embedding_layers(self):
         """
-        Add embedding layers to the model.
-        This is necessary for fine-tuning on a different dataset.
+        Modify embedding layers in the model.
         """
         if self.cfg.finetuning.map_x_embedding:
             self.embedding = self.model.net.x_embedder
@@ -137,18 +144,13 @@ class CaloChallengeFTCFM(CaloChallenge):
                 self.model.net.c_embedder[0].weight.data = c_embed_weights.data
 
         # define the positional embedding
+        self.model.net.num_patches = self.model_num_patches
         if self.model.net.learn_pos_embed:
             if self.cfg.finetuning.reinitialize_pos_embedding:
-                l, a, r = self.model_num_patches
-                self.model.net.lgrid = (
-                    torch.arange(l, device=self.device, dtype=self.dtype) / l
-                )
-                self.model.net.agrid = (
-                    torch.arange(a, device=self.device, dtype=self.dtype) / a
-                )
-                self.model.net.rgrid = (
-                    torch.arange(r, device=self.device, dtype=self.dtype) / r
-                )
+                pos_z, pos_y, pos_x = self.model.net.create_meshgrid()
+                self.model.net.pos_z = pos_z.to(self.device, dtype=self.dtype)
+                self.model.net.pos_y = pos_y.to(self.device, dtype=self.dtype)
+                self.model.net.pos_x = pos_x.to(self.device, dtype=self.dtype)
             else:
                 pass
         else:
@@ -207,3 +209,89 @@ class CaloChallengeFTCFM(CaloChallenge):
         ]
 
         super()._init_optimizer(param_groups=param_groups)
+
+
+class CaloChallengeFT_fromLEM(CaloChallengeFTCFM):
+    """
+    A class for fine tuning a neural network trained on the LEMURS dataset.
+    """
+
+    @torch.inference_mode()
+    def sample_n(self):
+
+        self.model.eval()
+
+        t_0 = time.time()
+
+        Einc = torch.tensor(
+            (
+                10 ** np.random.uniform(3, 6, size=self.cfg.n_samples)
+                if self.cfg.evaluation.eval_dataset in ["2", "3"]
+                else self.generate_Einc_ds1()
+            ),
+            dtype=self.dtype,
+            device=self.device,
+        ).unsqueeze(1)
+
+        # transform Einc to basis used in training
+        dummy, transformed_cond = None, Einc
+        for fn in self.transforms:
+            if hasattr(fn, "cond_transform"):
+                dummy, transformed_cond = fn(dummy, transformed_cond)
+
+        batchsize_sample = self.cfg.training.batchsize_sample
+        transformed_cond_loader = DataLoader(
+            dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
+        )
+
+        if self.cfg.sample_us:  # TODO
+            u_samples = self.sample_us(transformed_cond_loader)
+            transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
+
+            # Add LEMURS conditions
+            theta = self.cfg.gen_theta
+            phi = self.cfg.gen_phi
+            label = torch.tensor(self.cfg.gen_label, dtype=self.dtype).to(self.device)
+            theta_tensor = torch.full(
+                (transformed_cond.shape[0], 1),
+                theta,
+                dtype=self.dtype,
+                device=self.device,
+            )
+            phi_tensor = torch.full(
+                (transformed_cond.shape[0], 1),
+                phi,
+                dtype=self.dtype,
+                device=self.device,
+            )
+            label_tensor = label.unsqueeze(0).repeat(transformed_cond.shape[0], 1)
+            transformed_cond = torch.cat(
+                [transformed_cond, theta_tensor, phi_tensor, label_tensor], dim=1
+            )
+        else:  # optionally use truth us
+            transformed_cond = CaloChallengeDataset(
+                self.hdf5_test,
+                self.particle_type,
+                self.xml_filename,
+                transform=self.transforms,
+                split="full",
+                device=self.device,
+            ).energy.to(self.device)
+
+        # concatenate with Einc
+        transformed_cond_loader = DataLoader(
+            dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
+        )
+
+        sample = torch.vstack(
+            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
+        )
+
+        t_1 = time.time()
+        sampling_time = t_1 - t_0
+        LOGGER.info(
+            f"sample_n: Finished generating {len(sample)} samples "
+            f"after {sampling_time} s."
+        )
+
+        return sample.detach().cpu(), transformed_cond.detach().cpu()
