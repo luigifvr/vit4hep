@@ -68,7 +68,6 @@ def prepare_low_data_for_classifier(
         ret = np.concatenate(
             [
                 np.log10(E_inc),
-                # angles,
                 voxel,
                 label * np.ones_like(E_inc),
             ],
@@ -104,7 +103,6 @@ def prepare_high_data_for_classifier(
     ret = np.concatenate(
         [
             np.log10(E_inc),
-            # angles,
             np.log10(E_layer + 1e-8),
             EC_etas / 1e2,
             EC_phis / 1e2,
