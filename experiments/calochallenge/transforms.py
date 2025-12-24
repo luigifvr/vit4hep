@@ -34,7 +34,7 @@ class GlobalStandardizeFromFile(object):
         create: whether or not to calculate and save mean/std based on first call
     """
 
-    def __init__(self, model_dir):
+    def __init__(self, model_dir, exclude_zeros=True, eps=1.0e-6):
 
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
@@ -42,7 +42,8 @@ class GlobalStandardizeFromFile(object):
 
         self.dtype = torch.get_default_dtype()
         self.u_transform = True
-        self.eps = torch.logit(torch.tensor(1.0e-6))
+        self.exclude_zeros = exclude_zeros
+        self.eps = torch.logit(torch.tensor(eps))
         try:
             # load from file
             self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
@@ -63,6 +64,8 @@ class GlobalStandardizeFromFile(object):
         else:
             if not self.written:
                 nonzero_mask = (shower > self.eps) & (shower < -self.eps)
+                if not self.exclude_zeros:
+                    nonzero_mask = nonzero_mask.fill_(True)
                 self.mean = (shower[nonzero_mask]).mean()
                 self.std = (shower[nonzero_mask]).std()
                 if rank == 0:
@@ -202,11 +205,11 @@ class AddFeaturesToCond(object):
     def __call__(self, x, c, rev=False, rank=0):
 
         if rev:
-            c_, split = c[:, :1], c[:, 1:]
+            c_, split = c[:, -1:], c[:, :-1]
             x_ = torch.cat([x, split], dim=1)
         else:
             x_, split = x[:, : self.split_index], x[:, self.split_index :]
-            c_ = torch.cat([c, split], dim=1)
+            c_ = torch.cat([split, c], dim=1)
         return x_, c_
 
 
@@ -557,3 +560,35 @@ class AddAngularBins(object):
             )
             transformed = torch.cat((transformed, us), dim=-1)
         return transformed, energy
+
+
+class AddLEMURSConditions(object):
+    """
+    Add global variables to match the LEMURS conditions.
+    """
+
+    def __init__(self, theta=0.5, phi=0.5, label=[1, 0, 0, 0, 0]):
+        self.theta = theta
+        self.phi = phi
+        self.label = label
+        self.n_conds = 2 + len(label)
+
+    def __call__(self, shower, energy, rev=False, rank=0):
+        if rev:
+            energy, additional_conds = (
+                energy[:, : -self.n_conds],
+                energy[:, -self.n_conds :],
+            )
+            return shower, energy
+        else:
+            additional_conds = (
+                torch.tensor(
+                    [self.theta, self.phi] + self.label,
+                    dtype=energy.dtype,
+                    device=energy.device,
+                )
+                .unsqueeze(0)
+                .repeat(energy.shape[0], 1)
+            )
+            energy = torch.cat((energy, additional_conds), dim=1)
+            return shower, energy

@@ -36,6 +36,8 @@ class CaloChallenge(BaseExperiment):
     sample_n()           : Generate n_samples from the trained model, either energy ratios or full normalized showers
     plot()               : First generate full shower, then make plots and evaluate
     save_sample()        : Save generated samples in the correct format
+    load_sample()        : Load generated samples from the correct format
+    eval_sample()        : Evaluate saved sample with the evaluation script
     load_energy_model()  : Load an external energy model if sample_us
     """
 
@@ -50,7 +52,8 @@ class CaloChallenge(BaseExperiment):
         LOGGER.info("init_data: preparing model training")
         for name, kwargs in self.cfg.data.transforms.items():
             if "FromFile" in name:
-                kwargs["model_dir"] = self.cfg.run_dir
+                if kwargs["model_dir"] is None:
+                    kwargs["model_dir"] = self.cfg.run_dir
             self.transforms.append(getattr(transforms, name)(**kwargs))
         LOGGER.info("init_data: list of preprocessing steps:")
         for idx, transform in enumerate(self.transforms):
@@ -141,7 +144,7 @@ class CaloChallenge(BaseExperiment):
     def evaluate(self):
         pass
 
-    def generate_Einc_ds1(self, sample_multiplier=1000):
+    def generate_Einc_ds1(self, sample_multiplier=1):
         """generate the incident energy distribution of CaloChallenge ds1
         sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
         and 5, 3, 2, 1 times sample multiplier for the highest energies
@@ -195,7 +198,7 @@ class CaloChallenge(BaseExperiment):
 
             if self.cfg.sample_us:  # TODO
                 u_samples = self.sample_us(transformed_cond_loader)
-                transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
+                transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
             else:  # optionally use truth us
                 transformed_cond = CaloChallengeDataset(
                     self.hdf5_test,
@@ -212,7 +215,7 @@ class CaloChallenge(BaseExperiment):
             )
 
         sample = torch.vstack(
-            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
+            [self.model.sample_batch(c) for c in transformed_cond_loader]
         )
 
         t_1 = time.time()
@@ -294,17 +297,34 @@ class CaloChallenge(BaseExperiment):
             samples = samples.numpy()
             conditions = conditions.numpy()
 
-            self.save_sample(samples, conditions)
+            self.save_sample(samples, conditions, name=f"_{self.cfg.run_idx}")
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 run_from_py(samples, conditions, self.cfg)
 
+    def eval_sample(self, dirname=""):
+        samples, energies = self.load_sample(dirname=dirname)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            run_from_py(samples, energies, self.cfg)
+
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
-        save_file = h5py.File(self.cfg.base_dir + f"samples{name}.hdf5", "w")
+        save_file = h5py.File(self.cfg.run_dir + f"/samples{name}.hdf5", "w")
         save_file.create_dataset("incident_energies", data=energies, compression="gzip")
         save_file.create_dataset("showers", data=sample, compression="gzip")
         save_file.close()
+
+    def load_sample(self, dirname=""):
+        """Load sample from the correct format"""
+        if dirname == "":
+            dirname = self.cfg.run_dir + f"/samples_{self.cfg.run_idx}.hdf5"
+        LOGGER.info(f"load_sample: loading samples from {dirname}")
+        load_file = h5py.File(dirname, "r")
+        energies = load_file["incident_energies"][:]
+        sample = load_file["showers"][:]
+        load_file.close()
+        return sample, energies
 
     def load_energy_model(self):
         # initialize model
