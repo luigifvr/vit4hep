@@ -1,5 +1,5 @@
 """
-Transformer-based MLP for CFM as used in CaloDREAM arXiv:2405.09629.
+Transformer-based MLP for CFM modified from CaloDREAM arXiv:2405.09629.
 Used to generate energy ratios with a CFM generative network
 """
 
@@ -7,12 +7,11 @@ import torch
 import torch.nn as nn
 import math
 
-from experiments.logger import LOGGER
 
-
-class MLPTransformer(nn.Module):
+class ParallelTransformer(nn.Module):
     """
-    Simple Conditional Resnet class to build from a params dict
+    Predict velocity field for an entire vector in a single forward pass.
+    The embedding is learned by a transformer network.
     """
 
     def __init__(self, param):
@@ -28,29 +27,32 @@ class MLPTransformer(nn.Module):
             "dim_feedforward": 256,
             "dropout": 0.0,
             "activation": "relu",
-            "embeds": True,
+            "embeds": False,
             "encode_t_scale": 30,
+            "encode_t_dim": 64,
         }
 
         for k, p in defaults.items():
             setattr(self, k, param[k] if k in param else p)
 
+        self.time_embed = nn.Sequential(
+            GaussianFourierProjection(
+                embed_dim=self.encode_t_dim, scale=self.encode_t_scale
+            ),
+            nn.Linear(self.encode_t_dim, self.encode_t_dim),
+        )
         if self.embeds:
             self.d_model = 2 * self.dim_embedding
             self.x_embed = nn.Linear(1, self.dim_embedding)
             self.c_embed = nn.Linear(1, 2 * self.dim_embedding)
             self.pos_embed_x = nn.Embedding(self.dims_in, self.dim_embedding)
             self.pos_embed_c = nn.Embedding(self.dims_c, 2 * self.dim_embedding)
-            self.time_embed = nn.Sequential(
-                GaussianFourierProjection(
-                    embed_dim=self.dim_embedding, scale=self.encode_t_scale
-                ),
-                nn.Linear(self.dim_embedding, self.dim_embedding),
-            )
-            self.layer = nn.Linear(3 * self.dim_embedding, 1)
+            self.layer = nn.Linear(3 * self.dim_embedding, self.dim_feedforward)
         else:
             self.d_model = self.dim_embedding
-            self.layer = nn.Linear(self.dim_embedding + 1, 1)
+            self.layer = nn.Linear(
+                self.dim_embedding + self.encode_t_dim, self.dim_feedforward
+            )
 
         self.transformer = nn.Transformer(
             d_model=self.d_model,
@@ -63,16 +65,18 @@ class MLPTransformer(nn.Module):
             batch_first=True,
         )
 
-        # Initalize to zero
-        self.layer.weight.data *= 0
-        self.layer.bias.data *= 0
+        self.layers = nn.Sequential(
+            self.layer,
+            nn.SiLU(),
+            nn.Linear(self.dim_feedforward, 1),
+        )
 
     def compute_embedding(
         self, p: torch.Tensor, n_components: int, t: torch.Tensor = None
     ) -> torch.Tensor:
         """
-        Appends the one-hot encoded position to the momenta p. Then this is either zero-padded
-        or an embedding net is used to compute the embedding of the correct dimension.
+        Compute the embedding for the input vector p. Either use an embedding network
+        or a vector with the positional encoding, the features, and zero padding.
         """
         if self.embeds:
             if t is not None:
@@ -85,32 +89,17 @@ class MLPTransformer(nn.Module):
                 p = self.c_embed(p.unsqueeze(-1))
                 p = p + self.pos_embed_c(torch.arange(n_components, device=p.device))
                 return p
-
         else:
+            p = p.unsqueeze(-1)
             one_hot = torch.eye(n_components, device=p.device, dtype=p.dtype)[
                 None, : p.shape[1], :
             ].expand(p.shape[0], -1, -1)
-            if t is None:
-                p = p.unsqueeze(-1)
-            else:
-                p = torch.cat(
-                    [
-                        p.unsqueeze(-1),
-                        t.unsqueeze(1).expand(
-                            t.shape[0], p.shape[1], self.encode_t_dim
-                        ),
-                    ],
-                    dim=-1,
-                )
             n_rest = self.dim_embedding - n_components - p.shape[-1]
             assert n_rest >= 0
             zeros = torch.zeros((*p.shape[:2], n_rest), device=p.device, dtype=p.dtype)
             return torch.cat((p, one_hot, zeros), dim=-1)
 
     def forward(self, x, t, condition=None):
-        """
-        forward method of our Resnet
-        """
         if condition is None:
             embedding = self.transformer.decoder(
                 self.compute_embedding(x, n_components=self.dims_in, t=t),
@@ -125,12 +114,12 @@ class MLPTransformer(nn.Module):
                 src=self.compute_embedding(condition, n_components=self.dims_c),
                 tgt=self.compute_embedding(x, n_components=self.dims_in, t=t),
             )
-        if self.embeds:
-            t = self.time_embed(t)
-        v_pred = self.layer(
-            torch.cat([t.unsqueeze(1).repeat(1, self.dims_in, 1), embedding], dim=-1)
-        ).squeeze()
-        return v_pred
+
+        t = self.time_embed(t)
+        t = t.unsqueeze(1).expand(-1, embedding.size(1), -1)
+
+        v_pred = self.layers(torch.cat([t, embedding], dim=-1))
+        return v_pred.squeeze(-1)
 
 
 class PositionalEncoding(nn.Module):
