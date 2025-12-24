@@ -1,6 +1,15 @@
-_target_: experiments.calochallenge.calochallenge_cfm.model.CaloChallengeCFM
+_target_: experiments.calochallenge.calochallenge_cfm.model.CaloChallengeCFM_DS1
 in_channels: 1
-shape: [74, 1, 10]
+shape: [625]
+list_shape:
+ - [1, 8, 5]
+ - [1, 10, 10]
+ - [1, 10, 10]
+ - [1, 5, 5]
+ - [1, 15, 10]
+ - [1, 16, 10]
+ - [1, 10, 5]
+list_edges: [40, 100, 100, 25, 150, 160, 50]
 patch_shape: [1, 1, 5]
 
 time_distribution: uniform
@@ -24,9 +33,9 @@ net:
     proj_drop: 0.0
     pos_embedding_coords: cylindrical
     temperature: 10000
-    learn_pos_embed: false
+    learn_pos_embed: true
     causal_attn: false
-    chackpoint_grads: false
-    num_patches: [74,1,2]
+    checkpoint_grads: false
+    num_patches: [[1, 8, 1], [1, 10, 2], [1, 10, 2], [1, 5, 1], [1, 15, 2], [1, 16, 2], [1, 10, 1]]
     patch_dim: 5
     use_torch_sdpa: false

@@ -1,7 +1,11 @@
-_target_: experiments.calochallenge.calochallenge_cfm.model.CaloChallengeCFM
+_target_: experiments.calohadronic.model.CaloHadCFM
 in_channels: 1
-shape: [45, 50, 18]
-patch_shape: [3, 10, 3]
+shape: [45450]
+list_shape:
+ - [10, 15, 15]
+ - [48, 30, 30]
+list_edges: [2250, 43200]
+list_patch_shape: [[5, 5, 3], [3, 5, 5]]
 
 time_distribution: uniform
 trajectory: linear
@@ -14,7 +18,7 @@ net:
   _target_: nn.vit.ViT
   param:
     dim: 3
-    condition_dim: 46
+    condition_dim: 59
     hidden_dim: 480
     out_channels: 1
     depth: 6
@@ -27,6 +31,6 @@ net:
     learn_pos_embed: true
     causal_attn: false
     checkpoint_grads: false
-    num_patches: [15,5,6]
-    patch_dim: 90
+    num_patches: [[2, 3, 5], [16, 6, 6]]
+    patch_dim: 75
     use_torch_sdpa: false

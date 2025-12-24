@@ -11,10 +11,10 @@ odeint_kwargs:
     step_size: 0.05
 
 net:
-  _target_: nn.vit.ViT
+  _target_: nn.vit.ViT2
   param:
     dim: 3
-    condition_dim: 46
+    condition_dim: 53
     hidden_dim: 480
     out_channels: 1
     depth: 6
@@ -27,6 +27,6 @@ net:
     learn_pos_embed: true
     causal_attn: false
     checkpoint_grads: false
-    num_patches: [15,5,6]
+    num_patches: [[15,5,6]]
     patch_dim: 90
     use_torch_sdpa: false

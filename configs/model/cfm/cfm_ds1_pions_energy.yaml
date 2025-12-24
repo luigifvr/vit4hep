@@ -10,7 +10,7 @@ odeint_kwargs:
     step_size: 0.05
 
 net:
-  _target_: nn.cfm.mlp_transformer.MLPTransformer
+  _target_: nn.cfm.transformer_cfm.ParallelTransformer
   param:
     dims_in: 7
     dims_c: 1
