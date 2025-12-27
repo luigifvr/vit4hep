@@ -20,7 +20,7 @@ data:
     ScaleTotalEnergy: { n_layers: 45, factor: 0.35 },
     CutValues: {cut: 1.e-7, n_layers: 45},
     ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
-    GlobalStandardizeFromFile: {model_dir: None},
+    GlobalStandardizeFromFile: {model_dir: null},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 40500},
@@ -33,6 +33,8 @@ evaluation:
   eval_dataset: "3"
   eval_mode: all
   eval_cut: 0.015
+  eval_labels: ["Vit-CFM"]
+  eval_p_label: ""
   eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_3_2_full.hdf5
   eval_cls_n_layer: 2
   eval_cls_n_hidden: 2048
@@ -43,7 +45,7 @@ evaluation:
   eval_cls_save_mem: True
   # ResNet
   eval_cls_resnet_layers: 18
-  eval_cls_resnet_lr: 2.e-5
+  eval_cls_resnet_lr: 2.e-4
   eval_cls_resnet_n_epochs: 48
 
 defaults:
