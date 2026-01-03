@@ -39,7 +39,8 @@ finetuning:
   reinitialize_pos_embedding: true
   reinitialize_final_layer: true
   interpolate: true
-
+  
+load_sample: false
 evaluation:
   eval_dataset: "3"
   eval_labels: ["Vit-CFM"]

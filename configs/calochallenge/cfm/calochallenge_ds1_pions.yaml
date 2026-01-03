@@ -4,7 +4,7 @@ dtype: float32
 
 model_type: shape
 sample_us: true
-energy_model: ./runs/CaloChallenge_energy/calochallenge_ds1_pions_energy/
+energy_model: ./runs/CaloChallenge_energy/calochallenge_50541/
 n_samples: 100000
 data:
   training_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_1.hdf5
@@ -34,7 +34,7 @@ data:
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_dataset: "1-pions"
   eval_mode: all

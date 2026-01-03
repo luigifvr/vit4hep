@@ -34,7 +34,7 @@ data:
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_dataset: "1-photons"
   eval_mode: all

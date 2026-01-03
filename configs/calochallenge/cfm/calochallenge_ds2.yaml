@@ -28,7 +28,7 @@ data:
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_dataset: "2"
   eval_mode: all

@@ -40,7 +40,7 @@ data:
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_labels: ["ViT-CFM"]
   eval_dataset: "2"

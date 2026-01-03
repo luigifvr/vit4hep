@@ -57,6 +57,7 @@ finetuning:
   interpolate: false
   #ema_decay: 0.999  
 
+load_sample: false
 evaluation:
   eval_labels: ["Vit-CFM"]
   eval_p_label: ""

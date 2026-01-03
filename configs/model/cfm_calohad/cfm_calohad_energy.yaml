@@ -1,6 +1,6 @@
 _target_: models.base_model.CFM
 
-shape: [59]
+shape: [58]
 
 time_distribution: uniform
 trajectory: linear
