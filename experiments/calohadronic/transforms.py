@@ -93,7 +93,7 @@ class CaloHadStandardizeUsFromFile(object):
     def __call__(self, data_dict, rev=False, rank=0):
         us = data_dict["extra_dims"]
         if rev:
-            trafo_us = us * self.std_u.to(us.device) + self.mean_u.to(us.device)
+            trafo_us = us * (self.std_u.to(us.device) + 1) + self.mean_u.to(us.device)
         else:
             if not self.written:
                 self.mean_u = us.mean(0)
@@ -101,7 +101,7 @@ class CaloHadStandardizeUsFromFile(object):
                 if rank == 0:
                     self.write()
                 self.written = True
-            trafo_us = (us - self.mean_u.to(us.device)) / self.std_u.to(us.device)
+            trafo_us = (us - self.mean_u.to(us.device)) / (self.std_u.to(us.device) + 1)
         data_dict["extra_dims"] = trafo_us
         return data_dict
 

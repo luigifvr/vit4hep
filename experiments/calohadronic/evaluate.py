@@ -65,7 +65,7 @@ def plot_histograms(features_gen, features_g4, all_gen, all_g4, arg, output_dir=
         features_g4[:, 3],
         arg,
         title="energy",
-        label=r"$E_\text{tot}$ [GeV]",
+        label=r"$E_\text{tot}/E_\text{inc}$",
         title_label="CaloHad.",
         output_dir=output_dir,
     )
@@ -190,14 +190,14 @@ def run_from_py(ecal, hcal, energy, cfg):
     cog_x_gen = get_centroid_x(ecal, hcal, ecalmm=5.1 * 12)
     cog_y_gen = get_centroid_y(ecal, hcal, ecalmm=5.1 * 12)
     cog_z_gen = get_centroid_z(ecal, hcal)
-    energy_gen = get_total_energy(ecal, hcal)
+    energy_gen = get_total_energy(ecal, hcal) / energy.flatten()
     n_hits_gen = get_n_hits(ecal, hcal, threshold=min_energy)
     all_voxels_gen = np.concatenate((ecal.flatten(), hcal.flatten()), axis=0)
 
     cog_x_g4 = get_centroid_x(ecal_g4, hcal_g4, ecalmm=5.1 * 12)
     cog_y_g4 = get_centroid_y(ecal_g4, hcal_g4, ecalmm=5.1 * 12)
     cog_z_g4 = get_centroid_z(ecal_g4, hcal_g4)
-    energy_g4 = get_total_energy(ecal_g4, hcal_g4)
+    energy_g4 = get_total_energy(ecal_g4, hcal_g4) / energy_g4.flatten()
     n_hits_g4 = get_n_hits(ecal_g4, hcal_g4, threshold=min_energy)
     all_voxels_g4 = np.concatenate((ecal_g4.flatten(), hcal_g4.flatten()), axis=0)
 
@@ -226,6 +226,12 @@ def run_from_py(ecal, hcal, energy, cfg):
     energy_g4_std = (energy_g4 - energy_gen.mean()) / energy_gen.std()
     n_hits_g4_std = (n_hits_g4 - n_hits_gen.mean()) / n_hits_gen.std()
 
+    # extract layer energies
+    ecal_energies = ecal.sum(axis=(-1, -2))
+    hcal_energies = hcal.sum(axis=(-1, -2))
+    ecal_energies_g4 = ecal_g4.sum(axis=(-1, -2))
+    hcal_energies_g4 = hcal_g4.sum(axis=(-1, -2))
+
     g4_labels = np.zeros(features_g4.shape[0])
     gen_labels = np.ones(features_gen.shape[0])
     features_gen = np.concatenate(
@@ -235,6 +241,8 @@ def run_from_py(ecal, hcal, energy, cfg):
             cog_z_gen_std[:, None],
             energy_gen_std[:, None],
             n_hits_gen_std[:, None],
+            ecal_energies,
+            hcal_energies,
             gen_labels[:, None],
         ),
         axis=1,
@@ -246,6 +254,8 @@ def run_from_py(ecal, hcal, energy, cfg):
             cog_z_g4_std[:, None],
             energy_g4_std[:, None],
             n_hits_g4_std[:, None],
+            ecal_energies_g4,
+            hcal_energies_g4,
             g4_labels[:, None],
         ),
         axis=1,
