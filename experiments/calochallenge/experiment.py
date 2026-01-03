@@ -144,7 +144,7 @@ class CaloChallenge(BaseExperiment):
     def evaluate(self):
         pass
 
-    def generate_Einc_ds1(self, sample_multiplier=1):
+    def generate_Einc_ds1(self, sample_multiplier=1000):
         """generate the incident energy distribution of CaloChallenge ds1
         sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
         and 5, 3, 2, 1 times sample multiplier for the highest energies
