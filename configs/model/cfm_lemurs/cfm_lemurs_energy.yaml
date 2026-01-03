@@ -1,6 +1,6 @@
 _target_: models.base_model.CFM
 
-shape: [5]
+shape: [45]
 
 time_distribution: uniform
 trajectory: linear
@@ -12,8 +12,8 @@ odeint_kwargs:
 net:
   _target_: nn.cfm.transformer_cfm.ParallelTransformer
   param:
-    dims_in: 5
-    dims_c: 1
+    dims_in: 45
+    dims_c: 3
     dim_embedding: 64
     nhead: 4
     num_encoder_layers: 4
@@ -21,5 +21,6 @@ net:
     dim_feedforward: 512
     dropout: 0.0
     activation: relu
-    embeds: true
+    embeds: false
     encode_t_scale: 30
+    encode_t_dim: 64

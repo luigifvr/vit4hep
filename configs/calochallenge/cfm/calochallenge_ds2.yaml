@@ -20,7 +20,7 @@ data:
     ScaleTotalEnergy: {n_layers: 45, factor: 0.35},
     CutValues: {cut: 1.e-7, n_layers: 45},
     ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
-    GlobalStandardizeFromFile: {model_dir: None},
+    GlobalStandardizeFromFile: {model_dir: null, eps: 1.0e-6},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
@@ -28,11 +28,13 @@ data:
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_dataset: "2"
   eval_mode: all
   eval_cut: 0.015
+  eval_labels: ["Vit-CFM"]
+  eval_p_label: ""
   eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5
   eval_cls_n_layer: 2
   eval_cls_n_hidden: 2048

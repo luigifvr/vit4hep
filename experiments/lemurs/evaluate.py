@@ -1,44 +1,4 @@
-# pylint: disable=invalid-name
-"""
-Evaluation script for the LEMURS dataset inspired by the CaloChallenge.
-
-
-input:
-    - path to a folder containing .hdf5 samples.
-      The script loads only files with *samples.hdf5 in the name
-output:
-    - metrics for evaluation (plots, classifier scores, etc.)
-
-usage:
-    -i --input_file: path of the input files to be evaluated.
-    -r --reference_file: Name and path of the reference .hdf5 file.
-    -m --mode: Which metric to look at. Choices are
-               'all': does all of the below (with low-level classifier).
-               'avg': plots the average shower of the whole dataset.
-               'avg-E': plots the average showers at different energy (ranges).
-               'hist-p': plots histograms of high-level features.
-               'hist-chi': computes the chi2 difference of the histograms.
-               'hist': plots histograms and computes chi2.
-               'all-cls': only run classifiers in list_cls
-               'no-cls': does all of the above (no classifier).
-               'cls-low': trains a classifier on low-level features (voxels).
-               'cls-low-normed': trains a classifier on normalized voxels.
-               'cls-high': trains a classifier on high-level features (same as histograms).
-    -d --dataset: Which dataset the evaluation is for. Choices are
-                  '1-photons', '1-pions', '2', '3'
-       --output_dir: Folder in which the evaluation results (plots, scores) are saved.
-       --save_mem: If included, data is moved to the GPU batch by batch instead of once.
-                   This reduced the memory footprint a lot, especially for datasets 2 and 3.
-
-       --no_cuda: if added, code will not run on GPU, even if available.
-       --which_cuda: Which GPU to use if multiple are available.
-
-additional options for the classifier start with --cls_ and can be found below.
-"""
-
-import argparse
 import os
-
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
@@ -50,153 +10,53 @@ import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
 from experiments.calo_utils.ugr_evaluation.resnet import generate_model
 from experiments.calo_utils.ugr_evaluation.evaluate import (
     DNN,
-    prepare_low_data_for_classifier,
-    prepare_high_data_for_classifier,
     ttv_split,
     load_classifier,
     train_and_evaluate_cls,
     evaluate_cls,
 )
+from experiments.lemurs.utils import (
+    prepare_low_data_for_classifier,
+    prepare_high_data_for_classifier,
+)
 from experiments.logger import LOGGER
 
 torch.set_default_dtype(torch.float64)
 
-plt.rc("font", family="serif", size=16)
+plt.rc("font", **{"family": "serif", "serif": ["Computer Modern"], "size": 24})
 plt.rc("axes", titlesize="medium")
 plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
 plt.rc("text", usetex=True)
 
-########## Parser Setup ##########
 
-
-def define_parser():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Evaluate calorimeter showers of the " + "Fast Calorimeter Challenge 2022."
-        )
-    )
-
-    parser.add_argument(
-        "--input_file", "-i", help="Path of the inputs file to be evaluated."
-    )
-    parser.add_argument(
-        "--reference_file",
-        "-r",
-        help="Name and path of the .hdf5 file to be used as reference. ",
-    )
-    parser.add_argument(
-        "--mode",
-        "-m",
-        default="all",
-        choices=[
-            "all",
-            "all-cls",
-            "no-cls",
-            "avg",
-            "avg-E",
-            "hist-p",
-            "hist-chi",
-            "hist",
-            "cls-low",
-            "cls-low-normed",
-            "cls-high",
-        ],
-        help=(
-            "What metric to evaluate: "
-            + "'avg' plots the shower average;"
-            + "'avg-E' plots the shower average for energy ranges;"
-            + "'hist-p' plots the histograms;"
-            + "'hist-chi' evaluates a chi2 of the histograms;"
-            + "'hist' evaluates a chi2 of the histograms and plots them;"
-            + "'cls-low' trains a classifier on the low-level feautures;"
-            + "'cls-low-normed' trains a classifier on the low-level feautures"
-            + " with calorimeter layers normalized to 1;"
-            + "'cls-high' trains a classifier on the high-level features;"
-            + "'all' does the full evaluation, ie all of the above"
-            + " with low-level classifier."
-        ),
-    )
-    parser.add_argument(
-        "--dataset",
-        "-d",
-        choices=["1-photons", "1-pions", "2", "3"],
-        help="Which dataset is evaluated.",
-    )
-    parser.add_argument(
-        "--output_dir",
-        default="evaluation_results/",
-        help="Where to store evaluation output files (plots and scores).",
-    )
-
-    parser.add_argument("--cut", type=float)
-    parser.add_argument("--energy", type=float, default=None)
-
-    parser.add_argument(
-        "--cls_resnet_layers",
-        type=int,
-        default=18,
-        help="Number of layers in the ResNet classifier, default is 18.",
-    )
-    parser.add_argument(
-        "--cls_n_layer",
-        type=int,
-        default=2,
-        help="Number of hidden layers in the classifier, default is 2.",
-    )
-    parser.add_argument(
-        "--cls_n_hidden",
-        type=int,
-        default="512",
-        help="Hidden nodes per layer of the classifier, default is 512.",
-    )
-    parser.add_argument(
-        "--cls_dropout_probability",
-        type=float,
-        default=0.0,
-        help="Dropout probability of the classifier, default is 0.",
-    )
-
-    parser.add_argument(
-        "--cls_batch_size",
-        type=int,
-        default=1000,
-        help="Classifier batch size, default is 1000.",
-    )
-    parser.add_argument(
-        "--cls_n_epochs",
-        type=int,
-        default=50,
-        help="Number of epochs to train classifier, default is 50.",
-    )
-    parser.add_argument(
-        "--cls_lr",
-        type=float,
-        default=2e-4,
-        help="Learning rate of the classifier, default is 2e-4.",
-    )
-
-    # CUDA parameters
-    parser.add_argument("--no_cuda", action="store_true", help="Do not use cuda.")
-    parser.add_argument(
-        "--which_cuda", default=0, type=int, help="Which cuda device to use"
-    )
-
-    parser.add_argument(
-        "--save_mem",
-        action="store_true",
-        help="Data is moved to GPU batch by batch instead of once in total.",
-    )
-    return parser
-
-
-def extract_shower_and_energy(given_file, which, max_len=-1):
+def extract_shower_and_energy(
+    given_file, which, max_len=-1, energy_bin=None, theta_bin=None, phi_bin=None
+):
     """reads .hdf5 file and returns samples and their energy"""
     print("Extracting showers from {} file ...".format(which))
-    shower = given_file["showers"][:max_len]
-    energy = given_file["incident_energy"][:max_len]
-    theta = given_file["incident_theta"][:max_len]
-    phi = given_file["incident_phi"][:max_len]
+    shower = given_file["showers"][:]
+    energy = given_file["incident_energy"][:]
+    theta = given_file["incident_theta"][:]
+    phi = given_file["incident_phi"][:]
     print("Extracting showers from {} file: DONE.\n".format(which))
+    if energy_bin is not None:
+        energy_mask = (energy >= energy_bin[0]) & (energy < energy_bin[1])
+    else:
+        energy_mask = np.ones_like(energy, dtype=bool)
+    if theta_bin is not None:
+        theta_mask = (theta >= theta_bin[0]) & (theta < theta_bin[1])
+    else:
+        theta_mask = np.ones_like(energy, dtype=bool)
+    if phi_bin is not None:
+        phi_mask = (phi >= phi_bin[0]) & (phi < phi_bin[1])
+    else:
+        phi_mask = np.ones_like(energy, dtype=bool)
+    full_mask = np.ones_like(energy, dtype=bool)
+    full_mask = (full_mask & energy_mask & theta_mask & phi_mask).squeeze()
+    shower = shower[full_mask][:max_len]
+    energy = energy[full_mask][:max_len]
+    theta = theta[full_mask][:max_len]
+    phi = phi[full_mask][:max_len]
     return (
         shower.astype("float32", copy=False),
         energy.astype("float32", copy=False),
@@ -398,10 +258,7 @@ def plot_conditions(sample_conds, ref_conds, arg, labels, input_names, p_label):
             )
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            # ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
-
-            # ax[0].set_title("Energy deposited in layer {}".format(key))
             ax[0].set_ylabel(r"a.u.")
             ax[1].set_ylabel(r"$\frac{\text{Model}}{\text{Geant4}}$")
             ax[2].set_xlabel(f"cond {n}")
@@ -432,7 +289,13 @@ class args_class:
         self.cut = cfg.eval_cut
         self.reference_file = cfg.eval_hdf5_file
         self.labels = cfg.eval_labels
+        self.p_label = cfg.eval_p_label
         self.which_cuda = 0
+
+        # slice parameters
+        self.energy_bin = cfg.eval_energy_bin
+        self.theta_bin = cfg.eval_theta_bin
+        self.phi_bin = cfg.eval_phi_bin
 
         # ResNet classifier parameters
         self.cls_resnet_layers = cfg.eval_cls_resnet_layers
@@ -491,11 +354,21 @@ def run_from_py(sample, energy, theta, phi, cfg):
     reference_file = h5py.File(args.reference_file, "r")
     reference_file = reference_file["events"][:]
 
+    print("Extracting showers from reference file ...")
+    print(
+        f"slicing with energy bin: {args.energy_bin}, theta bin: {args.theta_bin}, phi bin: {args.phi_bin}"
+    )
     reference_shower, reference_energy, reference_theta, reference_phi = (
         extract_shower_and_energy(
-            reference_file, which="reference", max_len=len(sample)
+            reference_file,
+            which="reference",
+            max_len=len(sample),
+            energy_bin=args.energy_bin,
+            theta_bin=args.theta_bin,
+            phi_bin=args.phi_bin,
         )
     )
+    print("Number of showers in reference after slicing: ", len(reference_energy))
     # match the CaloChallenge convention
     reference_shower = reference_shower.transpose(0, 3, 2, 1)
     reference_shower = reference_shower.reshape(-1, args.num_voxels)
@@ -623,7 +496,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
                     + " see eq. 15 of 2009.03796 for its definition.\n"
                 )
         print("Plotting histograms ...")
-        p_label = "LEMURS"
+        p_label = f"{args.p_label}"
 
         plot_histograms(
             [
@@ -651,6 +524,53 @@ def run_from_py(sample, energy, theta, phi, cfg):
         plot_conditions(sample_conds, reference_conds, args, args.labels, [""], p_label)
         print("Plotting histograms: DONE. \n")
 
+    if args.mode in ["all", "fpd", "kpd"]:
+        import jetnet
+
+        print("Calculating high-level features for FPD/KPD ...")
+        hlf.CalculateFeatures(sample)
+        hlf.Einc = energy
+
+        reference_angles = np.concatenate((reference_theta, reference_phi), axis=1)
+        angles = np.concatenate((theta, phi), axis=1)
+        cut = args.cut
+
+        if reference_hlf.E_tot is None:
+            reference_hlf.CalculateFeatures(reference_shower)
+
+        print("Calculating high-level features for FPD/KPD: DONE.\n")
+
+        # get high level features and remove class label
+        source_array = prepare_high_data_for_classifier(
+            sample, energy, angles, hlf, 0.0, cut=cut
+        )
+        reference_array = prepare_high_data_for_classifier(
+            reference_shower,
+            reference_energy,
+            reference_angles,
+            reference_hlf,
+            1.0,
+            cut=cut,
+        )
+
+        fpd_val, fpd_err = jetnet.evaluation.fpd(
+            reference_array, source_array, min_samples=10000
+        )
+        kpd_val, kpd_err = jetnet.evaluation.kpd(
+            reference_array, source_array, batch_size=10000
+        )
+
+        result_str = (
+            f"FPD (x10^3): {fpd_val*1e3:.4f} ± {fpd_err*1e3:.4f}\n"
+            f"KPD (x10^3): {kpd_val*1e3:.4f} ± {kpd_err*1e3:.4f}"
+        )
+
+        print(result_str)
+        with open(
+            os.path.join(args.output_dir, "fpd_kpd_{}.txt".format(args.dataset)), "w"
+        ) as f:
+            f.write(result_str)
+
     if args.mode in [
         "all",
         "all-cls",
@@ -659,6 +579,9 @@ def run_from_py(sample, energy, theta, phi, cfg):
         "cls-low-normed",
         "cls-resnet",
     ]:
+        # TODO: angles are not currenlty used!!!
+        reference_angles = np.concatenate((reference_theta, reference_phi), axis=1)
+        angles = np.concatenate((theta, phi), axis=1)
         if args.mode in ["all", "all-cls"]:
             list_cls = ["cls-low", "cls-high", "cls-resnet"]
         else:
@@ -682,11 +605,12 @@ def run_from_py(sample, energy, theta, phi, cfg):
                 key in ["cls-low", "cls-resnet"]
             ):
                 source_array = prepare_low_data_for_classifier(
-                    sample, energy, hlf, 0.0, cut=cut, normed=False
+                    sample, energy, angles, hlf, 0.0, cut=cut, normed=False
                 )
                 reference_array = prepare_low_data_for_classifier(
                     reference_shower,
                     reference_energy,
+                    reference_angles,
                     reference_hlf,
                     1.0,
                     cut=cut,
@@ -694,11 +618,12 @@ def run_from_py(sample, energy, theta, phi, cfg):
                 )
             elif (args.mode in ["cls-low-normed"]) or (key in ["cls_low_normed"]):
                 source_array = prepare_low_data_for_classifier(
-                    sample, energy, hlf, 0.0, cut=cut, normed=True
+                    sample, energy, angles, hlf, 0.0, cut=cut, normed=True
                 )
                 reference_array = prepare_low_data_for_classifier(
                     reference_shower,
                     reference_energy,
+                    reference_angles,
                     reference_hlf,
                     1.0,
                     cut=cut,
@@ -706,10 +631,15 @@ def run_from_py(sample, energy, theta, phi, cfg):
                 )
             elif (args.mode in ["cls-high"]) or (key in ["cls-high"]):
                 source_array = prepare_high_data_for_classifier(
-                    sample, energy, hlf, 0.0, cut=cut
+                    sample, energy, angles, hlf, 0.0, cut=cut
                 )
                 reference_array = prepare_high_data_for_classifier(
-                    reference_shower, reference_energy, reference_hlf, 1.0, cut=cut
+                    reference_shower,
+                    reference_energy,
+                    reference_angles,
+                    reference_hlf,
+                    1.0,
+                    cut=cut,
                 )
 
             train_data, test_data, val_data = ttv_split(source_array, reference_array)

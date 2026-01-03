@@ -12,7 +12,7 @@ data:
   test_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5
   particle_type: electron
   xml_filename: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_2.xml
-  train_val_frac: [0.99,0.01]
+  train_val_frac: [0.9999,0.0001]
   transforms:
     NormalizeByElayer:
         ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_2.xml
@@ -33,6 +33,7 @@ data:
     Reshape:
         shape: [45]
 
+load_sample: false
 evaluation:
     eval_dataset: "2"
     eval_mode: all

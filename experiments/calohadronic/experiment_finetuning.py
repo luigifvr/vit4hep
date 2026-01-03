@@ -7,14 +7,14 @@ import time
 import numpy as np
 from torch.utils.data import DataLoader
 
-from experiments.calochallenge.datasets import CaloChallengeDataset
+from experiments.calohadronic.datasets import CaloHadDataset, CaloHadCollator
 from experiments.logger import LOGGER
-from experiments.calochallenge.experiment import CaloChallenge
+from experiments.calohadronic.experiment import CaloHadronic
 from experiments.misc import remove_module_from_state_dict
 from nn.vit import FinalLayer, get_sincos_pos_embed
 
 
-class CaloChallengeFTCFM(CaloChallenge):
+class CaloHadronicFT(CaloHadronic):
     """
     A class for fine tuning a neural network on a different CaloChallenge dataset
     """
@@ -26,7 +26,7 @@ class CaloChallengeFTCFM(CaloChallenge):
         self.backbone_cfg = OmegaConf.load(backbone_cfg)
 
         self.model_num_patches = self.cfg.model.net.param.num_patches
-        self.model_patch_dim = self.cfg.model.net.param.patch_dim
+        self.model_patch_dim = self.cfg.model.net.param.patch_dim  # ft patch dim
         self.model_condition_dim = self.cfg.model.net.param.condition_dim
         with open_dict(self.cfg):
             self.cfg.model.net = self.backbone_cfg.model.net
@@ -75,7 +75,8 @@ class CaloChallengeFTCFM(CaloChallenge):
 
     def add_embedding_layers(self):
         """
-        Modify embedding layers in the model.
+        Add embedding layers to the model.
+        This is necessary for fine-tuning on a different dataset.
         """
         if self.cfg.finetuning.map_x_embedding:
             self.embedding = self.model.net.x_embedder
@@ -210,82 +211,114 @@ class CaloChallengeFTCFM(CaloChallenge):
 
         super()._init_optimizer(param_groups=param_groups)
 
-
-class CaloChallengeFT_fromLEM(CaloChallengeFTCFM):
-    """
-    A class for fine tuning a neural network trained on the LEMURS dataset.
-    """
-
     @torch.inference_mode()
     def sample_n(self):
-
         self.model.eval()
 
         t_0 = time.time()
 
         Einc = torch.tensor(
-            (
-                10 ** np.random.uniform(3, 6, size=self.cfg.n_samples)
-                if self.cfg.evaluation.eval_dataset in ["2", "3"]
-                else self.generate_Einc_ds1()
-            ),
+            np.random.uniform(10, 90, size=self.cfg.n_samples),
             dtype=self.dtype,
             device=self.device,
         ).unsqueeze(1)
 
-        # transform Einc to basis used in training
-        dummy, transformed_cond = None, Einc
+        samples = {"energy": Einc}
+        samples["extra_dims"] = torch.empty(
+            self.cfg.model.shape[0], dtype=self.dtype, device=self.device
+        )
         for fn in self.transforms:
             if hasattr(fn, "cond_transform"):
-                dummy, transformed_cond = fn(dummy, transformed_cond)
+                samples = fn(samples)
 
+        transformed_cond = torch.cat(
+            (samples["energy"],),
+            dim=-1,
+        ).to(self.device)
         batchsize_sample = self.cfg.training.batchsize_sample
         transformed_cond_loader = DataLoader(
             dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
         )
 
-        if self.cfg.sample_us:  # TODO
-            u_samples = self.sample_us(transformed_cond_loader)
-            transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
+        # sample u_i's if self is a shape model
+        if self.cfg.model_type == "shape":
 
-            # Add LEMURS conditions
-            theta = self.cfg.gen_theta
-            phi = self.cfg.gen_phi
-            label = torch.tensor(self.cfg.gen_label, dtype=self.dtype).to(self.device)
-            theta_tensor = torch.full(
-                (transformed_cond.shape[0], 1),
-                theta,
-                dtype=self.dtype,
-                device=self.device,
-            )
-            phi_tensor = torch.full(
-                (transformed_cond.shape[0], 1),
-                phi,
-                dtype=self.dtype,
-                device=self.device,
-            )
-            label_tensor = label.unsqueeze(0).repeat(transformed_cond.shape[0], 1)
-            transformed_cond = torch.cat(
-                [transformed_cond, theta_tensor, phi_tensor, label_tensor], dim=1
-            )
-        else:  # optionally use truth us
-            transformed_cond = CaloChallengeDataset(
-                self.hdf5_test,
-                self.particle_type,
-                self.xml_filename,
-                transform=self.transforms,
-                split="full",
-                device=self.device,
-            ).energy.to(self.device)
+            if self.cfg.sample_us:
+                u_samples = self.sample_us(transformed_cond_loader)
+                transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
 
-        # concatenate with Einc
-        transformed_cond_loader = DataLoader(
-            dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
-        )
+                # Add LEMURS conditions
+                theta = self.cfg.gen_theta
+                phi = self.cfg.gen_phi
+                label = torch.tensor(self.cfg.gen_label, dtype=self.dtype).to(
+                    self.device
+                )
+                theta_tensor = torch.full(
+                    (transformed_cond.shape[0], 1),
+                    theta,
+                    dtype=self.dtype,
+                    device=self.device,
+                )
+                phi_tensor = torch.full(
+                    (transformed_cond.shape[0], 1),
+                    phi,
+                    dtype=self.dtype,
+                    device=self.device,
+                )
+                label_tensor = label.unsqueeze(0).repeat(transformed_cond.shape[0], 1)
+                transformed_cond = torch.cat(
+                    [transformed_cond, theta_tensor, phi_tensor, label_tensor], dim=1
+                )
+                transformed_cond_loader = DataLoader(
+                    dataset=transformed_cond,
+                    batch_size=batchsize_sample,
+                    shuffle=False,
+                )
 
-        sample = torch.vstack(
-            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
-        )
+                sample = torch.vstack(
+                    [
+                        self.model.sample_batch(c.to(self.device)).cpu()
+                        for c in transformed_cond_loader
+                    ]
+                )
+                conditions = transformed_cond
+            else:
+                # optionally use truth us
+                transformed_cond = CaloHadDataset(
+                    self.hdf5_dict_test,
+                    dtype=self.dtype,
+                    max_files_per_worker=self.max_files_per_worker,
+                )
+                test_collator = CaloHadCollator(
+                    hdf5_train_dict=self.hdf5_dict_test,
+                    transforms=self.transforms,
+                    return_us=False,
+                    dtype=self.dtype,
+                    rank=self.rank,
+                )
+                # concatenate with Einc
+                transformed_cond_loader = DataLoader(
+                    dataset=transformed_cond,
+                    batch_size=batchsize_sample,
+                    shuffle=False,
+                    collate_fn=test_collator,
+                )
+
+                conditions = torch.vstack([c[1] for c in transformed_cond_loader])
+                sample = torch.vstack(
+                    [
+                        self.model.sample_batch(c[1].to(self.device)).cpu()
+                        for c in transformed_cond_loader
+                    ]
+                )
+        else:
+            sample = torch.vstack(
+                [
+                    self.model.sample_batch(c.to(self.device)).cpu()
+                    for c in transformed_cond_loader
+                ]
+            )
+            conditions = transformed_cond
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
@@ -293,5 +326,4 @@ class CaloChallengeFT_fromLEM(CaloChallengeFTCFM):
             f"sample_n: Finished generating {len(sample)} samples "
             f"after {sampling_time} s."
         )
-
-        return sample.detach().cpu(), transformed_cond.detach().cpu()
+        return sample.detach().cpu(), conditions.detach().cpu()

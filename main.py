@@ -34,6 +34,12 @@ def experiment(rank, world_size, cfg):
         )
 
         exp = CaloChallengeFTCFM(cfg, rank, world_size)
+    elif cfg.exp_type == "calochallenge_ft_lem_cfm":
+        from experiments.calochallenge.calochallenge_cfm.experiment_finetuning import (
+            CaloChallengeFT_fromLEM,
+        )
+
+        exp = CaloChallengeFT_fromLEM(cfg, rank, world_size)
     elif cfg.exp_type == "calogan":
         from experiments.calogan.experiment import CaloGAN
 
@@ -46,6 +52,14 @@ def experiment(rank, world_size, cfg):
         from experiments.lemurs.experiment import LEMURS
 
         exp = LEMURS(cfg, rank, world_size)
+    elif cfg.exp_type == "calohadronic":
+        from experiments.calohadronic.experiment import CaloHadronic
+
+        exp = CaloHadronic(cfg, rank, world_size)
+    elif cfg.exp_type == "calohadronic_ft":
+        from experiments.calohadronic.experiment_finetuning import CaloHadronicFT
+
+        exp = CaloHadronicFT(cfg, rank, world_size)
     else:
         raise ValueError(f"exp_type {cfg.exp_type} not implemented")
 

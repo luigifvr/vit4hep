@@ -33,6 +33,7 @@ data:
     Reshape:
         shape: [45]
 
+load_sample: false
 evaluation:
     eval_dataset: "3"
     eval_mode: all

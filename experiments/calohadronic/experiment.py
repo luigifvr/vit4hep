@@ -14,15 +14,15 @@ from omegaconf import OmegaConf
 # Other functions of project
 from experiments.logger import LOGGER
 from experiments.base_experiment import BaseExperiment
-from experiments.lemurs.datasets import LEMURSDataset, LEMURSCollator
-import experiments.lemurs.transforms as transforms
-from experiments.lemurs.utils import load_data
-from experiments.lemurs.evaluate import run_from_py
+from experiments.calohadronic.datasets import CaloHadDataset, CaloHadCollator
+import experiments.calohadronic.transforms as transforms
+from experiments.calohadronic.utils import load_data
+from experiments.calohadronic.evaluate import run_from_py
 from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
 from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
 
 
-class LEMURS(BaseExperiment):
+class CaloHadronic(BaseExperiment):
     """
     Train a generative model on the CaloChallenge datasets.
     Structure:
@@ -38,15 +38,12 @@ class LEMURS(BaseExperiment):
     sample_n()           : Generate n_samples from the trained model, either energy ratios or full normalized showers
     plot()               : First generate full shower, then make plots and evaluate
     save_sample()        : Save generated samples in the correct format
-    load_sample()        : Load generated samples from the correct format
-    eval_sample()        : Evaluate saved sample using the evaluation script
     load_energy_model()  : Load an external energy model if sample_us
     """
 
     def init_data(self):
         self.hdf5_dict_train = self.cfg.data.training_file_dict
         self.hdf5_dict_test = self.cfg.data.test_file_dict
-        self.num_classes = self.cfg.data.num_classes
         self.max_files_per_worker = self.cfg.data.max_files_per_worker
         self.return_us = self.cfg.data.return_us
         self.transforms = []
@@ -54,13 +51,14 @@ class LEMURS(BaseExperiment):
         LOGGER.info("init_data: preparing model training")
         for name, kwargs in self.cfg.data.transforms.items():
             if "FromFile" in name:
-                kwargs["model_dir"] = self.cfg.run_dir
+                if kwargs["model_dir"] is None:
+                    kwargs["model_dir"] = self.cfg.run_dir
             self.transforms.append(getattr(transforms, name)(**kwargs))
         LOGGER.info("init_data: list of preprocessing steps:")
         for _, transform in enumerate(self.transforms):
             LOGGER.info(f"{transform.__class__.__name__}")
 
-        # init standardization
+        # init standardization from ~20k samples
         file_0_path = next(iter(self.hdf5_dict_train.values()))[0]
         file_0 = h5py.File(file_0_path, "r")
         if self.transforms:
@@ -70,13 +68,13 @@ class LEMURS(BaseExperiment):
         file_0.close()
         del dummy_data
 
-        self.train_dataset = LEMURSDataset(
+        self.train_dataset = CaloHadDataset(
             self.hdf5_dict_train,
             dtype=self.dtype,
             max_files_per_worker=self.max_files_per_worker,
         )
 
-        self.val_dataset = LEMURSDataset(
+        self.val_dataset = CaloHadDataset(
             self.hdf5_dict_test,
             dtype=self.dtype,
             max_files_per_worker=self.max_files_per_worker,
@@ -87,11 +85,9 @@ class LEMURS(BaseExperiment):
 
     def _init_dataloader(self):
         # instantiate collate_fn
-        collator = LEMURSCollator(
+        collator = CaloHadCollator(
             hdf5_train_dict=self.hdf5_dict_train,
             transforms=self.transforms,
-            num_classes=self.num_classes,
-            gen_label=None,
             return_us=self.return_us,
             dtype=self.dtype,
             rank=self.rank,
@@ -103,15 +99,22 @@ class LEMURS(BaseExperiment):
             else self.cfg.training.batchsize
         )
 
-        self.train_dist_sampler = DistributedSampler(
-            self.train_dataset,
-            num_replicas=self.world_size,
-            rank=self.rank,
-            shuffle=True,
-        )
-        self.val_dist_sampler = DistributedSampler(
-            self.val_dataset, num_replicas=self.world_size, rank=self.rank, shuffle=True
-        )
+        if self.world_size > 1:
+            self.train_dist_sampler = DistributedSampler(
+                self.train_dataset,
+                num_replicas=self.world_size,
+                rank=self.rank,
+                shuffle=True,
+            )
+            self.val_dist_sampler = DistributedSampler(
+                self.val_dataset,
+                num_replicas=self.world_size,
+                rank=self.rank,
+                shuffle=True,
+            )
+        else:
+            self.train_dist_sampler = None
+            self.val_dist_sampler = None
 
         self.train_loader = DataLoader(
             self.train_dataset,
@@ -153,47 +156,6 @@ class LEMURS(BaseExperiment):
     def evaluate(self):
         pass
 
-    def sample_initial_conds(self, n_samples=None):
-        gen_Einc = self.cfg.data.gen_Einc
-        gen_theta = self.cfg.data.gen_theta
-        gen_phi = self.cfg.data.gen_phi
-        n_samples = self.cfg.n_samples if n_samples is None else n_samples
-        Einc = torch.tensor(
-            (
-                np.random.uniform(gen_Einc[0], gen_Einc[1], size=n_samples)
-                if len(gen_Einc) == 2
-                else np.ones(n_samples) * gen_Einc[0]
-            ),
-            dtype=self.dtype,
-            device=self.device,
-        ).unsqueeze(1)
-
-        phi = torch.tensor(
-            (
-                np.random.uniform(-np.pi, np.pi, size=n_samples)
-                if gen_phi is None
-                else np.ones(n_samples) * gen_phi[0]
-            ),
-            dtype=self.dtype,
-            device=self.device,
-        ).unsqueeze(1)
-
-        cos_theta = torch.tensor(
-            (
-                np.random.uniform(
-                    torch.cos(torch.tensor(gen_theta[0])),
-                    torch.cos(torch.tensor(gen_theta[1])),
-                    size=n_samples,
-                )
-                if len(gen_theta) == 2
-                else np.ones(n_samples) * np.cos(gen_theta[0])
-            ),
-            dtype=self.dtype,
-            device=self.device,
-        ).unsqueeze(1)
-        theta = torch.acos(cos_theta)
-        return Einc, phi, theta
-
     @torch.inference_mode()
     def sample_n(self):
 
@@ -201,34 +163,22 @@ class LEMURS(BaseExperiment):
 
         t_0 = time.time()
 
-        Einc, phi, theta = self.sample_initial_conds()
-        gen_label_vector = (
-            self.cfg.data.gen_label_vector
-        )  # one-hot encoded vector, e.g. [0,1,0,0]
-        labels = torch.tensor(
-            np.tile(gen_label_vector, (self.cfg.n_samples, 1)),
+        Einc = torch.tensor(
+            np.random.uniform(10, 90, size=self.cfg.n_samples),
             dtype=self.dtype,
             device=self.device,
-        )  # shape (n_samples, num_classes)
-        samples = {
-            "incident_energy": Einc,
-            "incident_phi": phi,
-            "incident_theta": theta,
-        }
+        ).unsqueeze(1)
+
+        samples = {"energy": Einc}
         samples["extra_dims"] = torch.empty(
             self.cfg.model.shape[0], dtype=self.dtype, device=self.device
         )
-        samples["label"] = labels
         for fn in self.transforms:
             if hasattr(fn, "cond_transform"):
                 samples = fn(samples)
 
         transformed_cond = torch.cat(
-            (
-                samples["incident_energy"],
-                samples["incident_theta"],
-                samples["incident_phi"],
-            ),
+            (samples["energy"],),
             dim=-1,
         ).to(self.device)
         batchsize_sample = self.cfg.training.batchsize_sample
@@ -241,9 +191,7 @@ class LEMURS(BaseExperiment):
 
             if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
-                transformed_cond = torch.cat(
-                    [u_samples, transformed_cond, labels], dim=1
-                )
+                transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
                 # concatenate with Einc
                 transformed_cond_loader = DataLoader(
                     dataset=transformed_cond,
@@ -258,17 +206,16 @@ class LEMURS(BaseExperiment):
                     ]
                 )
                 conditions = transformed_cond
-            else:  # optionally use truth us
-                transformed_cond = LEMURSDataset(
+            else:
+                # optionally use truth us
+                transformed_cond = CaloHadDataset(
                     self.hdf5_dict_test,
                     dtype=self.dtype,
                     max_files_per_worker=self.max_files_per_worker,
                 )
-                test_collator = LEMURSCollator(
+                test_collator = CaloHadCollator(
                     hdf5_train_dict=self.hdf5_dict_test,
                     transforms=self.transforms,
-                    num_classes=self.num_classes,
-                    gen_label=gen_label_vector,
                     return_us=False,
                     dtype=self.dtype,
                     rank=self.rank,
@@ -323,9 +270,13 @@ class LEMURS(BaseExperiment):
         )
 
         u_samples_dict = {}
-        u_samples_dict["showers"] = torch.ones(
-            *self.cfg.model.shape, dtype=self.dtype, device=self.device
+        u_samples_dict["ecal"] = torch.ones(
+            *self.cfg.model.list_shape[0], dtype=self.dtype, device=self.device
         )
+        u_samples_dict["hcal"] = torch.ones(
+            *self.cfg.model.list_shape[1], dtype=self.dtype, device=self.device
+        )
+
         u_samples_dict["extra_dims"] = u_samples
         for fn in self.energy_model_transforms[::-1]:
             if hasattr(fn, "u_transform"):
@@ -341,15 +292,14 @@ class LEMURS(BaseExperiment):
         samples, conditions = self.sample_n()
 
         if self.cfg.model_type == "energy":
-            reference = LEMURSDataset(
+            reference = CaloHadDataset(
                 self.hdf5_dict_test,
                 dtype=self.dtype,
                 max_files_per_worker=self.max_files_per_worker,
             )
-            test_collator = LEMURSCollator(
+            test_collator = CaloHadCollator(
                 hdf5_train_dict=self.hdf5_dict_test,
                 transforms=self.transforms,
-                num_classes=self.num_classes,
                 return_us=True,
                 dtype=self.dtype,
                 rank=self.rank,
@@ -367,20 +317,14 @@ class LEMURS(BaseExperiment):
 
             samples_dict = {}
             samples_dict["extra_dims"] = samples
-            samples_dict["incident_energy"] = conditions[:, 0].unsqueeze(1)
-            samples_dict["incident_theta"] = conditions[:, 1].unsqueeze(1)
-            samples_dict["incident_phi"] = conditions[:, 2].unsqueeze(1)
-            samples_dict["label"] = conditions[:, 3:]
+            samples_dict["energy"] = conditions[:, 0].unsqueeze(1)
 
             reference_dict = {}
             reference_dict["extra_dims"] = reference_energy_ratios
-            reference_dict["incident_energy"] = reference_conditions[:, 0].unsqueeze(1)
-            reference_dict["incident_theta"] = reference_conditions[:, 1].unsqueeze(1)
-            reference_dict["incident_phi"] = reference_conditions[:, 2].unsqueeze(1)
-            reference_dict["label"] = reference_conditions[:, 3:]
+            reference_dict["energy"] = reference_conditions[:, 0].unsqueeze(1)
             # postprocess
             for fn in self.transforms[::-1]:
-                if fn.__class__.__name__ == "LEMURSNormalizeByElayer":
+                if fn.__class__.__name__ == "CaloHadNormalizeByElayer":
                     break  # this might break plotting
                 if hasattr(fn, "u_transform"):
                     fn.keys = ["extra_dims"]
@@ -405,49 +349,43 @@ class LEMURS(BaseExperiment):
                     reference,
                     cfg=self.cfg,
                 )
-                # include additional theta and phi conditions to classifier
-                samples = np.concatenate((samples, conditions[:, :3]), axis=1)
-                reference = np.concatenate(
-                    (reference, reference_conditions[:, :3]), axis=1
-                )
                 eval_ui_dists(
                     samples,
                     reference,
                     cfg=self.cfg,
                 )
         else:
-            # reshape as in LEMURS
             samples = samples.squeeze(1)
-            samples = samples.permute(0, 3, 2, 1)
 
             samples_dict = {}
-            samples_dict["showers"] = samples
-            samples_dict["extra_dims"] = conditions[:, : samples.shape[-1]]
-            samples_dict["incident_energy"] = conditions[
-                :, samples.shape[-1]
-            ].unsqueeze(1)
-            samples_dict["incident_theta"] = conditions[
-                :, samples.shape[-1] + 1
-            ].unsqueeze(1)
-            samples_dict["incident_phi"] = conditions[
-                :, samples.shape[-1] + 2
-            ].unsqueeze(1)
-            samples_dict["label"] = conditions[:, samples.shape[-1] + 3 :]
+            samples_dict["ecal"] = samples[:, : (10 * 15 * 15)].reshape(-1, 10, 15, 15)
+            samples_dict["hcal"] = samples[:, -(48 * 30 * 30) :].reshape(-1, 48, 30, 30)
+
+            n_layers = samples_dict["ecal"].shape[1] + samples_dict["hcal"].shape[1]
+            samples_dict["extra_dims"] = conditions[:, :n_layers]
+            samples_dict["energy"] = conditions[:, n_layers : (n_layers + 1)].unsqueeze(
+                1
+            )
             for key in samples_dict.keys():
                 samples_dict[key] = samples_dict[key].clone()
             # postprocess
             for fn in self.transforms[::-1]:
                 samples_dict = fn(samples_dict, rev=True)
 
-            samples = samples_dict["showers"].numpy()
-            Einc = samples_dict["incident_energy"].numpy()
-            theta = samples_dict["incident_theta"].numpy()
-            phi = samples_dict["incident_phi"].numpy()
+            ecal = samples_dict["ecal"].numpy()
+            hcal = samples_dict["hcal"].numpy()
+            Einc = samples_dict["energy"].numpy()
 
             self.save_sample(samples_dict, name=f"_{self.cfg.run_idx}")
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                run_from_py(samples, Einc, theta, phi, self.cfg)
+                run_from_py(ecal, hcal, Einc, self.cfg)
+
+    def eval_sample(self, dirname=""):
+        ecal, hcal, energies = self.load_sample(dirname=dirname)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            run_from_py(ecal, hcal, energies, self.cfg)
 
     def save_sample(self, samples_dict, name=""):
         """Save sample in the correct format"""
@@ -456,25 +394,17 @@ class LEMURS(BaseExperiment):
             save_file.create_dataset(key, data=samples_dict[key], compression="gzip")
         save_file.close()
 
-    def eval_sample(self, dirname=""):
-        samples, energies, theta, phi = self.load_sample(dirname=dirname)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            run_from_py(samples, energies, theta, phi, self.cfg)
-
     def load_sample(self, dirname=""):
         """Load sample from the correct format"""
         if dirname == "":
             dirname = self.cfg.run_dir + f"/samples_{self.cfg.run_idx}.hdf5"
         LOGGER.info(f"load_sample: loading samples from {dirname}")
         load_file = h5py.File(dirname, "r")
-        file = load_file["events"][:]
-        samples = file["showers"]
-        energies = file["incident_energy"]
-        theta = file["incident_theta"]
-        phi = file["incident_phi"]
+        energies = load_file["energy"][:]
+        ecal = load_file["ecal"][:]
+        hcal = load_file["hcal"][:]
         load_file.close()
-        return samples, energies, theta, phi
+        return ecal, hcal, energies
 
     def load_energy_model(self):
         # initialize model

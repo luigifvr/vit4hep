@@ -1,6 +1,13 @@
-_target_: experiments.calochallenge.calochallenge_cfm.model.CaloChallengeCFM
+_target_: experiments.calochallenge.calochallenge_cfm.model.CaloChallengeCFM_DS1
 in_channels: 1
-shape: [53, 1, 10]
+shape: [440]
+list_shape:
+ - [1, 8, 5]
+ - [1, 16, 10]
+ - [1, 19, 10]
+ - [1, 5, 5]
+ - [1, 5, 5]
+list_edges: [40, 160, 190, 25, 25]
 patch_shape: [1, 1, 5]
 
 time_distribution: uniform
@@ -27,6 +34,6 @@ net:
     learn_pos_embed: true
     causal_attn: false
     checkpoint_grads: false
-    num_patches: [53,1,2]
+    num_patches: [[1, 8, 1], [1, 16, 2], [1, 19, 2], [1, 5, 1], [1, 5, 1]]
     patch_dim: 5
     use_torch_sdpa: false

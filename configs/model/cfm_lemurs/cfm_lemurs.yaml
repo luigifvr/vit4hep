@@ -1,7 +1,7 @@
-_target_: experiments.calochallenge.calochallenge_cfm.model.CaloChallengeCFM
+_target_: experiments.lemurs.model.LEMURSCFM
 in_channels: 1
-shape: [45, 50, 18]
-patch_shape: [3, 10, 3]
+shape: [45, 16, 9]
+patch_shape: [3, 16, 1]
 
 time_distribution: uniform
 trajectory: linear
@@ -14,7 +14,7 @@ net:
   _target_: nn.vit.ViT
   param:
     dim: 3
-    condition_dim: 46
+    condition_dim: 53
     hidden_dim: 480
     out_channels: 1
     depth: 6
@@ -27,6 +27,7 @@ net:
     learn_pos_embed: true
     causal_attn: false
     checkpoint_grads: false
-    num_patches: [15,5,6]
-    patch_dim: 90
+    num_patches: [[15,1,9]]
+    patch_dim: 48
     use_torch_sdpa: false
+    use_rotary_emb: false # not implemented

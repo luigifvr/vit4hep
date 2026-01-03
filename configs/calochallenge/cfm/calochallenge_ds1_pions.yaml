@@ -4,7 +4,7 @@ dtype: float32
 
 model_type: shape
 sample_us: true
-energy_model: ./runs/CaloChallenge_energy/calochallenge_ds1_pions_energy/
+energy_model: ./runs/CaloChallenge_energy/calochallenge_50541/
 n_samples: 100000
 data:
   training_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_1.hdf5
@@ -22,22 +22,25 @@ data:
         ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_pions.xml,
         xml_filename: pion,
         num_bins: [1, 10, 10, 1, 10, 10, 1],
+        add_bins: [5, 10, 10, 5, 10, 10, 5],
     },
     CutValues: {cut: 1.e-7, n_layers: 7},
     ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
-    GlobalStandardizeFromFile: {model_dir: None},
+    GlobalStandardizeFromFile: {model_dir: null},
     LogEnergy: {},
     ScaleEnergy: {e_min: 5.5452, e_max: 15.2492},
-    AddFeaturesToCond: {split_index: 740},
-    Reshape: {shape: [1, 74, 1, 10]}
+    AddFeaturesToCond: {split_index: 625},
+    Reshape: {shape: [1, 625]}
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_dataset: "1-pions"
   eval_mode: all
   eval_cut: 0.015
+  eval_labels: ["Vit-CFM"]
+  eval_p_label: ""
   eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_2.hdf5
   eval_cls_n_layer: 2
   eval_cls_n_hidden: 2048

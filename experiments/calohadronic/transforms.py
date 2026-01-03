@@ -5,15 +5,15 @@ import os
 
 def logit(array, alpha=1.0e-6, inv=False):
     if inv:
-        z = torch.sigmoid(array)
-        z = (z - alpha) / (1 - 2 * alpha)
+        array = torch.sigmoid(array)
+        array = (array - alpha) / (1 - 2 * alpha)
     else:
-        z = array * (1 - 2 * alpha) + alpha
-        z = torch.logit(z)
-    return z
+        array = array * (1 - 2 * alpha) + alpha
+        array = torch.logit(array)
+    return array
 
 
-class LEMURSGlobalStandardizeFromFile(object):
+class CaloHadGlobalStandardizeFromFile(object):
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -30,7 +30,7 @@ class LEMURSGlobalStandardizeFromFile(object):
 
         self.dtype = torch.get_default_dtype()
         self.u_transform = True
-        self.keys = ["showers", "extra_dims"]
+        self.keys = ["ecal", "hcal", "extra_dims"]
         try:
             # load from file
             self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
@@ -61,7 +61,7 @@ class LEMURSGlobalStandardizeFromFile(object):
         return data_dict
 
 
-class LEMURSStandardizeUsFromFile(object):
+class CaloHadStandardizeUsFromFile(object):
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -93,7 +93,7 @@ class LEMURSStandardizeUsFromFile(object):
     def __call__(self, data_dict, rev=False, rank=0):
         us = data_dict["extra_dims"]
         if rev:
-            trafo_us = us * self.std_u.to(us.device) + self.mean_u.to(us.device)
+            trafo_us = us * (self.std_u.to(us.device) + 1) + self.mean_u.to(us.device)
         else:
             if not self.written:
                 self.mean_u = us.mean(0)
@@ -101,23 +101,21 @@ class LEMURSStandardizeUsFromFile(object):
                 if rank == 0:
                     self.write()
                 self.written = True
-            trafo_us = (us - self.mean_u.to(us.device)) / self.std_u.to(us.device)
+            trafo_us = (us - self.mean_u.to(us.device)) / (self.std_u.to(us.device) + 1)
         data_dict["extra_dims"] = trafo_us
         return data_dict
 
 
-class LEMURSPreprocessConds(object):
+class CaloHadPreprocessConds(object):
     """
     Apply preprocessing steps to the conditions.
     Scale all conditions to [0,1]. Incident energy is in linear scale.
     """
 
-    def __init__(
-        self, scale_E=[1e3, 1e6], scale_theta=[0.87, 2.27], scale_phi=[-3.1416, 3.1416]
-    ):
+    def __init__(self, scale_E=[1e1, 9e1]):
         self.cond_transform = True
-        self.keys = ["incident_energy", "incident_theta", "incident_phi"]
-        self.rescaling = [scale_E, scale_theta, scale_phi]
+        self.keys = ["energy"]
+        self.rescaling = [scale_E]
 
     def __call__(self, data_dict, rev=False, rank=0):
         if rev:
@@ -127,7 +125,6 @@ class LEMURSPreprocessConds(object):
                 max = self.rescaling[n][1]
                 data_dict[key] = data_dict[key] * (max - min) + min
         else:
-            # data_dict["incident_theta"] = torch.cos(data_dict["incident_theta"])
             # Rescale all conditions
             for n, key in enumerate(self.keys):
                 min = self.rescaling[n][0]
@@ -136,7 +133,7 @@ class LEMURSPreprocessConds(object):
         return data_dict
 
 
-class LEMURSScaleTotalEnergy(object):
+class CaloHadScaleTotalEnergy(object):
     """
     Scale only E_tot/E_inc by a factor f.
     The effect is the same of scaling the voxels but
@@ -158,7 +155,7 @@ class LEMURSScaleTotalEnergy(object):
         return data_dict
 
 
-class LEMURSExclusiveLogitTransform(object):
+class CaloHadExclusiveLogitTransform(object):
     """
     Take log of input data
         delta: regularization
@@ -169,24 +166,32 @@ class LEMURSExclusiveLogitTransform(object):
         self.delta = delta
         self.rescale = rescale
         self.u_transform = True
-        self.keys = ["showers", "extra_dims"]
+        self.keys = ["ecal", "hcal", "extra_dims"]
 
     def __call__(self, data_dict, rev=False, rank=0):
         for key in self.keys:
             if rev:
                 if self.rescale:
-                    data_dict[key] = logit(data_dict[key], alpha=self.delta, inv=True)
+                    # Inverse logit with rescaling
+                    data_dict[key] = torch.sigmoid(data_dict[key])
+                    data_dict[key] = (data_dict[key] - self.delta) / (
+                        1 - 2 * self.delta
+                    )
                 else:
-                    data_dict[key] = torch.special.expit(data_dict[key])
+                    # Standard inverse logit (sigmoid)
+                    data_dict[key] = torch.sigmoid(data_dict[key])
             else:
                 if self.rescale:
-                    data_dict[key] = logit(data_dict[key], alpha=self.delta)
+                    # Forward logit with rescaling
+                    data_dict[key] = data_dict[key] * (1 - 2 * self.delta) + self.delta
+                    data_dict[key] = torch.logit(data_dict[key])
                 else:
+                    # Standard logit
                     data_dict[key] = torch.logit(data_dict[key], eps=self.delta)
         return data_dict
 
 
-class LEMURSCutValues(object):
+class CaloHadCutValues(object):
     """
     Cut in Normalized space
         cut: threshold value for the cut
@@ -195,21 +200,23 @@ class LEMURSCutValues(object):
 
     def __init__(self, cut=0.0):
         self.cut = cut
+        self.keys = ["ecal", "hcal"]
 
     def __call__(self, data_dict, rev=False, rank=0):
-        shower = data_dict["showers"]
-        if rev:
-            mask = shower <= self.cut
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0
-        else:
-            transformed = shower
-        data_dict["showers"] = transformed
+        for key in self.keys:
+            shower = data_dict[key]
+            if rev:
+                mask = shower <= self.cut
+                transformed = shower
+                if self.cut:
+                    transformed[mask] = 0.0
+            else:
+                transformed = shower
+            data_dict[key] = transformed
         return data_dict
 
 
-class LEMURSNormalizeByElayer(object):
+class CaloHadNormalizeByElayer(object):
     """
     Normalize each shower by the layer energy.
     This will change the shower shape to N_voxels+N_layers.
@@ -217,16 +224,15 @@ class LEMURSNormalizeByElayer(object):
     """
 
     def __init__(self, cut=0.0, eps=1.0e-10):
+        self.keys = ["ecal", "hcal"]
         self.eps = eps
         self.cut = cut
 
     def __call__(self, data_dict, rev=False, rank=0):
-        shower = data_dict["showers"]
-        B, H, W, L = shower.shape  # Batch, Height, Width, Layers
-
         if rev:
             us = data_dict["extra_dims"]
-            energy = data_dict["incident_energy"]
+            energy = data_dict["energy"]
+            B, L = us.shape  # Batch, Layers
 
             # Clip u_{i>0} into [0,1]
             us[:, 1:] = torch.clamp(us[:, 1:], min=0.0, max=1.0)
@@ -241,24 +247,37 @@ class LEMURSNormalizeByElayer(object):
             layer_Es.append(remaining_E)  # The last layer's energy
             layer_Es = torch.stack(layer_Es, dim=1)
 
-            layer_Es_reshaped = layer_Es.view(B, 1, 1, L)
+            for key in self.keys:
+                shower = data_dict[key]
+                layer_Es_reshaped = layer_Es.view(B, L, 1, 1)
 
-            # Normalize each layer and multiply it with its original energy
-            layer_sums = shower.sum(dim=(1, 2), keepdim=True) + self.eps
-            shower /= layer_sums
-
-            if self.cut > 0.0:
-                mask = shower <= self.cut
-                shower[mask] = 0.0  # apply normalized cut
-
-            shower *= layer_Es_reshaped  # scale all layers at once
-
+                # Normalize each layer and multiply it with its original energy
+                layer_sums = shower.sum(dim=(-1, -2), keepdim=True) + self.eps
+                shower /= layer_sums
+                if self.cut > 0.0:
+                    mask = shower <= self.cut
+                    shower[mask] = 0.0  # apply normalized cut
+                if key == "ecal":
+                    L_ecal = shower.shape[1]
+                    shower *= layer_Es_reshaped[:, :L_ecal]
+                elif key == "hcal":
+                    L_hcal = shower.shape[1]
+                    shower *= layer_Es_reshaped[:, -L_hcal:]
+                else:
+                    raise ValueError(f"Unknown key {key} in CaloHadNormalizeByElayer")
         else:
-            layer_Es = shower.sum(dim=(1, 2))
-            shower /= layer_Es.view(B, 1, 1, L) + self.eps
-            u_0 = layer_Es.sum(dim=1, keepdim=True) / (
-                data_dict["incident_energy"] + self.eps
-            )
+            ecal_hcal_Es = []
+            for key in self.keys:
+                shower = data_dict[key]
+                B, L, _, _ = shower.shape  # Batch, Layers, Height, Width
+
+                layer_Es = shower.sum(dim=(-1, -2))  # shape (B, L)
+                shower /= layer_Es.view(B, L, 1, 1) + self.eps
+                ecal_hcal_Es.append(layer_Es)
+                data_dict[key] = shower
+
+            layer_Es = torch.cat(ecal_hcal_Es, dim=1)  # shape (B, L_total)
+            u_0 = layer_Es.sum(dim=1, keepdim=True) / (data_dict["energy"] + self.eps)
 
             # For u_1, u_2, ... u_{L-1}
             # We need E_l / (E_l + E_{l+1} + ... + E_{L-1})
@@ -270,6 +289,78 @@ class LEMURSNormalizeByElayer(object):
             extra_dims = torch.cat([u_0, us_rest], dim=1)
 
             data_dict["extra_dims"] = extra_dims
-
-        data_dict["showers"] = shower
         return data_dict
+
+
+class Reshape(object):
+    """
+    Reshape the shower as specified. Flattens batch in the reverse transformation.
+        shape -- Tuple representing the desired shape of a single example
+    """
+
+    def __init__(self, dict_shape):
+        self.dict_shape = dict_shape
+        self.keys = ["ecal", "hcal"]
+
+    def __call__(self, data_dict, rev=False, rank=0):
+        for key in self.keys:
+            shower = data_dict[key]
+            shape = torch.Size(self.dict_shape[key])
+            if rev:
+                shower = shower.reshape(-1, *shape)
+            else:
+                shower = shower.reshape(-1, 1, shape.numel())
+            data_dict[key] = shower
+        return data_dict
+
+
+class SumPool3dDownScale(object):
+    """
+    Downscale the ECAL
+    """
+
+    def __init__(self, calo="ecal", kernel=(3, 12, 12)):
+        self.calo = calo
+        self.kernel = kernel
+        self.maxpool3d = torch.nn.AvgPool3d(self.kernel)
+
+    def __call__(self, data_dict, rev=False, rank=0):
+        if rev:
+            pass
+        else:
+            showers = data_dict[self.calo]
+            showers = (
+                self.maxpool3d(showers)
+                * self.kernel[0]
+                * self.kernel[1]
+                * self.kernel[2]
+            )
+            data_dict[self.calo] = showers
+        return data_dict
+
+
+class AddLEMURSConditions(object):
+    def __init__(self, theta=0.5, phi=0.5, label=[0.2, 0.2, 0.2, 0.2, 0.2]):
+        self.theta = theta
+        self.phi = phi
+        self.label = label
+        self.n_conds = 2 + len(label)
+
+    def __call__(self, data_dict, rev=False, rank=0):
+        if rev:
+            return data_dict
+        else:
+            dtype = data_dict["energy"].dtype
+            device = data_dict["energy"].device
+            energy_shape = data_dict["energy"].shape
+            additional_conds = (
+                torch.tensor(
+                    [self.theta, self.phi] + self.label,
+                    dtype=dtype,
+                    device=device,
+                )
+                .unsqueeze(0)
+                .repeat(energy_shape, 1)
+            )
+            data_dict["additional_conds"] = additional_conds
+            return data_dict

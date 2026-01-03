@@ -70,18 +70,18 @@ class BaseExperiment:
         # implement all ml boilerplate as private methods (_name)
         t0 = time.time()
 
-        if self.rank == 0:
-            # save config
-            LOGGER.debug(OmegaConf.to_yaml(self.cfg))
-            self._save_config("config.yaml", to_mlflow=True)
-            self._save_config(f"config_{self.cfg.run_idx}.yaml")
-
         self.init_physics()
         self.init_model()
         self._init_ddp()
         self.init_data()
         self._init_dataloader()
         self._init_loss()
+
+        if self.rank == 0:
+            # save config
+            LOGGER.debug(OmegaConf.to_yaml(self.cfg))
+            self._save_config("config.yaml", to_mlflow=True)
+            self._save_config(f"config_{self.cfg.run_idx}.yaml")
 
         if self.cfg.train:
             self._init_optimizer()
@@ -94,6 +94,9 @@ class BaseExperiment:
 
         if self.cfg.plot and self.cfg.save:
             self.plot()
+
+        if self.cfg.load_sample:
+            self.eval_sample(self.cfg.load_sample)
 
         if self.device == torch.device("cuda"):
             max_used = torch.cuda.max_memory_allocated()
@@ -572,7 +575,7 @@ class BaseExperiment:
     def _step(self, data, step):
         # actual update step
         loss = self._batch_loss(data)
-        self.optimizer.zero_grad()
+        self.optimizer.zero_grad(set_to_none=True)
 
         loss.backward()
 
@@ -707,6 +710,9 @@ class BaseExperiment:
         raise NotImplementedError()
 
     def plot(self):
+        raise NotImplementedError()
+
+    def eval_sample(self):
         raise NotImplementedError()
 
     def _init_dataloader(self):

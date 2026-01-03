@@ -1,0 +1,66 @@
+exp_type: lemurs
+exp_name: LEMURS
+dtype: float32
+
+model_type: energy
+sample_us: false
+n_samples: 100000
+data:
+  xml_filename: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_2.xml
+  max_files_per_worker: 36
+  return_us: True
+  training_file_dict: {
+    "Par04SiW": [
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part1.h5",
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part2.h5",
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part3.h5",
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part4.h5",
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part5.h5",
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part6.h5",
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part7.h5",
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part8.h5",
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part9.h5",
+    ],
+  } 
+  test_file_dict: {
+    "Par04SiW": [
+      "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part10.h5",
+    ]
+  }
+  num_classes: 5
+  gen_Einc: [1e3, 1e6]
+  gen_theta: [0.87, 2.27]
+  gen_phi: null
+  gen_label_vector: [0, 0, 0, 0, 1]
+  transforms: {
+    LEMURSNormalizeByElayer: {},
+    LEMURSExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
+    LEMURSStandardizeUsFromFile: {n_us: 45, model_dir: None},
+    LEMURSPreprocessConds: {}
+  }
+
+finetuning: false
+load_sample: false
+evaluation:
+  eval_labels: ["ViT-CFM"]
+  eval_dataset: "2"
+  eval_mode: all
+  eval_cut: 0.015
+  eval_hdf5_file: "/gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_1000events_50GeV_phi0.2_theta2.1.h5"
+  eval_cls_n_layer: 2
+  eval_cls_n_hidden: 2048
+  eval_cls_dropout: 0.0
+  eval_cls_lr: 2.e-4
+  eval_cls_batch_size: 1000
+  eval_cls_n_epochs: 50
+  eval_cls_save_mem: True
+  #ResNet
+  eval_cls_resnet_layers: 18
+  eval_cls_resnet_lr: 2.e-4
+  eval_cls_resnet_n_epochs: 50
+
+defaults:
+ - /default
+ - /training: default
+ - /model: cfm_lemurs/cfm_lemurs_energy
+ - _self_
