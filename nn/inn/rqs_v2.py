@@ -12,13 +12,9 @@ class RationalQuadraticSpline(BinnedSpline):
     def __init__(self, *args, bins: int = 10, **kwargs):
         #       parameter                                       constraints             count
         # 1.    the derivative at the edge of each inner bin    positive                #bins - 1
-        super().__init__(
-            *args, bins=bins, parameter_counts={"deltas": bins - 1}, **kwargs
-        )
+        super().__init__(*args, bins=bins, parameter_counts={"deltas": bins - 1}, **kwargs)
 
-    def constrain_parameters(
-        self, parameters: dict[str, torch.Tensor]
-    ) -> dict[str, torch.Tensor]:
+    def constrain_parameters(self, parameters: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         parameters = super().constrain_parameters(parameters)
         # we additionally want positive derivatives to preserve monotonicity
         # the derivative must also match the tails at the spline boundaries
@@ -95,17 +91,13 @@ class ElementwiseRationalQuadraticSpline(BinnedSplineBase):
         num_params = sum(self.parameter_counts.values())
 
         if self.conditional:
-            self.subnet = subnet_constructor(
-                self.condition_length, self.channels * num_params
-            )
+            self.subnet = subnet_constructor(self.condition_length, self.channels * num_params)
         else:
             self.spline_parameters = nn.Parameter(
                 torch.zeros(self.channels * num_params, *dims_in[0][1:])
             )
 
-    def constrain_parameters(
-        self, parameters: dict[str, torch.Tensor]
-    ) -> dict[str, torch.Tensor]:
+    def constrain_parameters(self, parameters: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         parameters = super().constrain_parameters(parameters)
         # we additionally want positive derivatives to preserve monotonicity
         # the derivative must also match the tails at the spline boundaries
@@ -146,9 +138,7 @@ class ElementwiseRationalQuadraticSpline(BinnedSplineBase):
         parameters = self.split_parameters(parameters, self.channels)
         parameters = self.constrain_parameters(parameters)
 
-        y, jac = self.binned_spline(
-            x=x_or_z[0], parameters=parameters, spline=self.spline, rev=rev
-        )
+        y, jac = self.binned_spline(x=x_or_z[0], parameters=parameters, spline=self.spline, rev=rev)
         return (y,), jac
 
     def spline(

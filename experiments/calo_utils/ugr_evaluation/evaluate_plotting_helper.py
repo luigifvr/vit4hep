@@ -17,6 +17,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 def dup(a):
     return np.append(a, a[-1])
 
+
 # settings for the various plots. These should be larger than the number of hlf files
 colors = ["#0000cc", "#b40000"]
 
@@ -103,8 +104,7 @@ def plot_Etot_Einc_discrete(hlf_class, reference_class, arg):
             color=hlf_class.color,
         )
         counts_data, _, _ = ax.hist(
-            hlf_class.GetEtot()[which_showers_hlf]
-            / hlf_class.Einc.squeeze()[which_showers_hlf],
+            hlf_class.GetEtot()[which_showers_hlf] / hlf_class.Einc.squeeze()[which_showers_hlf],
             bins=bins,
             label="generated",
             histtype="step",
@@ -237,9 +237,7 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
         ratio_isnan = np.isnan(ratio)
         ratio[ratio_isnan] = 1.0
         ratio_err[ratio_isnan] = 0.0
-        ax[1].step(
-            bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post"
-        )
+        ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post")
         ax[1].fill_between(
             bins,
             dup(ratio - ratio_err),
@@ -275,9 +273,7 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
             f.write(str(seps))
             f.write("\n\n")
 
-    ax[1].hlines(
-        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-    )
+    ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0], bins[-1])
@@ -430,9 +426,7 @@ def plot_Etot_Einc_scaled(hlfs, reference_class, arg, labels, input_names, p_lab
         ratio_isnan = np.isnan(ratio)
         ratio[ratio_isnan] = 1.0
         ratio_err[ratio_isnan] = 0.0
-        ax[1].step(
-            bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post"
-        )
+        ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post")
         ax[1].fill_between(
             bins,
             dup(ratio - ratio_err),
@@ -468,9 +462,7 @@ def plot_Etot_Einc_scaled(hlfs, reference_class, arg, labels, input_names, p_lab
             f.write(str(seps))
             f.write("\n\n")
 
-    ax[1].hlines(
-        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-    )
+    ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0], bins[-1])
@@ -542,10 +534,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
             if arg.x_scale == "log":
                 bins = np.logspace(
                     np.log10(arg.min_energy),
-                    np.log10(
-                        2 * arg.min_energy
-                        + np.nanmax(reference_class.GetElayers()[key])
-                    ),
+                    np.log10(2 * arg.min_energy + np.nanmax(reference_class.GetElayers()[key])),
                     40,
                 )
             else:
@@ -598,9 +587,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetElayers()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetElayers()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(
                     hlfs[i].GetElayers()[key], bins=bins, density=False
                 )
@@ -734,9 +721,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
 
@@ -812,12 +797,8 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetECEtas()[key], bins=bins, density=False
-                )
-                counts_data, bins = np.histogram(
-                    hlfs[i].GetECEtas()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetECEtas()[key], bins=bins, density=False)
+                counts_data, bins = np.histogram(hlfs[i].GetECEtas()[key], bins=bins, density=False)
 
                 counts_data_norm = counts_data / counts_data.sum()
                 ax[0].step(
@@ -950,9 +931,7 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 title_fontsize=16,
                 fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
@@ -1029,12 +1008,8 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetECPhis()[key], bins=bins, density=False
-                )
-                counts_data, bins = np.histogram(
-                    hlfs[i].GetECPhis()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetECPhis()[key], bins=bins, density=False)
+                counts_data, bins = np.histogram(hlfs[i].GetECPhis()[key], bins=bins, density=False)
 
                 counts_data_norm = counts_data / counts_data.sum()
                 ax[0].step(
@@ -1167,9 +1142,7 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 title_fontsize=16,
                 fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
@@ -1246,9 +1219,7 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetWidthEtas()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetWidthEtas()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(
                     hlfs[i].GetWidthEtas()[key], bins=bins, density=False
                 )
@@ -1384,9 +1355,7 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
@@ -1463,9 +1432,7 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetWidthPhis()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetWidthPhis()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(
                     hlfs[i].GetWidthPhis()[key], bins=bins, density=False
                 )
@@ -1601,9 +1568,7 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
@@ -1681,14 +1646,10 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
             )
             for j in range(len(hlfs)):
                 func_hlf = (
-                    hlfs[j].GetWeightedDepthR()
-                    if L == 1
-                    else hlfs[j].GetGroupedWeightedDepthR()
+                    hlfs[j].GetWeightedDepthR() if L == 1 else hlfs[j].GetGroupedWeightedDepthR()
                 )
                 counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
-                counts_data, bins = np.histogram(
-                    func_hlf[key], bins=bins, density=False
-                )
+                counts_data, bins = np.histogram(func_hlf[key], bins=bins, density=False)
                 counts_data_norm = counts_data / counts_data.sum()
 
                 ax[0].step(
@@ -1749,9 +1710,7 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print(
-                    f"Separation power of Weighted depth slice {key} histogram: {seps}"
-                )
+                print(f"Separation power of Weighted depth slice {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
@@ -1822,18 +1781,14 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n + 1) % (reference_hlf.num_alpha[0]) == 0:
                 g += 1
             plt.savefig(pdf, format="pdf")
             plt.close()
 
 
-def plot_weighted_depth_a(
-    hlfs, reference_class, arg, labels, input_names, p_label, L=1
-):
+def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_label, L=1):
     """Plot weighted depth"""
     g = 0
     filename = os.path.join(
@@ -1906,14 +1861,10 @@ def plot_weighted_depth_a(
             )
             for j in range(len(hlfs)):
                 func_hlf = (
-                    hlfs[j].GetWeightedDepthA()
-                    if L == 1
-                    else hlfs[j].GetGroupedWeightedDepthA()
+                    hlfs[j].GetWeightedDepthA() if L == 1 else hlfs[j].GetGroupedWeightedDepthA()
                 )
                 counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
-                counts_data, bins = np.histogram(
-                    func_hlf[key], bins=bins, density=False
-                )
+                counts_data, bins = np.histogram(func_hlf[key], bins=bins, density=False)
                 counts_data_norm = counts_data / counts_data.sum()
 
                 ax[0].step(
@@ -1974,9 +1925,7 @@ def plot_weighted_depth_a(
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print(
-                    f"Separation power of Weighted depth ring {key} histogram: {seps}"
-                )
+                print(f"Separation power of Weighted depth ring {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
@@ -2047,9 +1996,7 @@ def plot_weighted_depth_a(
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n + 1) % (len(reference_class.r_edges[0]) - 1) == 0:
                 g += 1
 
@@ -2119,9 +2066,7 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    1 - hlfs[i].GetSparsity()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(1 - hlfs[i].GetSparsity()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(
                     1 - hlfs[i].GetSparsity()[key], bins=bins, density=False
                 )
@@ -2256,18 +2201,14 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             plt.savefig(pdf, format="pdf")
             plt.close()
 
 
 def plot_z_profile(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots energy profile in the z direction"""
-    filename = os.path.join(
-        arg.output_dir, f"profile_energy_z_dataset_{arg.dataset}.pdf"
-    )
+    filename = os.path.join(arg.output_dir, f"profile_energy_z_dataset_{arg.dataset}.pdf")
 
     ref_layer_energies = reference_class.GetElayers()
     ref_means = np.array([ref_layer_energies[key].mean() for key in ref_layer_energies])
@@ -2353,9 +2294,7 @@ def plot_z_profile(hlfs, reference_class, arg, labels, input_names, p_label):
 
             with np.errstate(divide="ignore", invalid="ignore"):
                 ratio = gen_means / ref_means
-                ratio_err = ratio * np.sqrt(
-                    (gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2
-                )
+                ratio_err = ratio * np.sqrt((gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2)
                 ratio[np.isnan(ratio)] = 1.0
                 ratio_err[np.isnan(ratio_err)] = 0.0
 
@@ -2423,9 +2362,7 @@ def plot_z_profile(hlfs, reference_class, arg, labels, input_names, p_label):
 
 def plot_r_profile(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots energy profile in the radial direction"""
-    filename = os.path.join(
-        arg.output_dir, f"profile_energy_r_dataset_{arg.dataset}.pdf"
-    )
+    filename = os.path.join(arg.output_dir, f"profile_energy_r_dataset_{arg.dataset}.pdf")
 
     ref_layer_energies = reference_class.GetEradial()
     ref_means = np.array([ref_layer_energies[key].mean() for key in ref_layer_energies])
@@ -2511,9 +2448,7 @@ def plot_r_profile(hlfs, reference_class, arg, labels, input_names, p_label):
 
             with np.errstate(divide="ignore", invalid="ignore"):
                 ratio = gen_means / ref_means
-                ratio_err = ratio * np.sqrt(
-                    (gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2
-                )
+                ratio_err = ratio * np.sqrt((gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2)
                 ratio[np.isnan(ratio)] = 1.0
                 ratio_err[np.isnan(ratio_err)] = 0.0
 
@@ -2640,9 +2575,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
     )
     for i in range(len(list_showers)):
         counts, _ = np.histogram(list_showers[i].flatten(), bins=bins, density=False)
-        counts_data, bins = np.histogram(
-            list_showers[i].flatten(), bins=bins, density=False
-        )
+        counts_data, bins = np.histogram(list_showers[i].flatten(), bins=bins, density=False)
 
         counts_data_norm = counts_data / counts_data.sum()
         ax[0].step(
@@ -2672,9 +2605,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
         ratio[ratio_isnan] = 1.0
         ratio_err[ratio_isnan] = 0.0
 
-        ax[1].step(
-            bins, dup(ratio), linewidth=1.5, alpha=1.0, color=colors[i], where="post"
-        )
+        ax[1].step(bins, dup(ratio), linewidth=1.5, alpha=1.0, color=colors[i], where="post")
         ax[1].fill_between(
             bins,
             dup(ratio - y_ref_err / counts_ref),
@@ -2710,9 +2641,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
             f.write(str(seps))
             f.write("\n\n")
 
-    ax[1].hlines(
-        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-    )
+    ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0] + 2 * arg.min_energy, bins[-1])

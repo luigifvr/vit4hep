@@ -3,6 +3,7 @@
 Class that handles the specific binning geometry based on the provided file
 and computes all relevant high-level features
 """
+
 import os
 
 import matplotlib.pyplot as plt
@@ -72,9 +73,7 @@ class HighLevelFeatures:
     def GetECandWidths(self, eta_layer, phi_layer, energy_layer):
         """Computes center of energy in eta and phi as well as their widths"""
         eta_EC, phi_EC = self._calculate_EC(eta_layer, phi_layer, energy_layer)
-        eta_width, phi_width = self._calculate_Widths(
-            eta_layer, phi_layer, energy_layer
-        )
+        eta_width, phi_width = self._calculate_Widths(eta_layer, phi_layer, energy_layer)
         # The following checks are needed to assure a positive argument to the sqrt,
         # if there is very little energy things can go wrong
         eta_width = np.sqrt((eta_width - eta_EC**2).clip(min=0.0))
@@ -112,10 +111,7 @@ class HighLevelFeatures:
             data_l = energy_calo[:, self.bin_edges[L] : self.bin_edges[L + 1]]
             energy_sum = data_l[
                 :,
-                edge_idx
-                * (len(self.r_edges[0]) - 1) : (edge_idx + 1)
-                * len(self.r_edges[0])
-                - 1,
+                edge_idx * (len(self.r_edges[0]) - 1) : (edge_idx + 1) * len(self.r_edges[0]) - 1,
             ].sum(axis=-1)
             total_energy_r += energy_sum
             weighted_r += self._calculate_WeightedDepth(energy_sum, L)
@@ -172,7 +168,6 @@ class HighLevelFeatures:
             )
 
         for L in self.relevantLayers:
-
             if L in self.layersBinnedInAlpha:
                 (
                     self.EC_etas[L],
@@ -214,9 +209,7 @@ class HighLevelFeatures:
         radii = np.array(self.r_edges[layer_nr])
         if self.particle != "electron":
             radii[1:] = np.log(radii[1:])
-        theta, rad = np.meshgrid(
-            2.0 * np.pi * np.arange(num_splits + 1) / num_splits, radii
-        )
+        theta, rad = np.meshgrid(2.0 * np.pi * np.arange(num_splits + 1) / num_splits, radii)
         pts_per_angular_bin = int(num_splits / self.num_alpha[layer_nr])
         data_reshaped = data.reshape(int(self.num_alpha[layer_nr]), -1)
         data_repeated = np.repeat(data_reshaped, (pts_per_angular_bin), axis=0)
@@ -224,9 +217,7 @@ class HighLevelFeatures:
         ax.grid(False)
         if vmax is None:
             vmax = data.max()
-        pcm = ax.pcolormesh(
-            theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax)
-        )
+        pcm = ax.pcolormesh(theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax))
         pcm.set_edgecolor("face")
         ax.axes.get_xaxis().set_visible(False)
         ax.axes.get_yaxis().set_visible(False)
@@ -288,22 +279,18 @@ class HighLevelFeatures:
             radii = np.array(self.r_edges[idx])
             if self.particle != "electron":
                 radii[1:] = np.log(radii[1:])
-            theta, rad = np.meshgrid(
-                2.0 * np.pi * np.arange(num_splits + 1) / num_splits, radii
-            )
+            theta, rad = np.meshgrid(2.0 * np.pi * np.arange(num_splits + 1) / num_splits, radii)
             pts_per_angular_bin = int(num_splits / self.num_alpha[idx])
-            data_reshaped = data[
-                layer_boundaries[idx] : layer_boundaries[idx + 1]
-            ].reshape(int(self.num_alpha[idx]), -1)
+            data_reshaped = data[layer_boundaries[idx] : layer_boundaries[idx + 1]].reshape(
+                int(self.num_alpha[idx]), -1
+            )
             data_repeated = np.repeat(data_reshaped, (pts_per_angular_bin), axis=0)
             if self.particle == "electron":
                 ax = plt.subplot(9, 5, idx + 1, polar=True)
             else:
                 ax = plt.subplot(1, len(self.r_edges), idx + 1, polar=True)
             ax.grid(False)
-            pcm = ax.pcolormesh(
-                theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax)
-            )
+            pcm = ax.pcolormesh(theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax))
             pcm.set_edgecolor("face")
             ax.axes.get_xaxis().set_visible(False)
             ax.axes.get_yaxis().set_visible(False)

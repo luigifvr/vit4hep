@@ -198,9 +198,7 @@ def run_from_py(ecal, hcal, energy, cfg):
     n_hits_g4 = get_n_hits(ecal_g4, hcal_g4, threshold=min_energy)
     all_voxels_g4 = np.concatenate((ecal_g4.flatten(), hcal_g4.flatten()), axis=0)
 
-    features_gen = np.stack(
-        (cog_x_gen, cog_y_gen, cog_z_gen, energy_gen, n_hits_gen), axis=1
-    )
+    features_gen = np.stack((cog_x_gen, cog_y_gen, cog_z_gen, energy_gen, n_hits_gen), axis=1)
     features_g4 = np.stack((cog_x_g4, cog_y_g4, cog_z_g4, energy_g4, n_hits_g4), axis=1)
     plot_histograms(
         features_gen,
@@ -269,20 +267,12 @@ def run_from_py(ecal, hcal, energy, cfg):
     classifier = DNN(**DNN_kwargs)
     classifier.to(device)
     print(classifier)
-    total_parameters = sum(
-        p.numel() for p in classifier.parameters() if p.requires_grad
-    )
+    total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
 
     print(f"Classifier has {int(total_parameters)} parameters")
-    train_data = TensorDataset(
-        torch.tensor(train_data, dtype=torch.get_default_dtype()).to(device)
-    )
-    test_data = TensorDataset(
-        torch.tensor(test_data, dtype=torch.get_default_dtype()).to(device)
-    )
-    val_data = TensorDataset(
-        torch.tensor(val_data, dtype=torch.get_default_dtype()).to(device)
-    )
+    train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()).to(device))
+    test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()).to(device))
+    val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()).to(device))
     train_dataloader = DataLoader(
         train_data, batch_size=cfg.evaluation.eval_cls_batch_size, shuffle=True
     )
@@ -294,9 +284,7 @@ def run_from_py(ecal, hcal, energy, cfg):
     )
     optimizer = torch.optim.Adam(classifier.parameters(), lr=cfg.evaluation.eval_cls_lr)
 
-    train_and_evaluate_cls(
-        classifier, train_dataloader, test_dataloader, optimizer, args
-    )
+    train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
     classifier = load_classifier(classifier, args)
 
     with torch.inference_mode():
@@ -323,9 +311,7 @@ def run_from_py(ecal, hcal, energy, cfg):
         )
 
 
-def plot_feature(
-    feature_gen, feature_g4, arg, title="", label="", title_label="", output_dir=""
-):
+def plot_feature(feature_gen, feature_g4, arg, title="", label="", title_label="", output_dir=""):
     gen_label = arg.evaluation.label
     g4_min = np.nanmin(feature_g4[np.isfinite(feature_g4)])
     g4_max = np.nanmax(feature_g4[np.isfinite(feature_g4)])
@@ -415,9 +401,7 @@ def plot_feature(
     ratio_isnan = np.isnan(ratio)
     ratio[ratio_isnan] = 1.0
     ratio_err[ratio_isnan] = 0.0
-    ax[1].step(
-        bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[0], where="post"
-    )
+    ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[0], where="post")
     ax[1].fill_between(
         bins,
         dup(ratio - ratio_err),
@@ -453,9 +437,7 @@ def plot_feature(
         f.write(str(seps))
         f.write("\n\n")
 
-    ax[1].hlines(
-        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-    )
+    ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0], bins[-1])

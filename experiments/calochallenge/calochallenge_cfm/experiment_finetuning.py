@@ -50,9 +50,7 @@ class CaloChallengeFTCFM(CaloChallenge):
             f"model_run{self.backbone_cfg.run_idx}.pt",
         )
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
         except FileNotFoundError as err:
             raise ValueError(f"Cannot load model from {model_path}") from err
         LOGGER.info(f"Loading pretrained model from {model_path}")
@@ -176,10 +174,10 @@ class CaloChallengeFTCFM(CaloChallenge):
                 if self.model.net.module.learn_pos_embed
                 else []
             )
-    
-            params_backbone = list(
-                self.model.net.module.t_embedder.parameters()
-            ) + list(self.model.net.module.blocks.parameters())
+
+            params_backbone = list(self.model.net.module.t_embedder.parameters()) + list(
+                self.model.net.module.blocks.parameters()
+            )
 
             params_head = self.model.net.module.final_layer.parameters()
         else:
@@ -214,7 +212,6 @@ class CaloChallengeFT_fromLEM(CaloChallengeFTCFM):
 
     @torch.inference_mode()
     def sample_n(self):
-
         self.model.eval()
 
         t_0 = time.time()
@@ -279,15 +276,10 @@ class CaloChallengeFT_fromLEM(CaloChallengeFTCFM):
             dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
         )
 
-        sample = torch.vstack(
-            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
-        )
+        sample = torch.vstack([self.model.sample_batch(c).cpu() for c in transformed_cond_loader])
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
-        LOGGER.info(
-            f"sample_n: Finished generating {len(sample)} samples "
-            f"after {sampling_time} s."
-        )
+        LOGGER.info(f"sample_n: Finished generating {len(sample)} samples after {sampling_time} s.")
 
         return sample.detach().cpu(), transformed_cond.detach().cpu()

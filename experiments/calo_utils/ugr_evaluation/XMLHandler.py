@@ -11,7 +11,6 @@ import numpy as np
 
 class XMLHandler:
     def __init__(self, particle_name, filename="binning.xml"):
-
         tree = ET.parse(filename)
         root = tree.getroot()
 

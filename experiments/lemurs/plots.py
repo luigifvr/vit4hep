@@ -22,7 +22,6 @@ def plot_ui_dists(
 
     # iterate layers
     for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T, strict=True)):
-
         # create figure and subaxes
         fig, ax = plt.subplots(
             3,
@@ -38,11 +37,7 @@ def plot_ui_dists(
             quantiles = np.linspace(0, 1, num_bins + 1)
             bins = np.quantile(
                 total,
-                (
-                    quantiles[skip_quantiles:-skip_quantiles]
-                    if skip_quantiles
-                    else quantiles
-                ),
+                (quantiles[skip_quantiles:-skip_quantiles] if skip_quantiles else quantiles),
             )
         else:
             if xlim == "auto":
@@ -168,9 +163,7 @@ def plot_ui_dists(
         ax[1].set_xlabel(f"$u_{{{i}}}$")
         ax[0].set_xticklabels([])
 
-        ax[1].hlines(
-            1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-        )
+        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
         ax[1].set_yticks((0.7, 1.0, 1.3))
         ax[1].set_ylim(0.5, 1.5)
         ax[0].set_xlim(bins[0], bins[-1])
@@ -231,9 +224,7 @@ def plot_ui_dists(
             if not os.path.isdir(cfg.run_dir + "/eval/"):
                 os.makedirs(cfg.run_dir + "/eval/")
 
-            fig.savefig(
-                cfg.run_dir + "/eval/" + f"u{i}_dist.pdf", dpi=200, bbox_inches="tight"
-            )
+            fig.savefig(cfg.run_dir + "/eval/" + f"u{i}_dist.pdf", dpi=200, bbox_inches="tight")
         else:
             plt.show()
 

@@ -98,9 +98,7 @@ def prepare_low_data_for_classifier(
         )
     else:
         voxel = voxel / E_inc
-        ret = np.concatenate(
-            [np.log10(E_inc), voxel, label * np.ones_like(E_inc)], axis=1
-        )
+        ret = np.concatenate([np.log10(E_inc), voxel, label * np.ones_like(E_inc)], axis=1)
     return ret
 
 
@@ -269,9 +267,7 @@ def evaluate_cls(model, data_test, arg, final_eval=False, calibration_data=None)
     eval_auc = roc_auc_score(result_true, result_pred)
     print("AUC on test set is", eval_auc)
     JSD = -BCE + np.log(2.0)
-    print(
-        f"BCE loss of test set is {BCE:.4f}, JSD of the two dists is {JSD / np.log(2.0):.4f}"
-    )
+    print(f"BCE loss of test set is {BCE:.4f}, JSD of the two dists is {JSD / np.log(2.0):.4f}")
     if final_eval:
         prob_true, prob_pred = calibration_curve(result_true, result_pred, n_bins=10)
         print("unrescaled calibration curve:", prob_true, prob_pred)
@@ -290,8 +286,7 @@ def evaluate_cls(model, data_test, arg, final_eval=False, calibration_data=None)
         )
         JSD = -BCE.cpu().numpy() + np.log(2.0)
         otp_str = (
-            "rescaled BCE loss of test set is {:.4f}, "
-            + "rescaled JSD of the two dists is {:.4f}"
+            "rescaled BCE loss of test set is {:.4f}, " + "rescaled JSD of the two dists is {:.4f}"
         )
         print(otp_str.format(BCE, JSD / np.log(2.0)))
     return eval_acc, eval_auc, JSD / np.log(2.0)
@@ -318,9 +313,9 @@ def calibrate_classifier(model, calibration_data, arg):
             result_pred = torch.cat((result_pred, pred), 0)
     result_true = result_true.cpu().numpy()
     result_pred = result_pred.cpu().numpy()
-    iso_reg = IsotonicRegression(
-        out_of_bounds="clip", y_min=1e-6, y_max=1.0 - 1e-6
-    ).fit(result_pred, result_true)
+    iso_reg = IsotonicRegression(out_of_bounds="clip", y_min=1e-6, y_max=1.0 - 1e-6).fit(
+        result_pred, result_true
+    )
     return iso_reg
 
 
@@ -339,15 +334,15 @@ def check_file(given_file, arg, which=None):
         "LEMURS": 6480,
     }[arg.dataset]
     num_events = given_file["incident_energies"].shape[0]
-    assert (
-        given_file["showers"].shape[0] == num_events
-    ), "Number of energies provided does not match number of showers, {} != {}".format(
-        num_events, given_file["showers"].shape[0]
+    assert given_file["showers"].shape[0] == num_events, (
+        "Number of energies provided does not match number of showers, {} != {}".format(
+            num_events, given_file["showers"].shape[0]
+        )
     )
-    assert (
-        given_file["showers"].shape[1] == num_features
-    ), "Showers have wrong shape, expected {}, got {}".format(
-        num_features, given_file["showers"].shape[1]
+    assert given_file["showers"].shape[1] == num_features, (
+        "Showers have wrong shape, expected {}, got {}".format(
+            num_features, given_file["showers"].shape[1]
+        )
     )
 
     print(f"Found {num_events} events in the file.")
@@ -372,9 +367,7 @@ def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1)
     return shower.astype("float32", copy=False), energy.astype("float32", copy=False)
 
 
-def plot_histograms(
-    hlf_classes, reference_class, arg, labels, input_names="", p_label=""
-):
+def plot_histograms(hlf_classes, reference_class, arg, labels, input_names="", p_label=""):
     """plots histograms based with reference file as comparison"""
     plot_Etot_Einc(hlf_classes, reference_class, arg, labels, input_names, p_label)
     plot_E_layers(hlf_classes, reference_class, arg, labels, input_names, p_label)
@@ -383,12 +376,8 @@ def plot_histograms(
     plot_ECWidthEtas(hlf_classes, reference_class, arg, labels, input_names, p_label)
     plot_ECWidthPhis(hlf_classes, reference_class, arg, labels, input_names, p_label)
     plot_sparsity(hlf_classes, reference_class, arg, labels, input_names, p_label)
-    plot_weighted_depth_a(
-        hlf_classes, reference_class, arg, labels, input_names, p_label
-    )
-    plot_weighted_depth_r(
-        hlf_classes, reference_class, arg, labels, input_names, p_label
-    )
+    plot_weighted_depth_a(hlf_classes, reference_class, arg, labels, input_names, p_label)
+    plot_weighted_depth_r(hlf_classes, reference_class, arg, labels, input_names, p_label)
 
 
 class args_class:
@@ -486,9 +475,7 @@ def run_from_py(sample, energy, cfg):
         print("Plotting average shower...")
         hlf.DrawAverageShower(
             sample,
-            filename=os.path.join(
-                args.output_dir, f"average_shower_dataset_{args.dataset}.png"
-            ),
+            filename=os.path.join(args.output_dir, f"average_shower_dataset_{args.dataset}.png"),
             title="Shower average",
         )
         if hasattr(reference_hlf, "avg_shower"):
@@ -508,9 +495,7 @@ def run_from_py(sample, energy, cfg):
         print("Plotting randomly selected reference and generated shower: ")
         hlf.DrawSingleShower(
             sample[:5],
-            filename=os.path.join(
-                args.output_dir, f"single_shower_dataset_{args.dataset}.png"
-            ),
+            filename=os.path.join(args.output_dir, f"single_shower_dataset_{args.dataset}.png"),
             title="Single shower",
         )
         hlf.DrawSingleShower(
@@ -526,20 +511,14 @@ def run_from_py(sample, energy, cfg):
         print("Plotting average showers for different energies ...")
         if "1" in args.dataset:
             target_energies = 2 ** np.linspace(8, 23, 16)
-            plot_title = [
-                f"shower average at E = {int(en)} MeV" for en in target_energies
-            ]
+            plot_title = [f"shower average at E = {int(en)} MeV" for en in target_energies]
         else:
             target_energies = 10 ** np.linspace(3, 6, 4)
             plot_title = []
             for i in range(3, 7):
-                plot_title.append(
-                    f"shower average for E in [{10**i}, {10 ** (i + 1)}] MeV"
-                )
+                plot_title.append(f"shower average for E in [{10**i}, {10 ** (i + 1)}] MeV")
         for i in range(len(target_energies) - 1):
-            filename = (
-                f"average_shower_dataset_{args.dataset}_E_{target_energies[i]}.png"
-            )
+            filename = f"average_shower_dataset_{args.dataset}_E_{target_energies[i]}.png"
             which_showers = (
                 (energy >= target_energies[i]) & (energy < target_energies[i + 1])
             ).squeeze()
@@ -655,9 +634,7 @@ def run_from_py(sample, energy, cfg):
 
         print("Calculating high-level features for classifer: DONE.\n")
         for key in list_cls:
-            if (args.mode in ["cls-low", "cls-resnet"]) or (
-                key in ["cls-low", "cls-resnet"]
-            ):
+            if (args.mode in ["cls-low", "cls-resnet"]) or (key in ["cls-low", "cls-resnet"]):
                 source_array = prepare_low_data_for_classifier(
                     sample, energy, hlf, 0.0, cut=cut, normed=False
                 )
@@ -682,9 +659,7 @@ def run_from_py(sample, energy, cfg):
                     normed=True,
                 )
             elif (args.mode in ["cls-high"]) or (key in ["cls-high"]):
-                source_array = prepare_high_data_for_classifier(
-                    sample, energy, hlf, 0.0, cut=cut
-                )
+                source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0.0, cut=cut)
                 reference_array = prepare_high_data_for_classifier(
                     reference_shower, reference_energy, reference_hlf, 1.0, cut=cut
                 )
@@ -719,9 +694,7 @@ def run_from_py(sample, energy, cfg):
 
             classifier.to(args.device)
             print(classifier)
-            total_parameters = sum(
-                p.numel() for p in classifier.parameters() if p.requires_grad
-            )
+            total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
 
             print(f"{args.mode} has {int(total_parameters)} parameters")
 
@@ -736,42 +709,24 @@ def run_from_py(sample, energy, cfg):
                 train_data = TensorDataset(
                     torch.tensor(train_data, dtype=torch.get_default_dtype())
                 )
-                test_data = TensorDataset(
-                    torch.tensor(test_data, dtype=torch.get_default_dtype())
-                )
-                val_data = TensorDataset(
-                    torch.tensor(val_data, dtype=torch.get_default_dtype())
-                )
+                test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()))
+                val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()))
             else:
                 train_data = TensorDataset(
-                    torch.tensor(train_data, dtype=torch.get_default_dtype()).to(
-                        args.device
-                    )
+                    torch.tensor(train_data, dtype=torch.get_default_dtype()).to(args.device)
                 )
                 test_data = TensorDataset(
-                    torch.tensor(test_data, dtype=torch.get_default_dtype()).to(
-                        args.device
-                    )
+                    torch.tensor(test_data, dtype=torch.get_default_dtype()).to(args.device)
                 )
                 val_data = TensorDataset(
-                    torch.tensor(val_data, dtype=torch.get_default_dtype()).to(
-                        args.device
-                    )
+                    torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device)
                 )
 
-            train_dataloader = DataLoader(
-                train_data, batch_size=args.cls_batch_size, shuffle=True
-            )
-            test_dataloader = DataLoader(
-                test_data, batch_size=args.cls_batch_size, shuffle=False
-            )
-            val_dataloader = DataLoader(
-                val_data, batch_size=args.cls_batch_size, shuffle=False
-            )
+            train_dataloader = DataLoader(train_data, batch_size=args.cls_batch_size, shuffle=True)
+            test_dataloader = DataLoader(test_data, batch_size=args.cls_batch_size, shuffle=False)
+            val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
 
-            train_and_evaluate_cls(
-                classifier, train_dataloader, test_dataloader, optimizer, args
-            )
+            train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
             classifier = load_classifier(classifier, args)
 
             with torch.inference_mode():
@@ -810,9 +765,9 @@ def run_from_py(sample, energy, cfg):
                 print("Calculating high-level features for FPD/KPD: DONE.\n")
 
                 # get high level features and remove class label
-                source_array = prepare_high_data_for_classifier(
-                    sample, energy, hlf, 0.0, cut=cut
-                )[:, :-1]
+                source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0.0, cut=cut)[
+                    :, :-1
+                ]
                 reference_array = prepare_high_data_for_classifier(
                     reference_shower, reference_energy, reference_hlf, 1.0, cut=cut
                 )[:, :-1]
@@ -825,8 +780,8 @@ def run_from_py(sample, energy, cfg):
                 )
 
                 result_str = (
-                    f"FPD (x10^3): {fpd_val*1e3:.4f} ± {fpd_err*1e3:.4f}\n"
-                    f"KPD (x10^3): {kpd_val*1e3:.4f} ± {kpd_err*1e3:.4f}"
+                    f"FPD (x10^3): {fpd_val * 1e3:.4f} ± {fpd_err * 1e3:.4f}\n"
+                    f"KPD (x10^3): {kpd_val * 1e3:.4f} ± {kpd_err * 1e3:.4f}"
                 )
 
                 print(result_str)

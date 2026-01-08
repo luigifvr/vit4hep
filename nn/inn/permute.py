@@ -1,5 +1,3 @@
-
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -31,9 +29,7 @@ class PermuteRandomS1(InvertibleModule):
             self.perm_inv[p] = i
 
         self.perm = nn.Parameter(torch.LongTensor(self.perm), requires_grad=False)
-        self.perm_inv = nn.Parameter(
-            torch.LongTensor(self.perm_inv), requires_grad=False
-        )
+        self.perm_inv = nn.Parameter(torch.LongTensor(self.perm_inv), requires_grad=False)
 
     def forward(self, x, rev=False, jac=True):
         if not rev:
@@ -71,9 +67,7 @@ class PermuteRandomS2(InvertibleModule):
             self.perm_inv[p] = i
 
         self.perm = nn.Parameter(torch.LongTensor(self.perm), requires_grad=False)
-        self.perm_inv = nn.Parameter(
-            torch.LongTensor(self.perm_inv), requires_grad=False
-        )
+        self.perm_inv = nn.Parameter(torch.LongTensor(self.perm_inv), requires_grad=False)
 
     def forward(self, x, rev=False, jac=True):
         if not rev:

@@ -27,7 +27,6 @@ class GlobalStandardizeFromFile:
     """
 
     def __init__(self, model_dir, exclude_zeros=True, eps=1.0e-6):
-
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
@@ -50,9 +49,7 @@ class GlobalStandardizeFromFile:
 
     def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
-            transformed = shower * self.std.to(shower.device) + self.mean.to(
-                shower.device
-            )
+            transformed = shower * self.std.to(shower.device) + self.mean.to(shower.device)
         else:
             if not self.written:
                 nonzero_mask = (shower > self.eps) & (shower < -self.eps)
@@ -63,9 +60,7 @@ class GlobalStandardizeFromFile:
                 if rank == 0:
                     self.write()
                 self.written = True
-            transformed = (shower - self.mean.to(shower.device)) / self.std.to(
-                shower.device
-            )
+            transformed = (shower - self.mean.to(shower.device)) / self.std.to(shower.device)
         return transformed, energy
 
 
@@ -78,7 +73,6 @@ class StandardizeUsFromFile:
     """
 
     def __init__(self, n_us, model_dir):
-
         self.model_dir = model_dir
         self.mean_us_path = os.path.join(model_dir, "means_u.npy")
         self.std_us_path = os.path.join(model_dir, "stds_u.npy")
@@ -111,9 +105,7 @@ class StandardizeUsFromFile:
                 if rank == 0:
                     self.write()
                 self.written = True
-            trafo_us = (us - self.mean_u.to(shower.device)) / self.std_u.to(
-                shower.device
-            )
+            trafo_us = (us - self.mean_u.to(shower.device)) / self.std_u.to(shower.device)
             transformed = torch.cat((voxels, trafo_us), dim=1)
         return transformed, energy
 
@@ -145,7 +137,6 @@ class AddFeaturesToCond:
         self.split_index = split_index
 
     def __call__(self, x, c, rev=False, rank=0):
-
         if rev:
             c_, split = c[:, -1:], c[:, :-1]
             x_ = torch.cat([x, split], dim=1)
@@ -275,9 +266,7 @@ class SelectiveUniformNoise:
         # self.func = func
         self.a = a
         self.b = b
-        self.func = torch.distributions.Uniform(
-            torch.tensor(self.a), torch.tensor(self.b)
-        )
+        self.func = torch.distributions.Uniform(torch.tensor(self.a), torch.tensor(self.b))
         self.exclusions = exclusions
         self.cut = cut  # apply cut if True
 
@@ -354,7 +343,6 @@ class NormalizeByElayer:
 
     def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
-
             # select u features
             us = shower[:, -self.n_layers :]
 
@@ -386,9 +374,7 @@ class NormalizeByElayer:
                 layer /= layer.sum(-1, keepdims=True) + self.eps  # normalize to unity
                 mask = layer <= self.cut
                 layer[mask] = 0.0  # apply normalized cut
-                transformed[:, start:end] = (
-                    layer * layer_Es[:, [L]]
-                )  # scale to layer energy
+                transformed[:, start:end] = layer * layer_Es[:, [L]]  # scale to layer energy
 
         else:
             # compute layer energies
@@ -431,7 +417,6 @@ class AddAngularBins:
         self.n_voxels = self.layer_boundaries[-1]
 
     def __call__(self, shower, energy, rev=False, rank=0):
-
         if rev:
             new_n_voxels = self.new_layer_boundaries[-1]
             shower, us = shower[:, :new_n_voxels], shower[:, new_n_voxels:]
@@ -440,9 +425,7 @@ class AddAngularBins:
                 alpha_bins = self.num_bins[L]
                 add_alpha_bins = self.add_bins[L] // alpha_bins
                 layer = shower[:, start:end]
-                layer, _ = layer.reshape(
-                    shower.shape[0], -1, alpha_bins, add_alpha_bins
-                ).max(-1)
+                layer, _ = layer.reshape(shower.shape[0], -1, alpha_bins, add_alpha_bins).max(-1)
                 transformed.append(layer.reshape(layer.shape[0], -1))
             transformed = torch.cat(transformed, dim=-1).to(
                 dtype=shower.dtype, device=shower.device
@@ -465,9 +448,7 @@ class AddAngularBins:
                 )
 
                 transformed.append(layer)
-                self.new_layer_boundaries.append(
-                    self.new_layer_boundaries[L] + layer.shape[-1]
-                )
+                self.new_layer_boundaries.append(self.new_layer_boundaries[L] + layer.shape[-1])
             transformed = torch.cat(transformed, dim=-1).to(
                 dtype=shower.dtype, device=shower.device
             )

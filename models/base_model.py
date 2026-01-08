@@ -117,11 +117,7 @@ class CINN(BaseModel):
         """
         z, log_jac_det = self.forward(x, c, rev=False)
         z = z.reshape(-1, math.prod(self.shape))
-        log_prob = (
-            -0.5 * torch.sum(z**2, 1)
-            + log_jac_det
-            - z.shape[1] / 2 * math.log(2 * math.pi)
-        )
+        log_prob = -0.5 * torch.sum(z**2, 1) + log_jac_det - z.shape[1] / 2 * math.log(2 * math.pi)
         return log_prob.mean()
 
     def forward(self, x, c, rev=False, jac=True):

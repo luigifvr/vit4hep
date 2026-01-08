@@ -23,7 +23,6 @@ class CaloHadGlobalStandardizeFromFile:
     """
 
     def __init__(self, model_dir, eps=1.0e-6):
-
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
@@ -71,7 +70,6 @@ class CaloHadStandardizeUsFromFile:
     """
 
     def __init__(self, n_us, model_dir):
-
         self.model_dir = model_dir
         self.mean_us_path = os.path.join(model_dir, "means_u.npy")
         self.std_us_path = os.path.join(model_dir, "stds_u.npy")
@@ -175,9 +173,7 @@ class CaloHadExclusiveLogitTransform:
                 if self.rescale:
                     # Inverse logit with rescaling
                     data_dict[key] = torch.sigmoid(data_dict[key])
-                    data_dict[key] = (data_dict[key] - self.delta) / (
-                        1 - 2 * self.delta
-                    )
+                    data_dict[key] = (data_dict[key] - self.delta) / (1 - 2 * self.delta)
                 else:
                     # Standard inverse logit (sigmoid)
                     data_dict[key] = torch.sigmoid(data_dict[key])
@@ -330,12 +326,7 @@ class SumPool3dDownScale:
             pass
         else:
             showers = data_dict[self.calo]
-            showers = (
-                self.maxpool3d(showers)
-                * self.kernel[0]
-                * self.kernel[1]
-                * self.kernel[2]
-            )
+            showers = self.maxpool3d(showers) * self.kernel[0] * self.kernel[1] * self.kernel[2]
             data_dict[self.calo] = showers
         return data_dict
 

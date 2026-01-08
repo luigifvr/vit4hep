@@ -113,8 +113,7 @@ class CaloHadCollator:
             self.worker_id = worker_info.id if worker_info is not None else -1
 
         batch_dict = {
-            key: torch.cat([item[key] for item in raw_batch], dim=0)
-            for key in raw_batch[0]
+            key: torch.cat([item[key] for item in raw_batch], dim=0) for key in raw_batch[0]
         }
 
         if self.transforms:

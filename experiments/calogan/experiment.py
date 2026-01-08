@@ -136,7 +136,6 @@ class CaloGAN(BaseExperiment):
 
     @torch.inference_mode()
     def sample_n(self):
-
         self.model.eval()
 
         t_0 = time.time()
@@ -159,7 +158,6 @@ class CaloGAN(BaseExperiment):
 
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
-
             if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
@@ -176,16 +174,11 @@ class CaloGAN(BaseExperiment):
                 dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
             )
 
-        sample = torch.vstack(
-            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
-        )
+        sample = torch.vstack([self.model.sample_batch(c).cpu() for c in transformed_cond_loader])
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
-        LOGGER.info(
-            f"sample_n: Finished generating {len(sample)} samples "
-            f"after {sampling_time} s."
-        )
+        LOGGER.info(f"sample_n: Finished generating {len(sample)} samples after {sampling_time} s.")
         return sample, transformed_cond.cpu()
 
     def sample_us(self, transformed_cond_loader):
@@ -200,8 +193,7 @@ class CaloGAN(BaseExperiment):
         )
         t_1 = time.time()
         LOGGER.info(
-            f"sample_us: Finished generating {len(u_samples)} energy samples "
-            f"after {t_1 - t_0} s."
+            f"sample_us: Finished generating {len(u_samples)} energy samples after {t_1 - t_0} s."
         )
 
         u_samples_dict = {}
@@ -309,17 +301,13 @@ class CaloGAN(BaseExperiment):
             self.energy_model_transforms.append(getattr(transforms, name)(**kwargs))
 
         self.energy_model = instantiate(energy_model_cfg.model)
-        num_parameters = sum(
-            p.numel() for p in self.energy_model.parameters() if p.requires_grad
-        )
+        num_parameters = sum(p.numel() for p in self.energy_model.parameters() if p.requires_grad)
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
         model_path = os.path.join(energy_model_cfg.run_dir, "models", "model_run0.pt")
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
             LOGGER.info(f"Loading energy model from {model_path}")
             self.energy_model.load_state_dict(state_dict)
         except FileNotFoundError as err:

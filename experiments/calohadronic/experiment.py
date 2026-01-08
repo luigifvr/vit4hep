@@ -159,7 +159,6 @@ class CaloHadronic(BaseExperiment):
 
     @torch.inference_mode()
     def sample_n(self):
-
         self.model.eval()
 
         t_0 = time.time()
@@ -189,7 +188,6 @@ class CaloHadronic(BaseExperiment):
 
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
-
             if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
@@ -238,19 +236,13 @@ class CaloHadronic(BaseExperiment):
                 )
         else:
             sample = torch.vstack(
-                [
-                    self.model.sample_batch(c.to(self.device)).cpu()
-                    for c in transformed_cond_loader
-                ]
+                [self.model.sample_batch(c.to(self.device)).cpu() for c in transformed_cond_loader]
             )
             conditions = transformed_cond
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
-        LOGGER.info(
-            f"sample_n: Finished generating {len(sample)} samples "
-            f"after {sampling_time} s."
-        )
+        LOGGER.info(f"sample_n: Finished generating {len(sample)} samples after {sampling_time} s.")
 
         return sample.detach().cpu(), conditions.detach().cpu()
 
@@ -266,8 +258,7 @@ class CaloHadronic(BaseExperiment):
         )
         t_1 = time.time()
         LOGGER.info(
-            f"sample_us: Finished generating {len(u_samples)} energy samples "
-            f"after {t_1 - t_0} s."
+            f"sample_us: Finished generating {len(u_samples)} energy samples after {t_1 - t_0} s."
         )
 
         u_samples_dict = {}
@@ -311,9 +302,7 @@ class CaloHadronic(BaseExperiment):
                 shuffle=False,
                 collate_fn=test_collator,
             )
-            reference_energy_ratios = torch.vstack(
-                [b[0] for b in reference_loader]
-            ).cpu()
+            reference_energy_ratios = torch.vstack([b[0] for b in reference_loader]).cpu()
             reference_conditions = torch.vstack([b[1] for b in reference_loader]).cpu()
 
             samples_dict = {}
@@ -364,9 +353,7 @@ class CaloHadronic(BaseExperiment):
 
             n_layers = samples_dict["ecal"].shape[1] + samples_dict["hcal"].shape[1]
             samples_dict["extra_dims"] = conditions[:, :n_layers]
-            samples_dict["energy"] = conditions[:, n_layers : (n_layers + 1)].unsqueeze(
-                1
-            )
+            samples_dict["energy"] = conditions[:, n_layers : (n_layers + 1)].unsqueeze(1)
             for key in samples_dict.keys():
                 samples_dict[key] = samples_dict[key].clone()
             # postprocess
@@ -427,17 +414,13 @@ class CaloHadronic(BaseExperiment):
         del dummy_data
 
         self.energy_model = instantiate(energy_model_cfg.model)
-        num_parameters = sum(
-            p.numel() for p in self.energy_model.parameters() if p.requires_grad
-        )
+        num_parameters = sum(p.numel() for p in self.energy_model.parameters() if p.requires_grad)
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
         model_path = os.path.join(energy_model_cfg.run_dir, "models", "model_run0.pt")
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
             LOGGER.info(f"Loading energy model from {model_path}")
             self.energy_model.load_state_dict(state_dict)
         except FileNotFoundError as err:

@@ -31,9 +31,9 @@ class CaloChallengeCFM(CFM):
         self.in_channels = in_channels
 
         for i, (s, p) in enumerate(zip(self.shape, self.patch_shape, strict=True)):
-            assert (
-                s % p == 0
-            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
+            assert s % p == 0, (
+                f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
+            )
 
         self.net = net
 
@@ -44,7 +44,8 @@ class CaloChallengeCFM(CFM):
             **dict(
                 zip(
                     ("l", "a", "r", "p1", "p2", "p3"),
-                    self.num_patches + self.patch_shape, strict=True,
+                    self.num_patches + self.patch_shape,
+                    strict=True,
                 )
             ),
         )
@@ -135,9 +136,9 @@ class CaloChallengeCFM_DS1(CaloChallengeCFM):
 
         for i, s in enumerate(self.list_shape):
             for L, m in zip(s, patch_shape, strict=True):
-                assert (
-                    L % m == 0
-                ), f"Input size ({L}) should be divisible by patch size ({m}) in axis {i}."
+                assert L % m == 0, (
+                    f"Input size ({L}) should be divisible by patch size ({m}) in axis {i}."
+                )
 
         self.net = net
         self.net.num_patches = self.num_patches_per_dim

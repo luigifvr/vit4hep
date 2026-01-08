@@ -15,7 +15,6 @@ class GlobalStandardizeFromFileGAN:
     """
 
     def __init__(self, model_dir, eps=1.0e-6):
-
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
@@ -148,7 +147,6 @@ class NormalizeLayerEnergyGAN:
     def __call__(self, data_dict, rev=False, rank=0):
         energy = data_dict["energy"]
         if rev:
-
             # select u features
             us = data_dict["extra_dims"]
 

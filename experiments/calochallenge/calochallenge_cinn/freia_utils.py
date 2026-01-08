@@ -43,9 +43,7 @@ def get_permutation_block(nblocks, is_spatial=None):
     return PermuteBlocks
 
 
-def get_vit_block_kwargs(
-    nblocks, is_spatial, shape, patch_shape, cinn_kwargs, vit_kwargs
-):
+def get_vit_block_kwargs(nblocks, is_spatial, shape, patch_shape, cinn_kwargs, vit_kwargs):
     """Returns the class and keyword arguments for different coupling block types"""
 
     list_block_kwargs = []
@@ -56,6 +54,7 @@ def get_vit_block_kwargs(
     for spatial_split in is_spatial:
         block_kwargs = {}
         if spatial_split:
+
             def func(x_in, x_out):
                 subnet = SubnetViT(
                     x_out=x_out,
@@ -69,6 +68,7 @@ def get_vit_block_kwargs(
             block_kwargs["spatial"] = True
             block_kwargs.update(cinn_kwargs)
         else:
+
             def func(x_in, x_out):
                 subnet = SubnetViT(
                     x_out=x_out,

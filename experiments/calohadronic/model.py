@@ -44,14 +44,14 @@ class CaloHadCFM(CFM):
             self.num_patches_per_dim.append(num_patches_dim)
             self.num_patches_per_layer.append(num_patches)
 
-        assert len(list_shape) == len(
-            list_patch_shape
-        ), "list_shape and list_patch_shape must have the same length"
+        assert len(list_shape) == len(list_patch_shape), (
+            "list_shape and list_patch_shape must have the same length"
+        )
         for i, (s, p) in enumerate(zip(self.list_shape, self.list_patch_shape, strict=True)):
             for L, m in zip(s, p, strict=True):
-                assert (
-                    L % m == 0
-                ), f"Input size ({L}) should be divisible by patch size ({m}) in axis {i}."
+                assert L % m == 0, (
+                    f"Input size ({L}) should be divisible by patch size ({m}) in axis {i}."
+                )
 
         self.net = net
         self.net.num_patches = self.num_patches_per_dim

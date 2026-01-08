@@ -37,9 +37,7 @@ class ParallelTransformer(nn.Module):
             setattr(self, k, param[k] if k in param else p)
 
         self.time_embed = nn.Sequential(
-            GaussianFourierProjection(
-                embed_dim=self.encode_t_dim, scale=self.encode_t_scale
-            ),
+            GaussianFourierProjection(embed_dim=self.encode_t_dim, scale=self.encode_t_scale),
             nn.Linear(self.encode_t_dim, self.encode_t_dim),
         )
         if self.embeds:
@@ -51,9 +49,7 @@ class ParallelTransformer(nn.Module):
             self.layer = nn.Linear(3 * self.dim_embedding, self.dim_feedforward)
         else:
             self.d_model = self.dim_embedding
-            self.layer = nn.Linear(
-                self.dim_embedding + self.encode_t_dim, self.dim_feedforward
-            )
+            self.layer = nn.Linear(self.dim_embedding + self.encode_t_dim, self.dim_feedforward)
 
         self.transformer = nn.Transformer(
             d_model=self.d_model,
@@ -124,15 +120,12 @@ class ParallelTransformer(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
-
     def __init__(self, d_model: int, dropout: float = 0.0, max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)
-        )
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
         pe = torch.zeros(1, max_len, d_model)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
@@ -144,12 +137,9 @@ class PositionalEncoding(nn.Module):
 
 
 class SinCos_embedding(nn.Module):
-
     def __init__(self, n_frequencies: int, sigmoid=True):
         super().__init__()
-        self.arg = nn.Parameter(
-            2 * math.pi * 2 ** torch.arange(n_frequencies), requires_grad=False
-        )
+        self.arg = nn.Parameter(2 * math.pi * 2 ** torch.arange(n_frequencies), requires_grad=False)
         self.sigmoid = sigmoid
 
     def forward(self, x):
@@ -157,9 +147,7 @@ class SinCos_embedding(nn.Module):
             x_pp = nn.functional.sigmoid(x)
         else:
             x_pp = x
-        frequencies = (x_pp.unsqueeze(-1) * self.arg).reshape(
-            x_pp.size(0), x_pp.size(1), -1
-        )
+        frequencies = (x_pp.unsqueeze(-1) * self.arg).reshape(x_pp.size(0), x_pp.size(1), -1)
         return torch.cat([torch.sin(frequencies), torch.cos(frequencies)], dim=-1)
 
 

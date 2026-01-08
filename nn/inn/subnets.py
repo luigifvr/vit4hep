@@ -57,9 +57,7 @@ class SubnetMLP(nn.Module):
         self.layers.append(nn.Linear(self.x_in, self.hidden_channels[0]))
         self.layers.append(nn.ReLU())
         for n in range(self.n_layers - 1):
-            self.layers.append(
-                nn.Linear(self.hidden_channels[n], self.hidden_channels[n + 1])
-            )
+            self.layers.append(nn.Linear(self.hidden_channels[n], self.hidden_channels[n + 1]))
             if self.dropout > 0:
                 self.layers.append(nn.Dropout(p=self.dropout))
             self.layers.append(nn.ReLU())

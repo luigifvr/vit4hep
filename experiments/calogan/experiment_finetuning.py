@@ -42,9 +42,7 @@ class CaloGANFTCFM(CaloGAN):
             f"model_run{self.backbone_cfg.run_idx}.pt",
         )
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
         except FileNotFoundError as err:
             raise ValueError(f"Cannot load model from {model_path}") from err
         LOGGER.info(f"Loading pretrained model from {model_path}")
@@ -140,15 +138,9 @@ class CaloGANFTCFM(CaloGAN):
         if self.model.net.learn_pos_embed:
             if self.cfg.finetuning.reinitialize_pos_embedding:
                 L, a, r = self.model_num_patches
-                self.model.net.lgrid = (
-                    torch.arange(L, device=self.device, dtype=self.dtype) / L
-                )
-                self.model.net.agrid = (
-                    torch.arange(a, device=self.device, dtype=self.dtype) / a
-                )
-                self.model.net.rgrid = (
-                    torch.arange(r, device=self.device, dtype=self.dtype) / r
-                )
+                self.model.net.lgrid = torch.arange(L, device=self.device, dtype=self.dtype) / L
+                self.model.net.agrid = torch.arange(a, device=self.device, dtype=self.dtype) / a
+                self.model.net.rgrid = torch.arange(r, device=self.device, dtype=self.dtype) / r
             else:
                 pass
         else:
@@ -178,9 +170,9 @@ class CaloGANFTCFM(CaloGAN):
                 else []
             )
 
-            params_backbone = list(
-                self.model.net.module.t_embedder.parameters()
-            ) + list(self.model.net.module.blocks.parameters())
+            params_backbone = list(self.model.net.module.t_embedder.parameters()) + list(
+                self.model.net.module.blocks.parameters()
+            )
 
             params_head = self.model.net.module.final_layer.parameters()
         else:

@@ -22,7 +22,6 @@ def plot_ui_dists(
 
     # iterate layers
     for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T, strict=True)):
-
         # create figure and subaxes
         fig, ax = plt.subplots(
             3,
@@ -178,9 +177,7 @@ def plot_ui_dists(
         ax[1].set_xlabel(f"$u_{{{i}}}$")
         ax[0].set_xticklabels([])
 
-        ax[1].hlines(
-            1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-        )
+        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
         ax[1].set_yticks((0.7, 1.0, 1.3))
         ax[1].set_ylim(0.5, 1.5)
         ax[0].set_xlim(bins[0], bins[-1])

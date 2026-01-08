@@ -23,7 +23,6 @@ class LEMURSGlobalStandardizeFromFile:
     """
 
     def __init__(self, model_dir, eps=1.0e-6):
-
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
@@ -71,7 +70,6 @@ class LEMURSStandardizeUsFromFile:
     """
 
     def __init__(self, n_us, model_dir):
-
         self.model_dir = model_dir
         self.mean_us_path = os.path.join(model_dir, "means_u.npy")
         self.std_us_path = os.path.join(model_dir, "stds_u.npy")
@@ -113,9 +111,7 @@ class LEMURSPreprocessConds:
     Scale all conditions to [0,1]. Incident energy is in linear scale.
     """
 
-    def __init__(
-        self, scale_E=[1e3, 1e6], scale_theta=[0.87, 2.27], scale_phi=[-3.1416, 3.1416]
-    ):
+    def __init__(self, scale_E=[1e3, 1e6], scale_theta=[0.87, 2.27], scale_phi=[-3.1416, 3.1416]):
         self.cond_transform = True
         self.keys = ["incident_energy", "incident_theta", "incident_phi"]
         self.rescaling = [scale_E, scale_theta, scale_phi]
@@ -257,9 +253,7 @@ class LEMURSNormalizeByElayer:
         else:
             layer_Es = shower.sum(dim=(1, 2))
             shower /= layer_Es.view(B, 1, 1, L) + self.eps
-            u_0 = layer_Es.sum(dim=1, keepdim=True) / (
-                data_dict["incident_energy"] + self.eps
-            )
+            u_0 = layer_Es.sum(dim=1, keepdim=True) / (data_dict["incident_energy"] + self.eps)
 
             # For u_1, u_2, ... u_{L-1}
             # We need E_l / (E_l + E_{l+1} + ... + E_{L-1})

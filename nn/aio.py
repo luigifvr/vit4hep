@@ -95,9 +95,9 @@ class AllInOneBlock(InvertibleModule):
             self.conditional = False
             self.condition_channels = 0
         else:
-            assert tuple(dims_c[0][1:]) == tuple(
-                dims_in[0][1:]
-            ), f"Dimensions of input and condition don't agree: {dims_c} vs {dims_in}."
+            assert tuple(dims_c[0][1:]) == tuple(dims_in[0][1:]), (
+                f"Dimensions of input and condition don't agree: {dims_c} vs {dims_in}."
+            )
             self.conditional = True
             self.condition_channels = sum(dc[0] for dc in dims_c)
 
@@ -124,7 +124,8 @@ class AllInOneBlock(InvertibleModule):
         if permute_soft and channels > 512:
             warnings.warn(
                 "Soft permutation will take a very long time to initialize "
-                f"with {channels} feature channels. Consider using hard permutation instead.", stacklevel=2
+                f"with {channels} feature channels. Consider using hard permutation instead.",
+                stacklevel=2,
             )
 
         # global_scale is used as the initial value for the global affine scale
@@ -143,18 +144,14 @@ class AllInOneBlock(InvertibleModule):
             global_scale = np.log(global_affine_init)
             self.global_scale_activation = lambda a: torch.exp(a)
         else:
-            raise ValueError(
-                'Global affine activation must be "SIGMOID", "SOFTPLUS" or "EXP"'
-            )
+            raise ValueError('Global affine activation must be "SIGMOID", "SOFTPLUS" or "EXP"')
 
         self.global_scale = nn.Parameter(
             torch.ones(1, self.in_channels, *([1] * self.input_rank), dtype=torch.float)
             * float(global_scale)
         )
         self.global_offset = nn.Parameter(
-            torch.zeros(
-                1, self.in_channels, *([1] * self.input_rank), dtype=torch.float
-            )
+            torch.zeros(1, self.in_channels, *([1] * self.input_rank), dtype=torch.float)
         )
 
         if permute_soft:
@@ -180,16 +177,13 @@ class AllInOneBlock(InvertibleModule):
                 requires_grad=False,
             )
             self.w_perm_inv = nn.Parameter(
-                torch.FloatTensor(w.T).view(
-                    channels, channels, *([1] * self.input_rank)
-                ),
+                torch.FloatTensor(w.T).view(channels, channels, *([1] * self.input_rank)),
                 requires_grad=False,
             )
 
         if subnet_constructor is None:
             raise ValueError(
-                "Please supply a callable subnet_constructor"
-                "function or object (see docstring)"
+                "Please supply a callable subnet_constructorfunction or object (see docstring)"
             )
         self.subnet = subnet_constructor(
             self.splits[0] + self.condition_channels, 2 * self.splits[1]
@@ -223,8 +217,7 @@ class AllInOneBlock(InvertibleModule):
 
         if rev:
             return (
-                (self.permute_function(x, self.w_perm_inv) - self.global_offset)
-                / scale,
+                (self.permute_function(x, self.w_perm_inv) - self.global_offset) / scale,
                 perm_log_jac,
             )
         else:

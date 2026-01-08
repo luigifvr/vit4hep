@@ -50,9 +50,7 @@ class CaloHadronicFT(CaloHadronic):
             f"model_run{self.backbone_cfg.run_idx}.pt",
         )
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
         except FileNotFoundError as err:
             raise ValueError(f"Cannot load model from {model_path}") from err
         LOGGER.info(f"Loading pretrained model from {model_path}")
@@ -171,16 +169,16 @@ class CaloHadronicFT(CaloHadronic):
         # collect parameter lists
         if self.world_size > 1:
             params_embedder = (
-            list(self.model.net.module.x_embedder.parameters()) 
-            + list(self.model.net.module.c_embedder.parameters())
-            + [self.model.net.module.pos_embed_freqs]
-            if self.model.net.module.learn_pos_embed
-            else []
-        )
+                list(self.model.net.module.x_embedder.parameters())
+                + list(self.model.net.module.c_embedder.parameters())
+                + [self.model.net.module.pos_embed_freqs]
+                if self.model.net.module.learn_pos_embed
+                else []
+            )
 
-            params_backbone = list(
-                self.model.net.module.t_embedder.parameters()
-            ) + list(self.model.net.module.blocks.parameters())
+            params_backbone = list(self.model.net.module.t_embedder.parameters()) + list(
+                self.model.net.module.blocks.parameters()
+            )
 
             params_head = self.model.net.module.final_layer.parameters()
         else:
@@ -238,7 +236,6 @@ class CaloHadronicFT(CaloHadronic):
 
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
-
             if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
@@ -246,9 +243,7 @@ class CaloHadronicFT(CaloHadronic):
                 # Add LEMURS conditions
                 theta = self.cfg.gen_theta
                 phi = self.cfg.gen_phi
-                label = torch.tensor(self.cfg.gen_label, dtype=self.dtype).to(
-                    self.device
-                )
+                label = torch.tensor(self.cfg.gen_label, dtype=self.dtype).to(self.device)
                 theta_tensor = torch.full(
                     (transformed_cond.shape[0], 1),
                     theta,
@@ -309,17 +304,11 @@ class CaloHadronicFT(CaloHadronic):
                 )
         else:
             sample = torch.vstack(
-                [
-                    self.model.sample_batch(c.to(self.device)).cpu()
-                    for c in transformed_cond_loader
-                ]
+                [self.model.sample_batch(c.to(self.device)).cpu() for c in transformed_cond_loader]
             )
             conditions = transformed_cond
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
-        LOGGER.info(
-            f"sample_n: Finished generating {len(sample)} samples "
-            f"after {sampling_time} s."
-        )
+        LOGGER.info(f"sample_n: Finished generating {len(sample)} samples after {sampling_time} s.")
         return sample.detach().cpu(), conditions.detach().cpu()

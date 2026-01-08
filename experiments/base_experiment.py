@@ -42,9 +42,7 @@ class BaseExperiment:
         try:
             self.run_mlflow()
         except errors.ConfigAttributeError as e:
-            LOGGER.exception(
-                "Tried to access key that is not specified in the config files"
-            )
+            LOGGER.exception("Tried to access key that is not specified in the config files")
             raise e
         except Exception as e:
             LOGGER.exception("Exiting with error")
@@ -106,11 +104,11 @@ class BaseExperiment:
             max_used = torch.cuda.max_memory_allocated()
             max_total = torch.cuda.mem_get_info()[1]
             LOGGER.info(
-                f"GPU RAM information: max_used = {max_used/1e9:.3} GB, max_total = {max_total/1e9:.3} GB"
+                f"GPU RAM information: max_used = {max_used / 1e9:.3} GB, max_total = {max_total / 1e9:.3} GB"
             )
         dt = time.time() - t0
         LOGGER.info(
-            f"Finished experiment {self.cfg.exp_name}/{self.cfg.run_name} after {dt/60:.2f}min = {dt/60**2:.2f}h"
+            f"Finished experiment {self.cfg.exp_name}/{self.cfg.run_name} after {dt / 60:.2f}min = {dt / 60**2:.2f}h"
         )
 
     def init_model(self):
@@ -119,9 +117,7 @@ class BaseExperiment:
         # pass device and dtype
         self.model.device = self.device
         self.model.dtype = self.dtype
-        num_parameters = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
+        num_parameters = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         if self.cfg.use_mlflow:
             log_mlflow("num_parameters", float(num_parameters), step=0)
         LOGGER.info(
@@ -145,17 +141,15 @@ class BaseExperiment:
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )
             try:
-                state_dict = torch.load(
-                    model_path, map_location="cpu", weights_only=False
-                )["model"]
+                state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
                 state_dict = remove_module_from_state_dict(state_dict)
                 LOGGER.info(f"Loading model from {model_path}")
                 self.model.load_state_dict(state_dict)
                 if self.ema is not None:
                     LOGGER.info(f"Loading EMA from {model_path}")
-                    state_dict = torch.load(
-                        model_path, map_location="cpu", weights_only=False
-                    )["ema"]
+                    state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
+                        "ema"
+                    ]
                     self.ema.load_state_dict(state_dict)
             except FileNotFoundError as err:
                 raise ValueError(f"Cannot load model from {model_path}") from err
@@ -199,9 +193,7 @@ class BaseExperiment:
             else:
                 run_name = self.cfg.run_name
 
-            run_dir = os.path.join(
-                self.cfg.base_dir, "runs", self.cfg.exp_name, run_name
-            )
+            run_dir = os.path.join(self.cfg.base_dir, "runs", self.cfg.exp_name, run_name)
             run_idx = 0
             LOGGER.info(f"Creating new experiment {self.cfg.exp_name}/{run_name}")
 
@@ -220,9 +212,7 @@ class BaseExperiment:
                 self.cfg.run_dir = run_dir
 
             # only use mlflow if save=True
-            self.cfg.use_mlflow = (
-                False if not self.cfg.save else self.cfg.use_mlflow
-            )
+            self.cfg.use_mlflow = False if not self.cfg.save else self.cfg.use_mlflow
 
         # set seed
         if self.cfg.seed is not None:
@@ -247,9 +237,7 @@ class BaseExperiment:
                 artifact_location=f"file:{Path(self.cfg.mlflow.artifacts).resolve()}",
             )
             logging.disable(logging.DEBUG)
-            LOGGER.info(
-                f"Created mlflow experiment {self.cfg.exp_name} with id {experiment_id}"
-            )
+            LOGGER.info(f"Created mlflow experiment {self.cfg.exp_name} with id {experiment_id}")
         except mlflow.exceptions.MlflowException:
             LOGGER.info(f"Using existing mlflow experiment {self.cfg.exp_name}")
             logging.disable(logging.DEBUG)
@@ -268,9 +256,7 @@ class BaseExperiment:
         # create experiment directory
         run_dir = Path(self.cfg.run_dir).resolve()
         if run_dir.exists() and not self.warm_start:
-            raise ValueError(
-                f"Experiment in directory {self.cfg.run_dir} alredy exists. Aborting."
-            )
+            raise ValueError(f"Experiment in directory {self.cfg.run_dir} alredy exists. Aborting.")
         os.makedirs(run_dir, exist_ok=True)
         os.makedirs(os.path.join(run_dir, "models"), exist_ok=True)
 
@@ -342,9 +328,7 @@ class BaseExperiment:
 
     def _init_optimizer(self, param_groups=None):
         if param_groups is None:
-            param_groups = [
-                {"params": self.model.parameters(), "lr": self.cfg.training.lr}
-            ]
+            param_groups = [{"params": self.model.parameters(), "lr": self.cfg.training.lr}]
 
         if self.cfg.training.optimizer == "Adam":
             self.optimizer = torch.optim.Adam(
@@ -395,9 +379,9 @@ class BaseExperiment:
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )
             try:
-                state_dict = torch.load(
-                    model_path, map_location="cpu", weights_only=False
-                )["optimizer"]
+                state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
+                    "optimizer"
+                ]
                 LOGGER.info(f"Loading optimizer from {model_path}")
                 self.optimizer.load_state_dict(state_dict)
             except FileNotFoundError as err:
@@ -411,16 +395,12 @@ class BaseExperiment:
                 self.optimizer,
                 max_lr=self.cfg.training.lr * self.cfg.training.onecycle_max_lr,
                 pct_start=self.cfg.training.onecycle_pct_start,
-                total_steps=int(
-                    self.cfg.training.iterations * self.cfg.training.scheduler_scale
-                ),
+                total_steps=int(self.cfg.training.iterations * self.cfg.training.scheduler_scale),
             )
         elif self.cfg.training.scheduler == "CosineAnnealingLR":
             self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 self.optimizer,
-                T_max=int(
-                    self.cfg.training.iterations * self.cfg.training.scheduler_scale
-                ),
+                T_max=int(self.cfg.training.iterations * self.cfg.training.scheduler_scale),
                 eta_min=self.cfg.training.cosanneal_eta_min,
             )
         elif self.cfg.training.scheduler == "ReduceLROnPlateau":
@@ -442,9 +422,9 @@ class BaseExperiment:
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )
             try:
-                state_dict = torch.load(
-                    model_path, map_location="cpu", weights_only=False
-                )["scheduler"]
+                state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
+                    "scheduler"
+                ]
                 LOGGER.info(f"Loading scheduler from {model_path}")
                 self.scheduler.load_state_dict(state_dict)
             except FileNotFoundError as err:
@@ -527,15 +507,12 @@ class BaseExperiment:
 
             # output
             dt = time.time() - self.training_start_time
-            if (
-                step in [0, 9, 999]
-                or (step + 1) % self.cfg.training.validate_every_n_steps == 0
-            ):
+            if step in [0, 9, 999] or (step + 1) % self.cfg.training.validate_every_n_steps == 0:
                 dt_estimate = dt * self.cfg.training.iterations / (step + 1)
                 LOGGER.info(
-                    f"Finished iteration {step+1} after {dt:.2f}s, "
-                    f"training time estimate: {dt_estimate/60:.2f}min "
-                    f"= {dt_estimate/60**2:.2f}h"
+                    f"Finished iteration {step + 1} after {dt:.2f}s, "
+                    f"training time estimate: {dt_estimate / 60:.2f}min "
+                    f"= {dt_estimate / 60**2:.2f}h"
                 )
 
             if step % len(self.train_loader) == 0:
@@ -549,7 +526,7 @@ class BaseExperiment:
         dt = time.time() - self.training_start_time
         LOGGER.info(
             f"Finished training for {step} iterations = {step / len(self.train_loader):.1f} epochs "
-            f"after {dt/60:.2f}min = {dt/60**2:.2f}h"
+            f"after {dt / 60:.2f}min = {dt / 60**2:.2f}h"
         )
         LOGGER.info(f"Spend {train_time:.2f}s training and {val_time:.2f}s validating")
         if self.cfg.use_mlflow:
@@ -565,9 +542,9 @@ class BaseExperiment:
                 f"model_run{self.cfg.run_idx}_it{smallest_val_loss_step}.pt",
             )
             try:
-                state_dict = torch.load(
-                    model_path, map_location=self.device, weights_only=False
-                )["model"]
+                state_dict = torch.load(model_path, map_location=self.device, weights_only=False)[
+                    "model"
+                ]
                 LOGGER.info(f"Loading model from {model_path}")
                 self.model.load_state_dict(state_dict)
             except FileNotFoundError:
@@ -583,9 +560,7 @@ class BaseExperiment:
         loss.backward()
 
         grad_norm_net = (
-            torch.nn.utils.clip_grad_norm_(self.model.net.parameters(), float("inf"))
-            .cpu()
-            .item()
+            torch.nn.utils.clip_grad_norm_(self.model.net.parameters(), float("inf")).cpu().item()
         )
 
         if self.cfg.training.clip_grad_value is not None:
@@ -695,9 +670,7 @@ class BaseExperiment:
             {
                 "model": self.model.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
-                "scheduler": (
-                    self.scheduler.state_dict() if self.scheduler is not None else None
-                ),
+                "scheduler": (self.scheduler.state_dict() if self.scheduler is not None else None),
                 "ema": self.ema.state_dict() if self.ema is not None else None,
             },
             model_path,

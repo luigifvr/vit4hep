@@ -67,9 +67,7 @@ def eval_calogan_lowlevel(source_array, cfg):
     classifier = DNN(**DNN_kwargs)
     classifier.to(args.device)
     print(classifier)
-    total_parameters = sum(
-        p.numel() for p in classifier.parameters() if p.requires_grad
-    )
+    total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
 
     print(f"{args.mode} has {int(total_parameters)} parameters")
 
@@ -85,17 +83,11 @@ def eval_calogan_lowlevel(source_array, cfg):
         torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device)
     )
 
-    train_dataloader = DataLoader(
-        train_data, batch_size=args.cls_batch_size, shuffle=True
-    )
-    test_dataloader = DataLoader(
-        test_data, batch_size=args.cls_batch_size, shuffle=False
-    )
+    train_dataloader = DataLoader(train_data, batch_size=args.cls_batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=args.cls_batch_size, shuffle=False)
     val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
 
-    train_and_evaluate_cls(
-        classifier, train_dataloader, test_dataloader, optimizer, args
-    )
+    train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
     classifier = load_classifier(classifier, args)
 
     with torch.inference_mode():
