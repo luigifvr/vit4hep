@@ -510,7 +510,7 @@ class LEMURS(BaseExperiment):
             ]
             LOGGER.info(f"Loading energy model from {model_path}")
             self.energy_model.load_state_dict(state_dict)
-        except FileNotFoundError:
-            raise ValueError(f"Cannot load model from {model_path}")
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot load model from {model_path}") from err
 
         self.energy_model.to(self.device, dtype=self.dtype)

@@ -58,7 +58,7 @@ class CaloChallenge(BaseExperiment):
                     kwargs["model_dir"] = self.cfg.run_dir
             self.transforms.append(getattr(transforms, name)(**kwargs))
         LOGGER.info("init_data: list of preprocessing steps:")
-        for idx, transform in enumerate(self.transforms):
+        for _, transform in enumerate(self.transforms):
             LOGGER.info(f"{transform.__class__.__name__}")
 
         self.train_dataset = CaloChallengeDataset(
@@ -352,7 +352,7 @@ class CaloChallenge(BaseExperiment):
             ]
             LOGGER.info(f"Loading energy model from {model_path}")
             self.energy_model.load_state_dict(state_dict)
-        except FileNotFoundError:
-            raise ValueError(f"Cannot load model from {model_path}")
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot load model from {model_path}") from err
 
         self.energy_model.to(self.device, dtype=self.dtype)

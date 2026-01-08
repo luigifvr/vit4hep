@@ -192,7 +192,7 @@ class ResNet(nn.Module):
             )
         )
         self.in_planes = planes * block.expansion
-        for i in range(1, blocks):
+        for _ in range(1, blocks):
             layers.append(block(self.in_planes, planes))
 
         return nn.Sequential(*layers)

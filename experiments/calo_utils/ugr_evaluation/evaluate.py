@@ -1,5 +1,4 @@
 import os
-from glob import glob
 
 import h5py
 import matplotlib.pyplot as plt
@@ -11,7 +10,19 @@ from sklearn.metrics import accuracy_score, roc_auc_score
 from torch.utils.data import DataLoader, TensorDataset
 
 import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
-from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
+from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import (
+    plot_cell_dist,
+    plot_E_layers,
+    plot_ECEtas,
+    plot_ECPhis,
+    plot_ECWidthEtas,
+    plot_ECWidthPhis,
+    plot_Etot_Einc,
+    plot_layer_comparison,
+    plot_sparsity,
+    plot_weighted_depth_a,
+    plot_weighted_depth_r,
+)
 from experiments.calo_utils.ugr_evaluation.resnet import generate_model
 
 torch.set_default_dtype(torch.float64)
@@ -32,7 +43,7 @@ class DNN(torch.nn.Module):
     """
 
     def __init__(self, num_layer, num_hidden, input_dim, dropout_probability=0.0):
-        super(DNN, self).__init__()
+        super().__init__()
 
         self.dpo = dropout_probability
 
@@ -98,7 +109,6 @@ def prepare_high_data_for_classifier(
 ):
     """takes hdf5_file, extracts high-level features, appends label, returns array"""
     E_inc = E_inc_orig.copy()
-    E_tot = hlf_class.GetEtot()
     E_layer = []
     for layer_id in hlf_class.GetElayers():
         E_layer.append(hlf_class.GetElayers()[layer_id].reshape(-1, 1))
@@ -131,11 +141,11 @@ def prepare_high_data_for_classifier(
     return ret
 
 
-def ttv_split(data1, data2, split=np.array([0.6, 0.2, 0.2])):
+def ttv_split(data1, data2, split=[0.6, 0.2, 0.2]):
     """splits data1 and data2 in train/test/val according to split,
     returns shuffled and merged arrays
     """
-    # assert len(data1) == len(data2)
+    split = np.array(split)
     if len(data1) < len(data2):
         data2 = data2[: len(data1)]
     elif len(data1) > len(data2):

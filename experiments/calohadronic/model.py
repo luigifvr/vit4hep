@@ -34,7 +34,7 @@ class CaloHadCFM(CFM):
 
         self.num_patches_per_dim = []
         self.num_patches_per_layer = []
-        for shape, patch_shape in zip(self.list_shape, self.list_patch_shape):
+        for shape, patch_shape in zip(self.list_shape, self.list_patch_shape, strict=True):
             num_patches_dim = (
                 (shape[0] // patch_shape[0]),
                 (shape[1] // patch_shape[1]),
@@ -47,11 +47,11 @@ class CaloHadCFM(CFM):
         assert len(list_shape) == len(
             list_patch_shape
         ), "list_shape and list_patch_shape must have the same length"
-        for i, (s, p) in enumerate(zip(self.list_shape, self.list_patch_shape)):
-            for l, m in zip(s, p):
+        for i, (s, p) in enumerate(zip(self.list_shape, self.list_patch_shape, strict=True)):
+            for L, m in zip(s, p, strict=True):
                 assert (
-                    l % m == 0
-                ), f"Input size ({l}) should be divisible by patch size ({m}) in axis {i}."
+                    L % m == 0
+                ), f"Input size ({L}) should be divisible by patch size ({m}) in axis {i}."
 
         self.net = net
         self.net.num_patches = self.num_patches_per_dim
@@ -63,8 +63,8 @@ class CaloHadCFM(CFM):
             x_split[k] = rearrange(
                 x_split[k],
                 "b (l a r) (p1 p2 p3 c) -> b c (l p1) (a p2) (r p3)",
-                **dict(zip(("l", "a", "r"), self.num_patches_per_dim[k])),
-                **dict(zip(("p1", "p2", "p3"), patch_shape)),
+                **dict(zip(("l", "a", "r"), self.num_patches_per_dim[k], strict=True)),
+                **dict(zip(("p1", "p2", "p3"), patch_shape, strict=True)),
                 c=self.in_channels,
             )
 
@@ -80,7 +80,7 @@ class CaloHadCFM(CFM):
             x_split[k] = rearrange(
                 x_split[k],
                 "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
-                **dict(zip(("p1", "p2", "p3"), self.list_patch_shape[k])),
+                **dict(zip(("p1", "p2", "p3"), self.list_patch_shape[k], strict=True)),
             )
         x = torch.cat(x_split, dim=1)
         return x

@@ -112,8 +112,8 @@ class AllInOneBlock(InvertibleModule):
                 2: F.conv2d,
                 3: F.conv3d,
             }[self.input_rank]
-        except KeyError:
-            raise ValueError(f"Data is {1 + self.input_rank}D. Must be 1D-4D.")
+        except KeyError as err:
+            raise ValueError(f"Data is {1 + self.input_rank}D. Must be 1D-4D.") from err
 
         self.in_channels = channels
         self.clamp = affine_clamping
@@ -124,7 +124,7 @@ class AllInOneBlock(InvertibleModule):
         if permute_soft and channels > 512:
             warnings.warn(
                 "Soft permutation will take a very long time to initialize "
-                f"with {channels} feature channels. Consider using hard permutation instead."
+                f"with {channels} feature channels. Consider using hard permutation instead.", stacklevel=2
             )
 
         # global_scale is used as the initial value for the global affine scale
@@ -207,7 +207,7 @@ class AllInOneBlock(InvertibleModule):
                 - 2 * torch.ger(vk, vk) / torch.dot(vk, vk),
             )
 
-        for i in range(self.input_rank):
+        for _ in range(self.input_rank):
             w = w.unsqueeze(-1)
         return w
 

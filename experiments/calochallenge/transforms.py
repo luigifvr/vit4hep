@@ -3,18 +3,9 @@ from itertools import pairwise
 
 import numpy as np
 import torch
-import torch.distributions as dist
 import torch.nn.functional as F
 
-from experiments.calo_utils.ugr_evaluation import *
 from experiments.calo_utils.ugr_evaluation import XMLHandler
-
-
-class LogUniform(dist.TransformedDistribution):
-    def __init__(self, lb, ub):
-        super(LogUniform, self).__init__(
-            dist.Uniform(lb.log(), ub.log()), dist.ExpTransform()
-        )
 
 
 def logit(array, alpha=1.0e-6, inv=False):
@@ -75,56 +66,6 @@ class GlobalStandardizeFromFile:
             transformed = (shower - self.mean.to(shower.device)) / self.std.to(
                 shower.device
             )
-        return transformed, energy
-
-
-class StandardizeVoxelsFromFile:
-    """
-    Standardize features
-        mean_path: path to `.npy` file containing means of the features
-        std_path: path to `.npy` file containing standard deviations of the features
-        create: whether or not to calculate and save mean/std based on first call
-    """
-
-    def __init__(self, n_voxels, model_dir):
-
-        self.model_dir = model_dir
-        self.mean_path = os.path.join(model_dir, "means.npy")
-        self.std_path = os.path.join(model_dir, "stds.npy")
-
-        self.dtype = torch.get_default_dtype()
-        self.n_voxels = n_voxels
-        try:
-            # load from file
-            self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
-            self.std = torch.from_numpy(np.load(self.std_path)).to(self.dtype)
-            self.written = True
-        except FileNotFoundError:
-            self.written = False
-
-    def write(self):
-        np.save(self.mean_path, self.mean.detach().cpu().numpy())
-        np.save(self.std_path, self.std.detach().cpu().numpy())
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        voxels = shower[:, : self.n_voxels]
-        us = shower[:, self.n_voxels :]
-        if rev:
-            trafo_voxels = voxels * self.std.to(shower.device) + self.mean.to(
-                shower.device
-            )
-            transformed = torch.cat((trafo_voxels, us), dim=1)
-        else:
-            if not self.written:
-                self.mean = voxels.mean(0)
-                self.std = voxels.std(0)
-                if rank == 0:
-                    self.write()
-                self.written = True
-            trafo_voxels = (voxels - self.mean.to(shower.device)) / self.std.to(
-                shower.device
-            )
-            transformed = torch.cat((trafo_voxels, us), dim=1)
         return transformed, energy
 
 
@@ -322,35 +263,6 @@ class ExclusiveLogitTransform:
         return transformed, energy
 
 
-class RegularizeLargeLogit:
-    def __init__(self, a, b, exclusions=None, cut=False):
-        self.a = a
-        self.b = b
-        self.func = torch.distributions.Uniform(
-            torch.tensor(self.a), torch.tensor(self.b)
-        )
-        self.exclusions = exclusions
-        self.cut = cut
-        self.u_transform = True
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        if rev:
-            mask = shower > 1 - self.b
-            if self.exclusions:
-                mask[:, self.exclusions] = False
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 1.0
-        else:
-            transformed = shower
-            mask = shower >= 1.0
-            noise = self.func.sample(shower.shape).to(shower.dtype)
-            if self.exclusions:
-                noise[:, self.exclusions] = 0.0
-            transformed[mask] = (shower - noise.to(shower.device))[mask]
-        return transformed, energy
-
-
 class SelectiveUniformNoise:
     """
     Add noise to input data with the option to exlude some features
@@ -469,13 +381,13 @@ class NormalizeByElayer:
 
             # Normalize each layer and multiply it with its original energy
             transformed = torch.zeros_like(shower)
-            for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
+            for L, (start, end) in enumerate(pairwise(self.layer_boundaries)):
                 layer = shower[:, start:end]  # select layer
                 layer /= layer.sum(-1, keepdims=True) + self.eps  # normalize to unity
                 mask = layer <= self.cut
                 layer[mask] = 0.0  # apply normalized cut
                 transformed[:, start:end] = (
-                    layer * layer_Es[:, [l]]
+                    layer * layer_Es[:, [L]]
                 )  # scale to layer energy
 
         else:
@@ -489,9 +401,9 @@ class NormalizeByElayer:
 
             # compute generalized extra dimensions
             extra_dims = [torch.sum(layer_Es, dim=1, keepdim=True) / energy]
-            for l in range(layer_Es.shape[1] - 1):
-                remaining_E = torch.sum(layer_Es[:, l:], dim=1, keepdim=True)
-                extra_dim = layer_Es[:, [l]] / (remaining_E + self.eps)
+            for L in range(layer_Es.shape[1] - 1):
+                remaining_E = torch.sum(layer_Es[:, L:], dim=1, keepdim=True)
+                extra_dim = layer_Es[:, [L]] / (remaining_E + self.eps)
                 extra_dims.append(extra_dim)
             extra_dims = torch.cat(extra_dims, dim=1)
 
@@ -524,9 +436,9 @@ class AddAngularBins:
             new_n_voxels = self.new_layer_boundaries[-1]
             shower, us = shower[:, :new_n_voxels], shower[:, new_n_voxels:]
             transformed = []
-            for l, (start, end) in enumerate(pairwise(self.new_layer_boundaries)):
-                alpha_bins = self.num_bins[l]
-                add_alpha_bins = self.add_bins[l] // alpha_bins
+            for L, (start, end) in enumerate(pairwise(self.new_layer_boundaries)):
+                alpha_bins = self.num_bins[L]
+                add_alpha_bins = self.add_bins[L] // alpha_bins
                 layer = shower[:, start:end]
                 layer, _ = layer.reshape(
                     shower.shape[0], -1, alpha_bins, add_alpha_bins
@@ -542,9 +454,9 @@ class AddAngularBins:
             self.new_layer_boundaries = [
                 0,
             ]
-            for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
-                alpha_bins = self.num_bins[l]
-                add_alpha_bins = self.add_bins[l] // alpha_bins - 1
+            for L, (start, end) in enumerate(pairwise(self.layer_boundaries)):
+                alpha_bins = self.num_bins[L]
+                add_alpha_bins = self.add_bins[L] // alpha_bins - 1
                 layer = shower[:, start:end].reshape(shower.shape[0], -1, alpha_bins)
                 pad_left = add_alpha_bins // 2
                 pad_right = add_alpha_bins - add_alpha_bins // 2
@@ -554,7 +466,7 @@ class AddAngularBins:
 
                 transformed.append(layer)
                 self.new_layer_boundaries.append(
-                    self.new_layer_boundaries[l] + layer.shape[-1]
+                    self.new_layer_boundaries[L] + layer.shape[-1]
                 )
             transformed = torch.cat(transformed, dim=-1).to(
                 dtype=shower.dtype, device=shower.device

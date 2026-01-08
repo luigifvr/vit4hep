@@ -157,8 +157,8 @@ class BaseExperiment:
                         model_path, map_location="cpu", weights_only=False
                     )["ema"]
                     self.ema.load_state_dict(state_dict)
-            except FileNotFoundError:
-                raise ValueError(f"Cannot load model from {model_path}")
+            except FileNotFoundError as err:
+                raise ValueError(f"Cannot load model from {model_path}") from err
 
         self.model.to(self.device, dtype=self.dtype)
         if self.ema is not None:
@@ -221,7 +221,7 @@ class BaseExperiment:
 
             # only use mlflow if save=True
             self.cfg.use_mlflow = (
-                False if self.cfg.save == False else self.cfg.use_mlflow
+                False if not self.cfg.save else self.cfg.use_mlflow
             )
 
         # set seed
@@ -282,7 +282,7 @@ class BaseExperiment:
             path_code = os.path.join(self.cfg.base_dir, "nn")
             path_experiment = os.path.join(self.cfg.base_dir, "experiments")
             for path in [path_code, path_experiment]:
-                for root, dirs, files in os.walk(path):
+                for root, _, files in os.walk(path):
                     for file in files:
                         file_path = os.path.join(root, file)
                         zipf.write(file_path, os.path.relpath(file_path, path))
@@ -400,8 +400,8 @@ class BaseExperiment:
                 )["optimizer"]
                 LOGGER.info(f"Loading optimizer from {model_path}")
                 self.optimizer.load_state_dict(state_dict)
-            except FileNotFoundError:
-                raise ValueError(f"Cannot load optimizer from {model_path}")
+            except FileNotFoundError as err:
+                raise ValueError(f"Cannot load optimizer from {model_path}") from err
 
     def _init_scheduler(self):
         if self.cfg.training.scheduler is None:
@@ -447,8 +447,8 @@ class BaseExperiment:
                 )["scheduler"]
                 LOGGER.info(f"Loading scheduler from {model_path}")
                 self.scheduler.load_state_dict(state_dict)
-            except FileNotFoundError:
-                raise ValueError(f"Cannot load scheduler from {model_path}")
+            except FileNotFoundError as err:
+                raise ValueError(f"Cannot load scheduler from {model_path}") from err
 
     def train(self):
         # performance metrics
@@ -487,8 +487,7 @@ class BaseExperiment:
             set_epoch = getattr(self.train_loader.sampler, "set_epoch", lambda _: None)
             while True:
                 set_epoch(epoch)
-                for x in iterable:
-                    yield x
+                yield from iterable
                 epoch += 1
 
         iterator = iter(cycle(self.train_loader))
@@ -647,7 +646,7 @@ class BaseExperiment:
 
     def _validate(self, step):
         losses = []
-        metrics = self._init_metrics()
+        self._init_metrics()
 
         self.model.eval()
         with torch.no_grad():

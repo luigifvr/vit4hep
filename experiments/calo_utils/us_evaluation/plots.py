@@ -21,7 +21,7 @@ def plot_ui_dists(
     """
 
     # iterate layers
-    for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T)):
+    for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T, strict=True)):
 
         # create figure and subaxes
         fig, ax = plt.subplots(

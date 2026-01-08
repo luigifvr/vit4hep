@@ -53,8 +53,8 @@ class CaloHadronicFT(CaloHadronic):
             state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
                 "model"
             ]
-        except FileNotFoundError:
-            raise ValueError(f"Cannot load model from {model_path}")
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot load model from {model_path}") from err
         LOGGER.info(f"Loading pretrained model from {model_path}")
         state_dict = remove_module_from_state_dict(state_dict)
         self.model.load_state_dict(state_dict)
@@ -170,14 +170,13 @@ class CaloHadronicFT(CaloHadronic):
     def _init_optimizer(self):
         # collect parameter lists
         if self.world_size > 1:
-            params_embedder = list(
-                self.model.net.module.x_embedder.parameters()
-            ) + list(self.model.net.module.c_embedder.parameters())
-            +(
-                +[self.model.net.module.pos_embed_freqs]
-                if self.model.net.module.learn_pos_embed
-                else []
-            )
+            params_embedder = (
+            list(self.model.net.module.x_embedder.parameters()) 
+            + list(self.model.net.module.c_embedder.parameters())
+            + [self.model.net.module.pos_embed_freqs]
+            if self.model.net.module.learn_pos_embed
+            else []
+        )
 
             params_backbone = list(
                 self.model.net.module.t_embedder.parameters()

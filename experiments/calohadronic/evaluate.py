@@ -6,7 +6,6 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
 from experiments.calo_utils.ugr_evaluation.evaluate import (
     DNN,
     evaluate_cls,
@@ -14,10 +13,7 @@ from experiments.calo_utils.ugr_evaluation.evaluate import (
     train_and_evaluate_cls,
     ttv_split,
 )
-from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
-from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import (
-    _separation_power,
-)
+from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import _separation_power, dup
 from experiments.calohadronic.utils import load_data
 from experiments.logger import LOGGER
 

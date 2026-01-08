@@ -4,7 +4,7 @@ import h5py
 import torch
 from torch.utils.data import Dataset
 
-from experiments.lemurs.transforms import *
+from experiments.lemurs.transforms import *  # noqa: F403
 from experiments.lemurs.utils import load_data
 from experiments.logger import LOGGER
 

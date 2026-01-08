@@ -95,11 +95,11 @@ class HighLevelFeatures:
         total_energy = 0.0
         n_layers = len(self.relevantLayers)
         fraction = int(n_layers / ngroups)
-        for l in self.relevantLayers[k * fraction : (k + 1) * fraction]:
-            data_l = energy_calo[:, self.bin_edges[l] : self.bin_edges[l + 1]]
+        for L in self.relevantLayers[k * fraction : (k + 1) * fraction]:
+            data_l = energy_calo[:, self.bin_edges[L] : self.bin_edges[L + 1]]
             energy_sum = data_l[:, edge_idx :: (len(self.r_edges[0]) - 1)].sum(axis=-1)
             total_energy += energy_sum
-            weighted_s += self._calculate_WeightedDepth(energy_sum, l)
+            weighted_s += self._calculate_WeightedDepth(energy_sum, L)
         return weighted_s / (total_energy + 1.0e-8)
 
     def CalculateWeightedDepthR(self, energy_calo, edge_idx, ngroups=1, k=0):
@@ -108,8 +108,8 @@ class HighLevelFeatures:
         total_energy_r = 0.0
         n_layers = len(self.relevantLayers)
         fraction = int(n_layers / ngroups)
-        for l in self.relevantLayers[k * fraction : (k + 1) * fraction]:
-            data_l = energy_calo[:, self.bin_edges[l] : self.bin_edges[l + 1]]
+        for L in self.relevantLayers[k * fraction : (k + 1) * fraction]:
+            data_l = energy_calo[:, self.bin_edges[L] : self.bin_edges[L + 1]]
             energy_sum = data_l[
                 :,
                 edge_idx
@@ -118,7 +118,7 @@ class HighLevelFeatures:
                 - 1,
             ].sum(axis=-1)
             total_energy_r += energy_sum
-            weighted_r += self._calculate_WeightedDepth(energy_sum, l)
+            weighted_r += self._calculate_WeightedDepth(energy_sum, L)
         return weighted_r / (total_energy_r + 1.0e-8)
 
     def _calculate_Eradial(self, energy_calo, n):
@@ -130,8 +130,8 @@ class HighLevelFeatures:
             layer_sum += angular_sum
         return layer_sum
 
-    def GetGroupedWeightedDepths(self, energy_calo, l=5):
-        n_groups = len(self.relevantLayers) / l
+    def GetGroupedWeightedDepths(self, energy_calo, L=5):
+        n_groups = len(self.relevantLayers) / L
         j = 0
         for k in range(int(n_groups)):
             for n in range(len(self.r_edges[0]) - 1):
@@ -163,30 +163,30 @@ class HighLevelFeatures:
         """Computes all high-level features for the given data"""
         self.E_tot = data.sum(axis=-1)
 
-        for l in self.relevantLayers:
-            E_layer = data[:, self.bin_edges[l] : self.bin_edges[l + 1]].sum(axis=-1)
-            self.E_layers[l] = E_layer
+        for L in self.relevantLayers:
+            E_layer = data[:, self.bin_edges[L] : self.bin_edges[L + 1]].sum(axis=-1)
+            self.E_layers[L] = E_layer
 
-            self.sparsity[l] = self._calculate_sparsity(
-                data[:, self.bin_edges[l] : self.bin_edges[l + 1]]
+            self.sparsity[L] = self._calculate_sparsity(
+                data[:, self.bin_edges[L] : self.bin_edges[L + 1]]
             )
 
-        for l in self.relevantLayers:
+        for L in self.relevantLayers:
 
-            if l in self.layersBinnedInAlpha:
+            if L in self.layersBinnedInAlpha:
                 (
-                    self.EC_etas[l],
-                    self.EC_phis[l],
-                    self.width_etas[l],
-                    self.width_phis[l],
+                    self.EC_etas[L],
+                    self.EC_phis[L],
+                    self.width_etas[L],
+                    self.width_phis[L],
                 ) = self.GetECandWidths(
-                    self.eta_all_layers[l],
-                    self.phi_all_layers[l],
-                    data[:, self.bin_edges[l] : self.bin_edges[l + 1]],
+                    self.eta_all_layers[L],
+                    self.phi_all_layers[L],
+                    data[:, self.bin_edges[L] : self.bin_edges[L + 1]],
                 )
 
-                self.sparsity[l] = self._calculate_sparsity(
-                    data[:, self.bin_edges[l] : self.bin_edges[l + 1]]
+                self.sparsity[L] = self._calculate_sparsity(
+                    data[:, self.bin_edges[L] : self.bin_edges[L + 1]]
                 )
         self.GetWeightedDepths(data)
         self.GetGroupedWeightedDepths(data)
@@ -391,7 +391,6 @@ class HighLevelFeatures:
 
     def DrawSingleShower(self, data, filename=None, title=None):
         """plots all provided showers after each other"""
-        ret = []
         if len(data.shape) == 1:
             data = data.reshape(1, -1)
         for num, shower in enumerate(data):

@@ -170,12 +170,12 @@ class NormalizeLayerEnergyGAN:
             layer_Es.append(total_E - cum_sum)
             layer_Es = torch.vstack(layer_Es).T
 
-            for l, key in enumerate(self.layer_keys):
+            for L, key in enumerate(self.layer_keys):
                 layer = data_dict[key].clone()  # select layer
                 layer /= layer.sum(-1, keepdims=True) + self.eps  # normalize to unity
                 mask = layer <= self.cut
                 layer[mask] = 0.0  # apply normalized cut
-                data_dict[key] = layer * layer_Es[:, [l]]  # scale to layer energy
+                data_dict[key] = layer * layer_Es[:, [L]]  # scale to layer energy
         else:
             # compute layer energies
             layer_Es = []
@@ -187,9 +187,9 @@ class NormalizeLayerEnergyGAN:
 
             # compute generalized extra dimensions
             extra_dims = [torch.sum(layer_Es, dim=1, keepdim=True) / energy]
-            for l in range(layer_Es.shape[1] - 1):
-                remaining_E = torch.sum(layer_Es[:, l:], dim=1, keepdim=True)
-                extra_dim = layer_Es[:, [l]] / (remaining_E + self.eps)
+            for L in range(layer_Es.shape[1] - 1):
+                remaining_E = torch.sum(layer_Es[:, L:], dim=1, keepdim=True)
+                extra_dim = layer_Es[:, [L]] / (remaining_E + self.eps)
                 extra_dims.append(extra_dim)
             extra_dims = torch.cat(extra_dims, dim=1)
             data_dict["extra_dims"] = extra_dims

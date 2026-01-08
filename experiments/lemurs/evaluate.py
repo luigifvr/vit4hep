@@ -4,6 +4,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from matplotlib.backends.backend_pdf import PdfPages
 from torch.utils.data import DataLoader, TensorDataset
 
 import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
@@ -14,7 +15,22 @@ from experiments.calo_utils.ugr_evaluation.evaluate import (
     train_and_evaluate_cls,
     ttv_split,
 )
-from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
+from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import (
+    dup,
+    plot_cell_dist,
+    plot_E_layers,
+    plot_ECEtas,
+    plot_ECPhis,
+    plot_ECWidthEtas,
+    plot_ECWidthPhis,
+    plot_Etot_Einc_scaled,
+    plot_layer_comparison,
+    plot_r_profile,
+    plot_sparsity,
+    plot_weighted_depth_a,
+    plot_weighted_depth_r,
+    plot_z_profile,
+)
 from experiments.calo_utils.ugr_evaluation.resnet import generate_model
 from experiments.lemurs.utils import (
     prepare_high_data_for_classifier,

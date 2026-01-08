@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 
-from experiments.calochallenge.transforms import *
+from experiments.calochallenge.transforms import *  # noqa: F403
 from experiments.calochallenge.utils import get_energy_and_sorted_layers, load_data
 from experiments.logger import LOGGER
 

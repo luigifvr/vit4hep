@@ -4,7 +4,7 @@ import h5py
 import torch
 from torch.utils.data import Dataset
 
-from experiments.calohadronic.transforms import *
+from experiments.calohadronic.transforms import *  # noqa: F403
 from experiments.calohadronic.utils import load_data
 from experiments.logger import LOGGER
 

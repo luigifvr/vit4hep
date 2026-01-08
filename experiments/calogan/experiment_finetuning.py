@@ -45,8 +45,8 @@ class CaloGANFTCFM(CaloGAN):
             state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
                 "model"
             ]
-        except FileNotFoundError:
-            raise ValueError(f"Cannot load model from {model_path}")
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot load model from {model_path}") from err
         LOGGER.info(f"Loading pretrained model from {model_path}")
         state_dict = remove_module_from_state_dict(state_dict)
         self.model.load_state_dict(state_dict)
@@ -139,9 +139,9 @@ class CaloGANFTCFM(CaloGAN):
         # define the positional embedding
         if self.model.net.learn_pos_embed:
             if self.cfg.finetuning.reinitialize_pos_embedding:
-                l, a, r = self.model_num_patches
+                L, a, r = self.model_num_patches
                 self.model.net.lgrid = (
-                    torch.arange(l, device=self.device, dtype=self.dtype) / l
+                    torch.arange(L, device=self.device, dtype=self.dtype) / L
                 )
                 self.model.net.agrid = (
                     torch.arange(a, device=self.device, dtype=self.dtype) / a
@@ -170,11 +170,10 @@ class CaloGANFTCFM(CaloGAN):
     def _init_optimizer(self):
         # collect parameter lists
         if self.world_size > 1:
-            params_embedder = list(
-                self.model.net.module.x_embedder.parameters()
-            ) + list(self.model.net.module.c_embedder.parameters())
-            +(
-                +[self.model.net.module.pos_embed_freqs]
+            params_embedder = (
+                list(self.model.net.module.x_embedder.parameters())
+                + list(self.model.net.module.c_embedder.parameters())
+                + [self.model.net.module.pos_embed_freqs]
                 if self.model.net.module.learn_pos_embed
                 else []
             )

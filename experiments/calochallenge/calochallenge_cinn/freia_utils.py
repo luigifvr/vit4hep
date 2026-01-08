@@ -49,19 +49,18 @@ def get_vit_block_kwargs(
     """Returns the class and keyword arguments for different coupling block types"""
 
     list_block_kwargs = []
+    spatial_patch_dim = int(math.prod(patch_shape) / 2)
+    patch_dim = int(math.prod(patch_shape))
+    num_patches = [s // p for s, p in zip(shape, patch_shape, strict=False)]
+    prod_num_patches = int(math.prod(num_patches))
     for spatial_split in is_spatial:
         block_kwargs = {}
         if spatial_split:
-            spatial_patch_dim = int(math.prod(patch_shape) / 2)
-            spatial_num_patches = int(
-                math.prod([s // p for s, p in zip(shape, patch_shape)])
-            )
-
             def func(x_in, x_out):
                 subnet = SubnetViT(
                     x_out=x_out,
                     patch_dim=spatial_patch_dim,
-                    prod_num_patches=spatial_num_patches,
+                    prod_num_patches=prod_num_patches,
                     **vit_kwargs,
                 )
                 return subnet
@@ -70,10 +69,6 @@ def get_vit_block_kwargs(
             block_kwargs["spatial"] = True
             block_kwargs.update(cinn_kwargs)
         else:
-            patch_dim = int(math.prod(patch_shape))
-            num_patches = [s // p for s, p in zip(shape, patch_shape)]
-            prod_num_patches = int(math.prod(num_patches) / 2)
-
             def func(x_in, x_out):
                 subnet = SubnetViT(
                     x_out=x_out,

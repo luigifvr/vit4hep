@@ -11,10 +11,12 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
 from matplotlib.backends.backend_pdf import PdfPages
 
-dup = lambda a: np.append(a, a[-1])
+
+def dup(a):
+    return np.append(a, a[-1])
+
 # settings for the various plots. These should be larger than the number of hlf files
 colors = ["#0000cc", "#b40000"]
 
@@ -33,7 +35,6 @@ def plot_layer_comparison(
         arg.output_dir,
         f"Average_Layer_dataset_{arg.dataset}_{input_name}.pdf",
     )
-    num_layer = len(reference_class.relevantLayers)
     vmax = np.max(reference_data)
     layer_boundaries = np.unique(reference_class.bin_edges)
     with PdfPages(filename) as pdf:
@@ -133,9 +134,9 @@ def plot_Etot_Einc_discrete(hlf_class, reference_class, arg):
             f.write(f"Etot / Einc at E = {energy}: \n")
             f.write(str(seps))
             f.write("\n\n")
-        h, l = ax.get_legend_handles_labels()
+        h, L = ax.get_legend_handles_labels()
     ax = plt.subplot(4, 4, 16)
-    ax.legend(h, l, loc="center", fontsize=16)
+    ax.legend(h, L, loc="center", fontsize=16)
     ax.axis("off")
     filename = os.path.join(arg.output_dir, f"Etot_Einc_dataset_{arg.dataset}_E_i.pdf")
     plt.savefig(filename, dpi=300, format="pdf")
@@ -1608,23 +1609,23 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             plt.close()
 
 
-def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label, l=1):
+def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label, L=1):
     """Plot weighted depth"""
     filename = os.path.join(
         arg.output_dir,
-        f"Weighted_Depth_slice_dataset_{arg.dataset}_groups_{l}.pdf",
+        f"Weighted_Depth_slice_dataset_{arg.dataset}_groups_{L}.pdf",
     )
     g = 0
     with PdfPages(filename) as pdf:
         func_ref = (
             reference_hlf.GetWeightedDepthR()
-            if l == 1
+            if L == 1
             else reference_hlf.GetGroupedWeightedDepthR()
         )
         for n, key in enumerate(func_ref.keys()):
             bins = np.linspace(
-                g * len(reference_hlf.relevantLayers) / l,
-                (g + 1) * len(reference_hlf.relevantLayers) / l,
+                g * len(reference_hlf.relevantLayers) / L,
+                (g + 1) * len(reference_hlf.relevantLayers) / L,
                 40,
             )
             fig, ax = plt.subplots(
@@ -1678,10 +1679,10 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
                 fmt=".",
                 capsize=2,
             )
-            for j, file in enumerate(hlfs):
+            for j in range(len(hlfs)):
                 func_hlf = (
                     hlfs[j].GetWeightedDepthR()
-                    if l == 1
+                    if L == 1
                     else hlfs[j].GetGroupedWeightedDepthR()
                 )
                 counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
@@ -1831,25 +1832,25 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
 
 
 def plot_weighted_depth_a(
-    hlfs, reference_class, arg, labels, input_names, p_label, l=1
+    hlfs, reference_class, arg, labels, input_names, p_label, L=1
 ):
     """Plot weighted depth"""
     g = 0
     filename = os.path.join(
         arg.output_dir,
-        f"Weighted_Depth_ring_dataset_{arg.dataset}_groups_{l}.pdf",
+        f"Weighted_Depth_ring_dataset_{arg.dataset}_groups_{L}.pdf",
     )
 
     with PdfPages(filename) as pdf:
         func_ref = (
             reference_class.GetWeightedDepthA()
-            if l == 1
+            if L == 1
             else reference_class.GetGroupedWeightedDepthA()
         )
         for n, key in enumerate(func_ref.keys()):
             bins = np.linspace(
-                g * len(reference_class.relevantLayers) / l,
-                (g + 1) * len(reference_class.relevantLayers) / l,
+                g * len(reference_class.relevantLayers) / L,
+                (g + 1) * len(reference_class.relevantLayers) / L,
                 40,
             )
             fig, ax = plt.subplots(
@@ -1903,10 +1904,10 @@ def plot_weighted_depth_a(
                 fmt=".",
                 capsize=2,
             )
-            for j, file in enumerate(hlfs):
+            for j in range(len(hlfs)):
                 func_hlf = (
                     hlfs[j].GetWeightedDepthA()
-                    if l == 1
+                    if L == 1
                     else hlfs[j].GetGroupedWeightedDepthA()
                 )
                 counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
@@ -2532,9 +2533,6 @@ def plot_r_profile(hlfs, reference_class, arg, labels, input_names, p_label):
                 color=colors[i],
                 alpha=0.2,
             )
-
-            delta = np.fabs(ratio - 1) * 100
-            delta_err = ratio_err * 100
 
             seps = _separation_power(ref_means, gen_means, None)
             print(f"Separation power of r profile: {seps}")

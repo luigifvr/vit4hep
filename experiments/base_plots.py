@@ -20,7 +20,7 @@ def plot_loss(file, losses, lr=None, labels=None, logy=True):
     labels = [None for _ in range(len(losses))] if labels is None else labels
     iterations = range(1, len(losses[0]) + 1)
     fig, ax = plt.subplots()
-    for i, loss, label in zip(range(len(losses)), losses, labels):
+    for _, loss, label in zip(range(len(losses)), losses, labels, strict=False):
         if len(loss) == len(iterations):
             its = iterations
         else:
@@ -44,7 +44,7 @@ def plot_loss(file, losses, lr=None, labels=None, logy=True):
 def plot_metric(file, metrics, metric_label, labels=None, logy=False):
     labels = [None for _ in range(len(metrics))] if labels is None else labels
     fig, ax = plt.subplots()
-    for i, metric, label in zip(range(len(metrics)), metrics, labels):
+    for _, metric, label in zip(range(len(metrics)), metrics, labels, strict=False):
         iterations = range(1, len(metric) + 1)
         if len(metric) == len(iterations):
             its = iterations
