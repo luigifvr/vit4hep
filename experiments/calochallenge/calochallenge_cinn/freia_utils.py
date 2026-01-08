@@ -1,7 +1,7 @@
 import math
 
 from FrEIA.modules import PermuteRandom
-from nn.inn.subnets import SubnetViT, SubnetMLP
+
 from nn.inn.permute import PermuteRandomS1
 from nn.inn.rqs_nflows import (
     CaloRationalQuadraticSplineBlock,
@@ -9,6 +9,7 @@ from nn.inn.rqs_nflows import (
     SimpleRationalQuadraticSplineBlock,
 )
 from nn.inn.rqs_v2 import RationalQuadraticSpline
+from nn.inn.subnets import SubnetMLP, SubnetViT
 
 
 def get_coupling_block(coupling_block):

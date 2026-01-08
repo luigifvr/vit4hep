@@ -1,23 +1,24 @@
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import h5py
-import torch
-from torch.utils.data import TensorDataset, DataLoader
 
-from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+
 import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
-from experiments.calo_utils.ugr_evaluation.resnet import generate_model
 from experiments.calo_utils.ugr_evaluation.evaluate import (
     DNN,
-    ttv_split,
+    evaluate_cls,
     load_classifier,
     train_and_evaluate_cls,
-    evaluate_cls,
+    ttv_split,
 )
+from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
+from experiments.calo_utils.ugr_evaluation.resnet import generate_model
 from experiments.lemurs.utils import (
-    prepare_low_data_for_classifier,
     prepare_high_data_for_classifier,
+    prepare_low_data_for_classifier,
 )
 from experiments.logger import LOGGER
 
@@ -33,12 +34,12 @@ def extract_shower_and_energy(
     given_file, which, max_len=-1, energy_bin=None, theta_bin=None, phi_bin=None
 ):
     """reads .hdf5 file and returns samples and their energy"""
-    print("Extracting showers from {} file ...".format(which))
+    print(f"Extracting showers from {which} file ...")
     shower = given_file["showers"][:]
     energy = given_file["incident_energy"][:]
     theta = given_file["incident_theta"][:]
     phi = given_file["incident_phi"][:]
-    print("Extracting showers from {} file: DONE.\n".format(which))
+    print(f"Extracting showers from {which} file: DONE.\n")
     if energy_bin is not None:
         energy_mask = (energy >= energy_bin[0]) & (energy < energy_bin[1])
     else:
@@ -343,7 +344,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
     np.nan_to_num(sample, copy=False, nan=0.0, neginf=0.0, posinf=0.0)
 
     # Using a cut everywhere
-    print("Using Everywhere a cut of {}".format(args.cut))
+    print(f"Using Everywhere a cut of {args.cut}")
     sample[sample < args.cut] = 0.0
     sample_conds = np.concatenate((energy, theta, phi), axis=1)
 
@@ -396,7 +397,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
         hlf.DrawAverageShower(
             sample,
             filename=os.path.join(
-                args.output_dir, "average_shower_dataset_{}.png".format(args.dataset)
+                args.output_dir, f"average_shower_dataset_{args.dataset}.png"
             ),
             title="Shower average",
         )
@@ -408,7 +409,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
             reference_hlf.avg_shower,
             filename=os.path.join(
                 args.output_dir,
-                "reference_average_shower_dataset_{}.png".format(args.dataset),
+                f"reference_average_shower_dataset_{args.dataset}.png",
             ),
             title="Shower average reference dataset",
         )
@@ -418,7 +419,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
         hlf.DrawSingleShower(
             sample[:5],
             filename=os.path.join(
-                args.output_dir, "single_shower_dataset_{}.png".format(args.dataset)
+                args.output_dir, f"single_shower_dataset_{args.dataset}.png"
             ),
             title="Single shower",
         )
@@ -426,7 +427,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
             reference_shower[:5],
             filename=os.path.join(
                 args.output_dir,
-                "reference_single_shower_dataset_{}.png".format(args.dataset),
+                f"reference_single_shower_dataset_{args.dataset}.png",
             ),
             title="Reference single shower",
         )
@@ -436,12 +437,10 @@ def run_from_py(sample, energy, theta, phi, cfg):
         target_energies = 10 ** np.linspace(3, 6, 4)
         plot_title = []
         for i in range(3, 7):
-            plot_title.append(
-                "shower average for E in [{}, {}] MeV".format(10**i, 10 ** (i + 1))
-            )
+            plot_title.append(f"shower average for E in [{10**i}, {10 ** (i + 1)}] MeV")
         for i in range(len(target_energies) - 1):
-            filename = "average_shower_dataset_{}_E_{}.png".format(
-                args.dataset, target_energies[i]
+            filename = (
+                f"average_shower_dataset_{args.dataset}_E_{target_energies[i]}.png"
             )
             which_showers = (
                 (energy >= target_energies[i]) & (energy < target_energies[i + 1])
@@ -486,9 +485,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
 
         if args.mode in ["all", "no-cls", "hist-chi", "hist"]:
             with open(
-                os.path.join(
-                    args.output_dir, "histogram_chi2_{}.txt".format(args.dataset)
-                ),
+                os.path.join(args.output_dir, f"histogram_chi2_{args.dataset}.txt"),
                 "w",
             ) as f:
                 f.write(
@@ -567,7 +564,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
 
         print(result_str)
         with open(
-            os.path.join(args.output_dir, "fpd_kpd_{}.txt".format(args.dataset)), "w"
+            os.path.join(args.output_dir, f"fpd_kpd_{args.dataset}.txt"), "w"
         ) as f:
             f.write(result_str)
 
@@ -589,7 +586,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
 
         print("Calculating high-level features for classifier ...")
 
-        print("Using {} as cut for the showers ...".format(args.cut))
+        print(f"Using {args.cut} as cut for the showers ...")
         # set a cut on low energy voxels !only low level!
         cut = args.cut
 
@@ -648,7 +645,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
             args.device = torch.device(
                 "cuda:" + str(args.which_cuda) if torch.cuda.is_available() else "cpu"
             )
-            print("Using {}".format(args.device))
+            print(f"Using {args.device}")
 
             if key in ["all", "cls-low", "cls-low-normed", "cls-high"]:
                 # set up DNN classifier
@@ -672,7 +669,7 @@ def run_from_py(sample, energy, theta, phi, cfg):
                 p.numel() for p in classifier.parameters() if p.requires_grad
             )
 
-            LOGGER.info("{} has {} parameters".format(args.mode, int(total_parameters)))
+            LOGGER.info(f"{args.mode} has {int(total_parameters)} parameters")
 
             if key == "cls-resnet":
                 optimizer = torch.optim.AdamW(
@@ -733,15 +730,15 @@ def run_from_py(sample, energy, theta, phi, cfg):
                     calibration_data=test_dataloader,
                 )
             LOGGER.info("Final result of classifier test (AUC / JSD):")
-            LOGGER.info("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+            LOGGER.info(f"{eval_auc:.4f} / {eval_JSD:.4f}")
             with open(
                 os.path.join(
                     args.output_dir,
-                    "classifier_{}_{}_{}.txt".format(args.mode, key, args.dataset),
+                    f"classifier_{args.mode}_{key}_{args.dataset}.txt",
                 ),
                 "a",
             ) as f:
                 f.write(
                     "Final result of classifier test (AUC / JSD):\n"
-                    + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
+                    + f"{eval_auc:.4f} / {eval_JSD:.4f}\n\n"
                 )

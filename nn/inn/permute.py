@@ -1,18 +1,18 @@
-from FrEIA.modules import InvertibleModule
-
-from typing import Union, Iterable, Tuple
+from collections.abc import Iterable
+from typing import Tuple, Union
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from FrEIA.modules import InvertibleModule
 
 
 class PermuteRandomS1(InvertibleModule):
     """Constructs a random permutation, that stays fixed during training.
     Permutes along the first (channel-) dimension for multi-dimenional tensors."""
 
-    def __init__(self, dims_in, dims_c=None, seed: Union[int, None] = None):
+    def __init__(self, dims_in, dims_c=None, seed: int | None = None):
         """Additional args in docstring of base class FrEIA.modules.InvertibleModule.
 
         Args:
@@ -52,7 +52,7 @@ class PermuteRandomS2(InvertibleModule):
     """Constructs a random permutation, that stays fixed during training.
     Permutes along the first (channel-) dimension for multi-dimenional tensors."""
 
-    def __init__(self, dims_in, dims_c=None, seed: Union[int, None] = None):
+    def __init__(self, dims_in, dims_c=None, seed: int | None = None):
         """Additional args in docstring of base class FrEIA.modules.InvertibleModule.
 
         Args:

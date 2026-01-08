@@ -1,9 +1,9 @@
-import torch
 import numpy as np
-
+import torch
 from torch.utils.data import Dataset
-from experiments.logger import LOGGER
+
 from experiments.calogan.utils import load_data
+from experiments.logger import LOGGER
 
 
 class CaloGANDataset(Dataset):

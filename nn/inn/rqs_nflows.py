@@ -1,11 +1,12 @@
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.base_coupling import BaseCouplingBlock, OneSidedBaseCouplingBlock
 from FrEIA.modules import InvertibleModule
+
+from models.base_coupling import BaseCouplingBlock, OneSidedBaseCouplingBlock
 
 
 class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):
@@ -19,7 +20,7 @@ class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):
         tails="linear",
         bounds_type="SOFTPLUS",
         spatial=False,
-        *args
+        *args,
     ):
         super().__init__(dims_in, dims_c, *args)
 
@@ -125,7 +126,7 @@ class OneSidedCaloRationalQuadraticSplineBlock(OneSidedBaseCouplingBlock):
         tails="linear",
         bounds_type="SOFTPLUS",
         spatial=False,
-        *args
+        *args,
     ):
         super().__init__(dims_in, dims_c, *args)
 
@@ -215,7 +216,7 @@ class SimpleRationalQuadraticSplineBlock(BaseCouplingBlock):
         tails="linear",
         bounds_type="SOFTPLUS",
         spatial=False,
-        *args
+        *args,
     ):
         super().__init__(dims_in, dims_c, *args)
 
@@ -381,7 +382,7 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
             masked_logabsdet[outside_interval_mask] = 0
 
         else:
-            raise RuntimeError("{} tails are not implemented.".format(self.tails))
+            raise RuntimeError(f"{self.tails} tails are not implemented.")
         inputs = inputs[inside_interval_mask]
         theta = theta[inside_interval_mask, :]
         bound = torch.min(self.bounds)

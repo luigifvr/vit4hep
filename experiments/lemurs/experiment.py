@@ -1,25 +1,26 @@
 # standard python libraries
+import os
+import time
+import warnings
+
+import h5py
 import numpy as np
 import torch
-import os, time
-import warnings
-from torch.utils.data import DataLoader
-
-from torch.utils.data.distributed import DistributedSampler
-import os
-import h5py
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
+from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
+
+import experiments.lemurs.transforms as transforms
+from experiments.base_experiment import BaseExperiment
+from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
+from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
+from experiments.lemurs.datasets import LEMURSCollator, LEMURSDataset
+from experiments.lemurs.evaluate import run_from_py
+from experiments.lemurs.utils import load_data
 
 # Other functions of project
 from experiments.logger import LOGGER
-from experiments.base_experiment import BaseExperiment
-from experiments.lemurs.datasets import LEMURSDataset, LEMURSCollator
-import experiments.lemurs.transforms as transforms
-from experiments.lemurs.utils import load_data
-from experiments.lemurs.evaluate import run_from_py
-from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
-from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
 
 
 class LEMURS(BaseExperiment):
@@ -502,7 +503,7 @@ class LEMURS(BaseExperiment):
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
-        model_path = os.path.join(energy_model_cfg.run_dir, "models", f"model_run0.pt")
+        model_path = os.path.join(energy_model_cfg.run_dir, "models", "model_run0.pt")
         try:
             state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
                 "model"

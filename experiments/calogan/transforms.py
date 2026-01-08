@@ -1,11 +1,12 @@
-import torch
-import numpy as np
 import os
+
+import numpy as np
+import torch
 
 from experiments.calochallenge.transforms import logit
 
 
-class GlobalStandardizeFromFileGAN(object):
+class GlobalStandardizeFromFileGAN:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -13,7 +14,7 @@ class GlobalStandardizeFromFileGAN(object):
         create: whether or not to calculate and save mean/std based on first call
     """
 
-    def __init__(self, model_dir):
+    def __init__(self, model_dir, eps=1.0e-6):
 
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
@@ -22,6 +23,7 @@ class GlobalStandardizeFromFileGAN(object):
         self.dtype = torch.get_default_dtype()
         self.u_transform = True
         self.layer_keys = ["layer_0", "layer_1", "layer_2", "extra_dims"]
+        self.eps = torch.logit(torch.tensor(eps))
         try:
             # load from file
             self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
@@ -41,8 +43,9 @@ class GlobalStandardizeFromFileGAN(object):
         else:
             if not self.written:
                 shower = torch.cat([data_dict[key] for key in self.layer_keys], dim=1)
-                self.mean = shower.mean()
-                self.std = shower.std()
+                nonzero_mask = (shower > self.eps) & (shower < -self.eps)
+                self.mean = (shower[nonzero_mask]).mean()
+                self.std = (shower[nonzero_mask]).std()
                 if rank == 0:
                     self.write()
                 self.written = True
@@ -51,7 +54,7 @@ class GlobalStandardizeFromFileGAN(object):
         return data_dict
 
 
-class LogEnergyGAN(object):
+class LogEnergyGAN:
     """
     Log transform incident energies
         alpha: Optional regularization for the log
@@ -71,7 +74,7 @@ class LogEnergyGAN(object):
         return data_dict
 
 
-class ScaleEnergyGAN(object):
+class ScaleEnergyGAN:
     """
     Scale incident energies to lie in the range [0, 1]
         e_min: Expected minimum value of the energy
@@ -97,7 +100,7 @@ class ScaleEnergyGAN(object):
         return data_dict
 
 
-class ExclusiveLogitTransformGAN(object):
+class ExclusiveLogitTransformGAN:
     """
     Take log of input data
         delta: regularization
@@ -127,7 +130,7 @@ class ExclusiveLogitTransformGAN(object):
         return data_dict
 
 
-class NormalizeLayerEnergyGAN(object):
+class NormalizeLayerEnergyGAN:
     """
     Normalize each shower by the layer energy
     This will change the shower shape to N_voxels+N_layers

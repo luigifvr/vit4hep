@@ -1,5 +1,5 @@
-from einops import rearrange
 import torch
+from einops import rearrange
 from torchdiffeq import odeint
 
 from models.base_model import CFM

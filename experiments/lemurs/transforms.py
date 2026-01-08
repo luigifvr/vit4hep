@@ -1,6 +1,7 @@
-import torch
-import numpy as np
 import os
+
+import numpy as np
+import torch
 
 
 def logit(array, alpha=1.0e-6, inv=False):
@@ -13,7 +14,7 @@ def logit(array, alpha=1.0e-6, inv=False):
     return z
 
 
-class LEMURSGlobalStandardizeFromFile(object):
+class LEMURSGlobalStandardizeFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -61,7 +62,7 @@ class LEMURSGlobalStandardizeFromFile(object):
         return data_dict
 
 
-class LEMURSStandardizeUsFromFile(object):
+class LEMURSStandardizeUsFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -106,7 +107,7 @@ class LEMURSStandardizeUsFromFile(object):
         return data_dict
 
 
-class LEMURSPreprocessConds(object):
+class LEMURSPreprocessConds:
     """
     Apply preprocessing steps to the conditions.
     Scale all conditions to [0,1]. Incident energy is in linear scale.
@@ -136,7 +137,7 @@ class LEMURSPreprocessConds(object):
         return data_dict
 
 
-class LEMURSScaleTotalEnergy(object):
+class LEMURSScaleTotalEnergy:
     """
     Scale only E_tot/E_inc by a factor f.
     The effect is the same of scaling the voxels but
@@ -158,7 +159,7 @@ class LEMURSScaleTotalEnergy(object):
         return data_dict
 
 
-class LEMURSExclusiveLogitTransform(object):
+class LEMURSExclusiveLogitTransform:
     """
     Take log of input data
         delta: regularization
@@ -186,7 +187,7 @@ class LEMURSExclusiveLogitTransform(object):
         return data_dict
 
 
-class LEMURSCutValues(object):
+class LEMURSCutValues:
     """
     Cut in Normalized space
         cut: threshold value for the cut
@@ -209,7 +210,7 @@ class LEMURSCutValues(object):
         return data_dict
 
 
-class LEMURSNormalizeByElayer(object):
+class LEMURSNormalizeByElayer:
     """
     Normalize each shower by the layer energy.
     This will change the shower shape to N_voxels+N_layers.

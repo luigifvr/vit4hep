@@ -1,11 +1,11 @@
 """Modified from github.com/facebookresearch/DiT/blob/main/models.py"""
 
 import math
+
 import torch
 import torch.nn as nn
-
-from torch.utils.checkpoint import checkpoint
 from timm.models.vision_transformer import Mlp
+from torch.utils.checkpoint import checkpoint
 from xformers.ops import memory_efficient_attention
 
 
@@ -48,7 +48,7 @@ class ViT(nn.Module):
 
     def __init__(self, param):
 
-        super(ViT, self).__init__()
+        super().__init__()
 
         defaults = {
             "dim": 3,
@@ -105,14 +105,14 @@ class ViT(nn.Module):
 
         # compute layer-causal attention mask
         if self.causal_attn:
-            l, a, r = self.num_patches
+            L, A, R = self.num_patches
             assert (
                 self.dim == 3
             ), "A layer-causal attention mask should only be used in 3d"
-            patch_idcs = torch.arange(l * a * r)
+            patch_idcs = torch.arange(L * A * R)
             self.attn_mask = nn.Parameter(
-                patch_idcs[:, None] // (a * r)
-                >= patch_idcs[None, :] // (a * r),  # tril (causal)
+                patch_idcs[:, None] // (A * R)
+                >= patch_idcs[None, :] // (A * R),  # tril (causal)
                 requires_grad=False,
             )
 
@@ -145,17 +145,17 @@ class ViT(nn.Module):
         sum_l = sum([num_patches_elem[0] for num_patches_elem in self.num_patches])
         sum_lgrid = torch.arange(sum_l) / sum_l
         for n, num_patches_elem in enumerate(self.num_patches):
-            _, a, r = num_patches_elem
+            _, A, R = num_patches_elem
             lgrid = sum_lgrid[
                 sum([self.num_patches[i][0] for i in range(n)]) : sum(
                     [self.num_patches[i][0] for i in range(n + 1)]
                 )
             ]
-            agrid = torch.arange(a) / a
-            rgrid = torch.arange(r) / r
+            agrid = torch.arange(A) / A
+            rgrid = torch.arange(R) / R
             z, y, x = torch.meshgrid(
                 lgrid, agrid, rgrid, indexing="ij"
-            )  # shape (l, a, r)
+            )  # shape (L, A, R)
             pos_z.append(z.flatten())
             pos_y.append(y.flatten())
             pos_x.append(x.flatten())
@@ -325,7 +325,10 @@ class DiTBlock(nn.Module):
         )
         self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
-        approx_gelu = lambda: nn.GELU(approximate="tanh")
+        
+        def approx_gelu():
+            return nn.GELU(approximate="tanh")
+        
         self.mlp = Mlp(
             in_features=hidden_size,
             hidden_features=mlp_hidden_dim,

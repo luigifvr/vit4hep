@@ -1,8 +1,8 @@
-from FrEIA.modules import InvertibleModule
-
-from typing import Callable, Union
+from collections.abc import Callable
+from typing import Union
 
 import torch
+from FrEIA.modules import InvertibleModule
 
 
 class BaseCouplingBlock(InvertibleModule):
@@ -18,7 +18,7 @@ class BaseCouplingBlock(InvertibleModule):
         dims_in,
         dims_c=[],
         clamp: float = 2.0,
-        clamp_activation: Union[str, Callable] = "ATAN",
+        clamp_activation: str | Callable = "ATAN",
         spatial: bool = False,
     ):
         """
@@ -130,7 +130,7 @@ class OneSidedBaseCouplingBlock(InvertibleModule):
         dims_in,
         dims_c=[],
         clamp: float = 2.0,
-        clamp_activation: Union[str, Callable] = "ATAN",
+        clamp_activation: str | Callable = "ATAN",
     ):
         """
         Additional args in docstring of base class.

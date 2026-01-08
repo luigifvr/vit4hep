@@ -4,12 +4,12 @@ Class that handles the specific binning geometry based on the provided file
 and computes all relevant high-level features
 """
 import os
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import cm
 from matplotlib.colors import LogNorm as LN
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-
 
 from experiments.calo_utils.ugr_evaluation.XMLHandler import XMLHandler
 
@@ -134,7 +134,7 @@ class HighLevelFeatures:
         n_groups = len(self.relevantLayers) / l
         j = 0
         for k in range(int(n_groups)):
-            for n in range((len(self.r_edges[0]) - 1)):
+            for n in range(len(self.r_edges[0]) - 1):
                 self.weighted_depth_ga[j] = self.CalculateWeightedDepthA(
                     energy_calo, n, n_groups, k
                 )
@@ -142,7 +142,7 @@ class HighLevelFeatures:
 
         j = 0
         for k in range(int(n_groups)):
-            for n in range((self.num_alpha[0])):
+            for n in range(self.num_alpha[0]):
                 self.weighted_depth_gr[j] = self.CalculateWeightedDepthR(
                     energy_calo, n, n_groups, k
                 )
@@ -397,7 +397,7 @@ class HighLevelFeatures:
         for num, shower in enumerate(data):
             if filename is not None:
                 local_name, local_ext = os.path.splitext(filename)
-                local_name += "_{}".format(num) + local_ext
+                local_name += f"_{num}" + local_ext
             else:
                 local_name = None
             self._DrawShower(shower, filename=local_name, title=title)

@@ -1,7 +1,8 @@
 import os
+
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib
 
 
 def plot_ui_dists(
@@ -96,7 +97,7 @@ def plot_ui_dists(
         ax[0].semilogy()
         # ax[0].set_ylim(None, min(ax[0].get_ylim()[1], 200))
         ax[0].set_ylim(max(ax[0].get_ylim()[0], 1.1e-4), None)
-        ax[0].set_ylabel(f"Prob. density")
+        ax[0].set_ylabel("Prob. density")
 
         ## RATIO AXIS ##
         norm = ref_vals
@@ -227,8 +228,8 @@ def plot_ui_dists(
         fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
         if cfg is not None:
-            if not os.path.isdir(cfg.run_dir + f"/eval/"):
-                os.makedirs(cfg.run_dir + f"/eval/")
+            if not os.path.isdir(cfg.run_dir + "/eval/"):
+                os.makedirs(cfg.run_dir + "/eval/")
 
             fig.savefig(
                 cfg.run_dir + "/eval/" + f"u{i}_dist.pdf", dpi=200, bbox_inches="tight"

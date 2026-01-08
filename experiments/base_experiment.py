@@ -1,25 +1,29 @@
 "Modified from https://github.com/heidelberg-hepml/lorentz-gatr/blob/main/experiments/base_experiment.py"
 
+import logging
+import os
+import time
+import zipfile
+from pathlib import Path
+
+import mlflow
 import numpy as np
+import pytorch_optimizer
 import torch
 import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-
-import os, time
-import zipfile
-import logging
-from pathlib import Path
-from omegaconf import OmegaConf, open_dict, errors
 from hydra.utils import instantiate
-import mlflow
+from omegaconf import OmegaConf, errors, open_dict
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_ema import ExponentialMovingAverage
-import pytorch_optimizer
-import torch.distributed as dist
 
-from experiments.misc import remove_module_from_state_dict
-from experiments.misc import get_device, get_dtype, flatten_dict
 import experiments.logger
-from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER, RankFilter
+from experiments.logger import FORMATTER, LOGGER, MEMORY_HANDLER, RankFilter
+from experiments.misc import (
+    flatten_dict,
+    get_device,
+    get_dtype,
+    remove_module_from_state_dict,
+)
 from experiments.mlflow import log_mlflow
 
 # set to 'True' to debug autograd issues (slows down code)
@@ -125,12 +129,12 @@ class BaseExperiment:
         )
 
         if self.cfg.ema:
-            LOGGER.info(f"Using EMA for validation and eval")
+            LOGGER.info("Using EMA for validation and eval")
             self.ema = ExponentialMovingAverage(
                 self.model.parameters(), decay=self.cfg.training.ema_decay
             )
         else:
-            LOGGER.info(f"Not using EMA")
+            LOGGER.info("Not using EMA")
             self.ema = None
 
         # load existing model if specified
@@ -258,7 +262,7 @@ class BaseExperiment:
 
     def _init_directory(self):
         if not self.cfg.save:
-            LOGGER.info(f"Running with save=False, i.e. no outputs will be saved")
+            LOGGER.info("Running with save=False, i.e. no outputs will be saved")
             return
 
         # create experiment directory
@@ -288,7 +292,7 @@ class BaseExperiment:
         # silence other loggers
         # (every app has a logger, eg hydra, torch, mlflow, matplotlib, fontTools...)
         for name, other_logger in logging.root.manager.loggerDict.items():
-            if not "lorentz-frames" in name:
+            if "lorentz-frames" not in name:
                 other_logger.level = logging.WARNING
 
         if experiments.logger.LOGGING_INITIALIZED:

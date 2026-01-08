@@ -3,9 +3,10 @@ Transformer-based MLP for CFM modified from CaloDREAM arXiv:2405.09629.
 Used to generate energy ratios with a CFM generative network
 """
 
+import math
+
 import torch
 import torch.nn as nn
-import math
 
 
 class ParallelTransformer(nn.Module):

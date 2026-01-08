@@ -1,24 +1,25 @@
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import h5py
-import torch
-from torch.utils.data import TensorDataset, DataLoader
 
-from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+
 import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
 from experiments.calo_utils.ugr_evaluation.evaluate import (
     DNN,
-    ttv_split,
+    evaluate_cls,
     load_classifier,
     train_and_evaluate_cls,
-    evaluate_cls,
+    ttv_split,
 )
+from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
 from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import (
     _separation_power,
 )
-from experiments.logger import LOGGER
 from experiments.calohadronic.utils import load_data
+from experiments.logger import LOGGER
 
 torch.set_default_dtype(torch.float64)
 
@@ -276,7 +277,7 @@ def run_from_py(ecal, hcal, energy, cfg):
         p.numel() for p in classifier.parameters() if p.requires_grad
     )
 
-    print("Classifier has {} parameters".format(int(total_parameters)))
+    print(f"Classifier has {int(total_parameters)} parameters")
     train_data = TensorDataset(
         torch.tensor(train_data, dtype=torch.get_default_dtype()).to(device)
     )
@@ -312,7 +313,7 @@ def run_from_py(ecal, hcal, energy, cfg):
             calibration_data=test_dataloader,
         )
     print("Final result of classifier test (AUC / JSD):")
-    print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+    print(f"{eval_auc:.4f} / {eval_JSD:.4f}")
     with open(
         os.path.join(
             output_dir,
@@ -322,7 +323,7 @@ def run_from_py(ecal, hcal, energy, cfg):
     ) as f:
         f.write(
             "Final result of classifier test (AUC / JSD):\n"
-            + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
+            + f"{eval_auc:.4f} / {eval_JSD:.4f}\n\n"
         )
 
 
@@ -444,7 +445,7 @@ def plot_feature(
     )
 
     seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-    print("Separation power of {} histogram: {}".format(title, seps))
+    print(f"Separation power of {title} histogram: {seps}")
     with open(
         os.path.join(
             output_dir,
@@ -510,6 +511,6 @@ def plot_feature(
         title_fontsize=18,
     )
     fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
-    filename = os.path.join(output_dir, "{}.pdf".format(title))
+    filename = os.path.join(output_dir, f"{title}.pdf")
     fig.savefig(filename, dpi=300, format="pdf")
     plt.close()

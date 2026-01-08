@@ -1,15 +1,14 @@
 import os
 from glob import glob
 
-import numpy as np
-import matplotlib.pyplot as plt
 import h5py
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
-from torch.utils.data import TensorDataset, DataLoader
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
 from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import accuracy_score, roc_auc_score
+from torch.utils.data import DataLoader, TensorDataset
 
 import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
 from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
@@ -219,9 +218,7 @@ def train_cls(model, data_train, optim, epoch, arg):
 
         if i % (len(data_train) // 2) == 0:
             print(
-                "Epoch {:3d} / {}, step {:4d} / {}; loss {:.4f}".format(
-                    epoch + 1, arg.cls_n_epochs, i, len(data_train), loss.item()
-                )
+                f"Epoch {epoch + 1:3d} / {arg.cls_n_epochs}, step {i:4d} / {len(data_train)}; loss {loss.item():.4f}"
             )
         # PREDICTIONS
         pred = torch.round(torch.sigmoid(output_vector.detach()))
@@ -263,9 +260,7 @@ def evaluate_cls(model, data_test, arg, final_eval=False, calibration_data=None)
     print("AUC on test set is", eval_auc)
     JSD = -BCE + np.log(2.0)
     print(
-        "BCE loss of test set is {:.4f}, JSD of the two dists is {:.4f}".format(
-            BCE, JSD / np.log(2.0)
-        )
+        f"BCE loss of test set is {BCE:.4f}, JSD of the two dists is {JSD / np.log(2.0):.4f}"
     )
     if final_eval:
         prob_true, prob_pred = calibration_curve(result_true, result_pred, n_bins=10)
@@ -345,7 +340,7 @@ def check_file(given_file, arg, which=None):
         num_features, given_file["showers"].shape[1]
     )
 
-    print("Found {} events in the file.".format(num_events))
+    print(f"Found {num_events} events in the file.")
     print(
         "Checking if {} file has the correct form: DONE \n".format(
             which if which is not None else "provided"
@@ -355,7 +350,7 @@ def check_file(given_file, arg, which=None):
 
 def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1):
     """reads .hdf5 file and returns samples and their energy"""
-    print("Extracting showers from {} file ...".format(which))
+    print(f"Extracting showers from {which} file ...")
     if single_energy is not None:
         energy_mask = given_file["incident_energies"][:] == single_energy
         energy = given_file["incident_energies"][:][energy_mask].reshape(-1, 1)
@@ -363,7 +358,7 @@ def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1)
     else:
         shower = given_file["showers"][:max_len]
         energy = given_file["incident_energies"][:max_len]
-    print("Extracting showers from {} file: DONE.\n".format(which))
+    print(f"Extracting showers from {which} file: DONE.\n")
     return shower.astype("float32", copy=False), energy.astype("float32", copy=False)
 
 
@@ -449,7 +444,7 @@ def run_from_py(sample, energy, cfg):
     np.nan_to_num(sample, copy=False, nan=0.0, neginf=0.0, posinf=0.0)
 
     # Using a cut everywhere
-    print("Using Everywhere a cut of {}".format(args.cut))
+    print(f"Using Everywhere a cut of {args.cut}")
     sample[sample < args.cut] = 0.0
 
     # get reference folder and name of file
@@ -482,7 +477,7 @@ def run_from_py(sample, energy, cfg):
         hlf.DrawAverageShower(
             sample,
             filename=os.path.join(
-                args.output_dir, "average_shower_dataset_{}.png".format(args.dataset)
+                args.output_dir, f"average_shower_dataset_{args.dataset}.png"
             ),
             title="Shower average",
         )
@@ -494,7 +489,7 @@ def run_from_py(sample, energy, cfg):
             reference_hlf.avg_shower,
             filename=os.path.join(
                 args.output_dir,
-                "reference_average_shower_dataset_{}.png".format(args.dataset),
+                f"reference_average_shower_dataset_{args.dataset}.png",
             ),
             title="Shower average reference dataset",
         )
@@ -504,7 +499,7 @@ def run_from_py(sample, energy, cfg):
         hlf.DrawSingleShower(
             sample[:5],
             filename=os.path.join(
-                args.output_dir, "single_shower_dataset_{}.png".format(args.dataset)
+                args.output_dir, f"single_shower_dataset_{args.dataset}.png"
             ),
             title="Single shower",
         )
@@ -512,7 +507,7 @@ def run_from_py(sample, energy, cfg):
             reference_shower[:5],
             filename=os.path.join(
                 args.output_dir,
-                "reference_single_shower_dataset_{}.png".format(args.dataset),
+                f"reference_single_shower_dataset_{args.dataset}.png",
             ),
             title="Reference single shower",
         )
@@ -522,18 +517,18 @@ def run_from_py(sample, energy, cfg):
         if "1" in args.dataset:
             target_energies = 2 ** np.linspace(8, 23, 16)
             plot_title = [
-                "shower average at E = {} MeV".format(int(en)) for en in target_energies
+                f"shower average at E = {int(en)} MeV" for en in target_energies
             ]
         else:
             target_energies = 10 ** np.linspace(3, 6, 4)
             plot_title = []
             for i in range(3, 7):
                 plot_title.append(
-                    "shower average for E in [{}, {}] MeV".format(10**i, 10 ** (i + 1))
+                    f"shower average for E in [{10**i}, {10 ** (i + 1)}] MeV"
                 )
         for i in range(len(target_energies) - 1):
-            filename = "average_shower_dataset_{}_E_{}.png".format(
-                args.dataset, target_energies[i]
+            filename = (
+                f"average_shower_dataset_{args.dataset}_E_{target_energies[i]}.png"
             )
             which_showers = (
                 (energy >= target_energies[i]) & (energy < target_energies[i + 1])
@@ -578,9 +573,7 @@ def run_from_py(sample, energy, cfg):
 
         if args.mode in ["all", "no-cls", "hist-chi", "hist"]:
             with open(
-                os.path.join(
-                    args.output_dir, "histogram_chi2_{}.txt".format(args.dataset)
-                ),
+                os.path.join(args.output_dir, f"histogram_chi2_{args.dataset}.txt"),
                 "w",
             ) as f:
                 f.write(
@@ -640,7 +633,7 @@ def run_from_py(sample, energy, cfg):
 
         print("Calculating high-level features for classifier ...")
 
-        print("Using {} as cut for the showers ...".format(args.cut))
+        print(f"Using {args.cut} as cut for the showers ...")
         # set a cut on low energy voxels !only low level!
         cut = args.cut
 
@@ -692,7 +685,7 @@ def run_from_py(sample, energy, cfg):
             args.device = torch.device(
                 "cuda:" + str(args.which_cuda) if torch.cuda.is_available() else "cpu"
             )
-            print("Using {}".format(args.device))
+            print(f"Using {args.device}")
 
             if key in ["all", "cls-low", "cls-low-normed", "cls-high"]:
                 # set up DNN classifier
@@ -720,7 +713,7 @@ def run_from_py(sample, energy, cfg):
                 p.numel() for p in classifier.parameters() if p.requires_grad
             )
 
-            print("{} has {} parameters".format(args.mode, int(total_parameters)))
+            print(f"{args.mode} has {int(total_parameters)} parameters")
 
             if key == "cls-resnet":
                 optimizer = torch.optim.AdamW(
@@ -781,17 +774,17 @@ def run_from_py(sample, energy, cfg):
                     calibration_data=test_dataloader,
                 )
             print("Final result of classifier test (AUC / JSD):")
-            print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+            print(f"{eval_auc:.4f} / {eval_JSD:.4f}")
             with open(
                 os.path.join(
                     args.output_dir,
-                    "classifier_{}_{}_{}.txt".format(args.mode, key, args.dataset),
+                    f"classifier_{args.mode}_{key}_{args.dataset}.txt",
                 ),
                 "a",
             ) as f:
                 f.write(
                     "Final result of classifier test (AUC / JSD):\n"
-                    + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
+                    + f"{eval_auc:.4f} / {eval_JSD:.4f}\n\n"
                 )
 
             if args.mode in ["all", "fpd", "kpd"]:
@@ -828,9 +821,7 @@ def run_from_py(sample, energy, cfg):
 
                 print(result_str)
                 with open(
-                    os.path.join(
-                        args.output_dir, "fpd_kpd_{}.txt".format(args.dataset)
-                    ),
+                    os.path.join(args.output_dir, f"fpd_kpd_{args.dataset}.txt"),
                     "w",
                 ) as f:
                     f.write(result_str)

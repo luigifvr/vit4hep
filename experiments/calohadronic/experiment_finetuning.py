@@ -1,15 +1,16 @@
 import os
-from omegaconf import OmegaConf, open_dict
+import time
+
+import numpy as np
 import torch
 import torch.nn as nn
-from torch_ema import ExponentialMovingAverage
-import time
-import numpy as np
+from omegaconf import OmegaConf, open_dict
 from torch.utils.data import DataLoader
+from torch_ema import ExponentialMovingAverage
 
-from experiments.calohadronic.datasets import CaloHadDataset, CaloHadCollator
-from experiments.logger import LOGGER
+from experiments.calohadronic.datasets import CaloHadCollator, CaloHadDataset
 from experiments.calohadronic.experiment import CaloHadronic
+from experiments.logger import LOGGER
 from experiments.misc import remove_module_from_state_dict
 from nn.vit import FinalLayer, get_sincos_pos_embed
 
@@ -63,7 +64,7 @@ class CaloHadronicFT(CaloHadronic):
         self.add_embedding_layers()
 
         if self.cfg.ema:
-            LOGGER.info(f"Re-initializing EMA")
+            LOGGER.info("Re-initializing EMA")
             self.ema = ExponentialMovingAverage(
                 self.model.parameters(), decay=self.cfg.training.ema_decay
             ).to(self.device)
@@ -84,10 +85,8 @@ class CaloHadronicFT(CaloHadronic):
                 self.model_patch_dim, self.backbone_cfg.model.net.param.patch_dim
             ).to(self.device, dtype=self.dtype)
             LOGGER.info(
-                (
-                    f"Mapping embedding from {self.model_patch_dim} "
-                    f"to {self.backbone_cfg.model.net.param.patch_dim}"
-                )
+                f"Mapping embedding from {self.model_patch_dim} "
+                f"to {self.backbone_cfg.model.net.param.patch_dim}"
             )
             self.model.net.x_embedder = nn.Sequential(
                 self.embedding_mapper, nn.SiLU(), self.embedding
@@ -114,10 +113,8 @@ class CaloHadronicFT(CaloHadronic):
                 self.backbone_cfg.model.net.param.condition_dim,
             ).to(self.device, dtype=self.dtype)
             LOGGER.info(
-                (
-                    f"Mapping condition embedding from {self.model_condition_dim} "
-                    f"to {self.backbone_cfg.model.net.param.condition_dim}"
-                )
+                f"Mapping condition embedding from {self.model_condition_dim} "
+                f"to {self.backbone_cfg.model.net.param.condition_dim}"
             )
             self.model.net.c_embedder = nn.Sequential(
                 self.c_embedding_mapper, nn.SiLU(), self.c_embedding

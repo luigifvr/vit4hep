@@ -1,9 +1,9 @@
 import torch
-
 from torch.utils.data import Dataset
-from experiments.logger import LOGGER
+
 from experiments.calochallenge.transforms import *
-from experiments.calochallenge.utils import load_data, get_energy_and_sorted_layers
+from experiments.calochallenge.utils import get_energy_and_sorted_layers, load_data
+from experiments.logger import LOGGER
 
 
 class CaloChallengeDataset(Dataset):

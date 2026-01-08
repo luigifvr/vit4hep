@@ -1,11 +1,12 @@
-import h5py
-import torch
 from collections import OrderedDict
 
+import h5py
+import torch
 from torch.utils.data import Dataset
-from experiments.logger import LOGGER
+
 from experiments.calohadronic.transforms import *
 from experiments.calohadronic.utils import load_data
+from experiments.logger import LOGGER
 
 
 class CaloHadDataset(Dataset):
@@ -38,7 +39,7 @@ class CaloHadDataset(Dataset):
                         num_samples = len(f["events"])
                         for local_idx in range(num_samples):
                             index_map.append((file_path, local_idx))
-                except (IOError, KeyError) as e:
+                except (OSError, KeyError) as e:
                     LOGGER.error(f"Could not read {file_path} for class {label}: {e}")
         return index_map
 

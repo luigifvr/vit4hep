@@ -3,9 +3,8 @@ from typing import Dict, Tuple
 import numpy as np
 import torch
 import torch.nn.functional as F
-
-from FrEIA.modules.base import InvertibleModule
 from FrEIA import utils
+from FrEIA.modules.base import InvertibleModule
 
 from models.base_coupling import BaseCouplingBlock
 
@@ -64,18 +63,18 @@ class BinnedSpline(BaseCouplingBlock):
         self.subnet2 = subnet_constructor(len(self.indices1), self.num_params)
 
     def _spline1(
-        self, x1: torch.Tensor, parameters: Dict[str, torch.Tensor], rev: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, x1: torch.Tensor, parameters: dict[str, torch.Tensor], rev: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
     def _spline2(
-        self, x2: torch.Tensor, parameters: Dict[str, torch.Tensor], rev: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, x2: torch.Tensor, parameters: dict[str, torch.Tensor], rev: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
     def _coupling1(
         self, x1: torch.Tensor, u2: torch.Tensor, c: torch.Tensor, rev: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         The full coupling consists of:
         1. Querying the parameter tensor from the subnetwork
@@ -99,7 +98,7 @@ class BinnedSpline(BaseCouplingBlock):
 
     def _coupling2(
         self, x2: torch.Tensor, u1: torch.Tensor, c: torch.Tensor, rev: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         parameters = self.subnet2(u1, c)
         x2, parameters = x2.to(self.dtype), parameters.to(self.dtype)
         parameters = self.spline_base.split_parameters(
@@ -115,8 +114,8 @@ class BinnedSpline(BaseCouplingBlock):
         return x2, j2
 
     def constrain_parameters(
-        self, parameters: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+        self, parameters: dict[str, torch.Tensor]
+    ) -> dict[str, torch.Tensor]:
         return self.spline_base.constrain_parameters(parameters)
 
     def forward(self, x, c=[], rev=False, jac=True):
@@ -160,9 +159,9 @@ class BinnedSplineBase(InvertibleModule):
         dims_in,
         dims_c=None,
         bins: int = 10,
-        parameter_counts: Dict[str, int] = None,
-        min_bin_sizes: Tuple[float] = (0.01, 0.01),
-        default_domain: Tuple[float] = (-15.0, 15.0, -15.0, 15.0),
+        parameter_counts: dict[str, int] = None,
+        min_bin_sizes: tuple[float] = (0.01, 0.01),
+        default_domain: tuple[float] = (-15.0, 15.0, -15.0, 15.0),
         identity_tails: bool = False,
         domain_clamping: float = None,
         dtype: torch.dtype = torch.float32,
@@ -235,7 +234,7 @@ class BinnedSplineBase(InvertibleModule):
 
     def split_parameters(
         self, parameters: torch.Tensor, split_len: int
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """
         Split parameter tensor into semantic parameters, as given by self.parameter_counts
         """
@@ -257,8 +256,8 @@ class BinnedSplineBase(InvertibleModule):
             return self.domain_clamping * torch.tanh(domain / self.domain_clamping)
 
     def constrain_parameters(
-        self, parameters: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+        self, parameters: dict[str, torch.Tensor]
+    ) -> dict[str, torch.Tensor]:
         """
         Constrain Parameters to meet certain conditions (e.g. positivity)
         """
@@ -317,10 +316,10 @@ class BinnedSplineBase(InvertibleModule):
     def binned_spline(
         self,
         x: torch.Tensor,
-        parameters: Dict[str, torch.Tensor],
+        parameters: dict[str, torch.Tensor],
         spline: callable,
         rev: bool = False,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Compute the spline for given bin and spline parameters
         """

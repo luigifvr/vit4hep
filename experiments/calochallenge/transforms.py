@@ -1,12 +1,13 @@
-import torch
-import torch.nn.functional as F
-import numpy as np
 import os
+from itertools import pairwise
+
+import numpy as np
+import torch
 import torch.distributions as dist
+import torch.nn.functional as F
 
 from experiments.calo_utils.ugr_evaluation import *
 from experiments.calo_utils.ugr_evaluation import XMLHandler
-from itertools import pairwise
 
 
 class LogUniform(dist.TransformedDistribution):
@@ -26,7 +27,7 @@ def logit(array, alpha=1.0e-6, inv=False):
     return z
 
 
-class GlobalStandardizeFromFile(object):
+class GlobalStandardizeFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -77,7 +78,7 @@ class GlobalStandardizeFromFile(object):
         return transformed, energy
 
 
-class StandardizeVoxelsFromFile(object):
+class StandardizeVoxelsFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -127,7 +128,7 @@ class StandardizeVoxelsFromFile(object):
         return transformed, energy
 
 
-class StandardizeUsFromFile(object):
+class StandardizeUsFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -176,7 +177,7 @@ class StandardizeUsFromFile(object):
         return transformed, energy
 
 
-class SelectDims(object):
+class SelectDims:
     """
     Selects a subset of the features
         start: start of range of indices to keep
@@ -193,7 +194,7 @@ class SelectDims(object):
         return transformed, energy
 
 
-class AddFeaturesToCond(object):
+class AddFeaturesToCond:
     """
     Transfers a subset of the input features to the condition
         split_index: Index at which to split input. Features past the index will be moved
@@ -213,7 +214,7 @@ class AddFeaturesToCond(object):
         return x_, c_
 
 
-class LogEnergy(object):
+class LogEnergy:
     """
     Log transform incident energies
         alpha: Optional regularization for the log
@@ -231,7 +232,7 @@ class LogEnergy(object):
         return shower, transformed
 
 
-class ScaleVoxels(object):
+class ScaleVoxels:
     """
     Apply a multiplicative factor to the voxels.
         factor: Number to multiply voxels
@@ -248,7 +249,7 @@ class ScaleVoxels(object):
         return transformed, energy
 
 
-class ScaleTotalEnergy(object):
+class ScaleTotalEnergy:
     """
     Scale only E_tot/E_inc by a factor f.
     The effect is the same of ScaleVoxels but
@@ -269,7 +270,7 @@ class ScaleTotalEnergy(object):
         return shower, energy
 
 
-class ScaleEnergy(object):
+class ScaleEnergy:
     """
     Scale incident energies to lie in the range [0, 1]
         e_min: Expected minimum value of the energy
@@ -291,7 +292,7 @@ class ScaleEnergy(object):
         return shower, transformed
 
 
-class ExclusiveLogitTransform(object):
+class ExclusiveLogitTransform:
     """
     Take log of input data
         delta: regularization
@@ -321,7 +322,7 @@ class ExclusiveLogitTransform(object):
         return transformed, energy
 
 
-class RegularizeLargeLogit(object):
+class RegularizeLargeLogit:
     def __init__(self, a, b, exclusions=None, cut=False):
         self.a = a
         self.b = b
@@ -350,7 +351,7 @@ class RegularizeLargeLogit(object):
         return transformed, energy
 
 
-class SelectiveUniformNoise(object):
+class SelectiveUniformNoise:
     """
     Add noise to input data with the option to exlude some features
         func: torch distribution used to sample from
@@ -386,7 +387,7 @@ class SelectiveUniformNoise(object):
         return transformed, energy
 
 
-class CutValues(object):
+class CutValues:
     """
     Cut in Normalized space
         cut: threshold value for the cut
@@ -409,7 +410,7 @@ class CutValues(object):
         return transformed, energy
 
 
-class Reshape(object):
+class Reshape:
     """
     Reshape the shower as specified. Flattens batch in the reverse transformation.
         shape -- Tuple representing the desired shape of a single example
@@ -426,7 +427,7 @@ class Reshape(object):
         return shower, energy
 
 
-class NormalizeByElayer(object):
+class NormalizeByElayer:
     """
     Normalize each shower by the layer energy
     This will change the shower shape to N_voxels+N_layers
@@ -498,7 +499,7 @@ class NormalizeByElayer(object):
         return transformed, energy
 
 
-class AddAngularBins(object):
+class AddAngularBins:
     """
     Add angular bins given an XML file. After the transformation the shower
     will have a regular geometry. The inverse step takes the maximum over the
@@ -562,7 +563,7 @@ class AddAngularBins(object):
         return transformed, energy
 
 
-class AddLEMURSConditions(object):
+class AddLEMURSConditions:
     """
     Add global variables to match the LEMURS conditions.
     """

@@ -1,16 +1,17 @@
 import math
-from einops import rearrange
+
 import torch
+from einops import rearrange
+from FrEIA.framework import ConditionNode, GraphINN, InputNode, Node, OutputNode
 from torchdiffeq import odeint
 
-from FrEIA.framework import InputNode, Node, OutputNode, GraphINN, ConditionNode
-from models.base_model import CINN
 from experiments.calochallenge.calochallenge_cinn.freia_utils import (
+    get_block_kwargs,
     get_coupling_block,
     get_permutation_block,
     get_vit_block_kwargs,
-    get_block_kwargs,
 )
+from models.base_model import CINN
 
 
 class CaloChallengeCINN(CINN):

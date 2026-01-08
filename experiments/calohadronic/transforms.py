@@ -1,6 +1,7 @@
-import torch
-import numpy as np
 import os
+
+import numpy as np
+import torch
 
 
 def logit(array, alpha=1.0e-6, inv=False):
@@ -13,7 +14,7 @@ def logit(array, alpha=1.0e-6, inv=False):
     return array
 
 
-class CaloHadGlobalStandardizeFromFile(object):
+class CaloHadGlobalStandardizeFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -61,7 +62,7 @@ class CaloHadGlobalStandardizeFromFile(object):
         return data_dict
 
 
-class CaloHadStandardizeUsFromFile(object):
+class CaloHadStandardizeUsFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -106,7 +107,7 @@ class CaloHadStandardizeUsFromFile(object):
         return data_dict
 
 
-class CaloHadPreprocessConds(object):
+class CaloHadPreprocessConds:
     """
     Apply preprocessing steps to the conditions.
     Scale all conditions to [0,1]. Incident energy is in linear scale.
@@ -133,7 +134,7 @@ class CaloHadPreprocessConds(object):
         return data_dict
 
 
-class CaloHadScaleTotalEnergy(object):
+class CaloHadScaleTotalEnergy:
     """
     Scale only E_tot/E_inc by a factor f.
     The effect is the same of scaling the voxels but
@@ -155,7 +156,7 @@ class CaloHadScaleTotalEnergy(object):
         return data_dict
 
 
-class CaloHadExclusiveLogitTransform(object):
+class CaloHadExclusiveLogitTransform:
     """
     Take log of input data
         delta: regularization
@@ -191,7 +192,7 @@ class CaloHadExclusiveLogitTransform(object):
         return data_dict
 
 
-class CaloHadCutValues(object):
+class CaloHadCutValues:
     """
     Cut in Normalized space
         cut: threshold value for the cut
@@ -216,7 +217,7 @@ class CaloHadCutValues(object):
         return data_dict
 
 
-class CaloHadNormalizeByElayer(object):
+class CaloHadNormalizeByElayer:
     """
     Normalize each shower by the layer energy.
     This will change the shower shape to N_voxels+N_layers.
@@ -292,7 +293,7 @@ class CaloHadNormalizeByElayer(object):
         return data_dict
 
 
-class Reshape(object):
+class Reshape:
     """
     Reshape the shower as specified. Flattens batch in the reverse transformation.
         shape -- Tuple representing the desired shape of a single example
@@ -314,7 +315,7 @@ class Reshape(object):
         return data_dict
 
 
-class SumPool3dDownScale(object):
+class SumPool3dDownScale:
     """
     Downscale the ECAL
     """
@@ -339,7 +340,7 @@ class SumPool3dDownScale(object):
         return data_dict
 
 
-class AddLEMURSConditions(object):
+class AddLEMURSConditions:
     def __init__(self, theta=0.5, phi=0.5, label=[0.2, 0.2, 0.2, 0.2, 0.2]):
         self.theta = theta
         self.phi = phi

@@ -1,7 +1,8 @@
 import os
+
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib
 
 
 def plot_ui_dists(
@@ -106,7 +107,7 @@ def plot_ui_dists(
         ax[0].semilogy()
         # ax[0].set_ylim(None, min(ax[0].get_ylim()[1], 200))
         ax[0].set_ylim(max(ax[0].get_ylim()[0], 1.1e-4), None)
-        ax[0].set_ylabel(f"Prob. density")
+        ax[0].set_ylabel("Prob. density")
 
         ## RATIO AXIS ##
         norm = ref_vals

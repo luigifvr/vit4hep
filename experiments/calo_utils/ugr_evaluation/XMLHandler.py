@@ -4,8 +4,9 @@ Helperclass that reads the binning xml file
 """
 
 import math
-import numpy as np
 import xml.etree.ElementTree as ET
+
+import numpy as np
 
 
 class XMLHandler:
@@ -39,9 +40,7 @@ class XMLHandler:
                 for layer in particle:
                     self.ReadPolarCoordinates(layer)
         if not found_particle:
-            raise ValueError(
-                "Particle {} not found in {}".format(particle_name, filename)
-            )
+            raise ValueError(f"Particle {particle_name} not found in {filename}")
 
         self.totalBins = 0
         self.bin_number = []
@@ -87,7 +86,7 @@ class XMLHandler:
     def get_midpoint(self, arr):
         middle_points = []
         for i in range(len(arr) - 1):
-            middle_value = arr[i] + float((arr[i + 1] - arr[i])) / 2
+            middle_value = arr[i] + float(arr[i + 1] - arr[i]) / 2
             middle_points.append(middle_value)
         return middle_points
 

@@ -1,22 +1,24 @@
 # standard python libraries
-import torch
-import os, time
-import warnings
-from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
 import os
+import time
+import warnings
+
 import h5py
+import torch
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
+from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
+
+import experiments.calogan.transforms as transforms
+from experiments.base_experiment import BaseExperiment
+from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
+from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
+from experiments.calogan.datasets import CaloGANDataset
+from experiments.calogan.evaluate import eval_calogan_lowlevel
 
 # Other functions of project
 from experiments.logger import LOGGER
-from experiments.base_experiment import BaseExperiment
-from experiments.calogan.datasets import CaloGANDataset
-import experiments.calogan.transforms as transforms
-from experiments.calogan.evaluate import eval_calogan_lowlevel
-from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
-from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
 
 
 class CaloGAN(BaseExperiment):
@@ -313,7 +315,7 @@ class CaloGAN(BaseExperiment):
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
-        model_path = os.path.join(energy_model_cfg.run_dir, "models", f"model_run0.pt")
+        model_path = os.path.join(energy_model_cfg.run_dir, "models", "model_run0.pt")
         try:
             state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
                 "model"
