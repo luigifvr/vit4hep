@@ -27,10 +27,10 @@ class CaloChallengeCFM(CFM):
         )
 
         self.patch_shape = patch_shape
-        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape, strict=True)]
+        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape, strict=False)]
         self.in_channels = in_channels
 
-        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape, strict=True)):
+        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape, strict=False)):
             assert s % p == 0, (
                 f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
             )
@@ -45,7 +45,7 @@ class CaloChallengeCFM(CFM):
                 zip(
                     ("l", "a", "r", "p1", "p2", "p3"),
                     self.num_patches + self.patch_shape,
-                    strict=True,
+                    strict=False,
                 )
             ),
         )
@@ -55,7 +55,7 @@ class CaloChallengeCFM(CFM):
         x = rearrange(
             x,
             "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
-            **dict(zip(("p1", "p2", "p3"), self.patch_shape, strict=True)),
+            **dict(zip(("p1", "p2", "p3"), self.patch_shape, strict=False)),
         )
         return x
 
@@ -135,7 +135,7 @@ class CaloChallengeCFM_DS1(CaloChallengeCFM):
             self.num_patches_per_layer.append(num_patches)
 
         for i, s in enumerate(self.list_shape):
-            for L, m in zip(s, patch_shape, strict=True):
+            for L, m in zip(s, patch_shape, strict=False):
                 assert L % m == 0, (
                     f"Input size ({L}) should be divisible by patch size ({m}) in axis {i}."
                 )
@@ -150,8 +150,8 @@ class CaloChallengeCFM_DS1(CaloChallengeCFM):
             x_split[k] = rearrange(
                 x_split[k],
                 "b (l a r) (p1 p2 p3 c) -> b c (l p1) (a p2) (r p3)",
-                **dict(zip(("l", "a", "r"), self.num_patches_per_dim[k], strict=True)),
-                **dict(zip(("p1", "p2", "p3"), self.patch_shape, strict=True)),
+                **dict(zip(("l", "a", "r"), self.num_patches_per_dim[k], strict=False)),
+                **dict(zip(("p1", "p2", "p3"), self.patch_shape, strict=False)),
                 c=self.in_channels,
             )
 
@@ -167,7 +167,7 @@ class CaloChallengeCFM_DS1(CaloChallengeCFM):
             x_split[k] = rearrange(
                 x_split[k],
                 "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
-                **dict(zip(("p1", "p2", "p3"), self.patch_shape, strict=True)),
+                **dict(zip(("p1", "p2", "p3"), self.patch_shape, strict=False)),
             )
         x = torch.cat(x_split, dim=1)
         return x

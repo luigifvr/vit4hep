@@ -73,8 +73,8 @@ def get_vit_block_kwargs(nblocks, is_spatial, shape, patch_shape, cinn_kwargs, v
                 subnet = SubnetViT(
                     x_out=x_out,
                     patch_dim=patch_dim,
-                    num_patches=num_patches,
-                    prod_num_patches=prod_num_patches,
+                    num_patches=[num_patches],
+                    prod_num_patches=prod_num_patches//2,
                     **vit_kwargs,
                 )
                 return subnet

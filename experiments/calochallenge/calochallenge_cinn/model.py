@@ -29,7 +29,7 @@ class CaloChallengeCINN(CINN):
     ):
         super().__init__(*args, **kwargs)
 
-        self.patch_shape = patch_shape
+        self.patch_shape = patch_shape[0]
         self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape, strict=True)]
         self.in_channels = in_channels
 

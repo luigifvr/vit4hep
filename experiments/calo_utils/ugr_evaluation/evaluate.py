@@ -616,7 +616,10 @@ def run_from_py(sample, energy, cfg):
         "cls-resnet",
     ]:
         if args.mode in ["all", "all-cls"]:
-            list_cls = ["cls-low", "cls-high", "cls-resnet"]
+            if args.dataset in ["1-photons", "1-pions"]:
+                list_cls = ["cls-low", "cls-high"]
+            else:
+                list_cls = ["cls-low", "cls-high", "cls-resnet"]
         else:
             list_cls = [args.mode]
 
@@ -752,41 +755,41 @@ def run_from_py(sample, energy, cfg):
                     + f"{eval_auc:.4f} / {eval_JSD:.4f}\n\n"
                 )
 
-            if args.mode in ["all", "fpd", "kpd"]:
-                import jetnet
+        if args.mode in ["all", "fpd", "kpd"]:
+            import jetnet
 
-                print("Calculating high-level features for FPD/KPD ...")
-                hlf.CalculateFeatures(sample)
-                hlf.Einc = energy
+            print("Calculating high-level features for FPD/KPD ...")
+            hlf.CalculateFeatures(sample)
+            hlf.Einc = energy
 
-                if reference_hlf.E_tot is None:
-                    reference_hlf.CalculateFeatures(reference_shower)
+            if reference_hlf.E_tot is None:
+                reference_hlf.CalculateFeatures(reference_shower)
 
-                print("Calculating high-level features for FPD/KPD: DONE.\n")
+            print("Calculating high-level features for FPD/KPD: DONE.\n")
 
-                # get high level features and remove class label
-                source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0.0, cut=cut)[
-                    :, :-1
-                ]
-                reference_array = prepare_high_data_for_classifier(
-                    reference_shower, reference_energy, reference_hlf, 1.0, cut=cut
-                )[:, :-1]
+            # get high level features and remove class label
+            source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0.0, cut=cut)[
+                :, :-1
+            ]
+            reference_array = prepare_high_data_for_classifier(
+                reference_shower, reference_energy, reference_hlf, 1.0, cut=cut
+            )[:, :-1]
 
-                fpd_val, fpd_err = jetnet.evaluation.fpd(
-                    reference_array, source_array, min_samples=10000
-                )
-                kpd_val, kpd_err = jetnet.evaluation.kpd(
-                    reference_array, source_array, batch_size=10000
-                )
+            fpd_val, fpd_err = jetnet.evaluation.fpd(
+                reference_array, source_array, min_samples=10000
+            )
+            kpd_val, kpd_err = jetnet.evaluation.kpd(
+                reference_array, source_array, batch_size=10000
+            )
 
-                result_str = (
-                    f"FPD (x10^3): {fpd_val * 1e3:.4f} ± {fpd_err * 1e3:.4f}\n"
-                    f"KPD (x10^3): {kpd_val * 1e3:.4f} ± {kpd_err * 1e3:.4f}"
-                )
+            result_str = (
+                f"FPD (x10^3): {fpd_val * 1e3:.4f} ± {fpd_err * 1e3:.4f}\n"
+                f"KPD (x10^3): {kpd_val * 1e3:.4f} ± {kpd_err * 1e3:.4f}"
+            )
 
-                print(result_str)
-                with open(
-                    os.path.join(args.output_dir, f"fpd_kpd_{args.dataset}.txt"),
-                    "w",
-                ) as f:
-                    f.write(result_str)
+            print(result_str)
+            with open(
+                os.path.join(args.output_dir, f"fpd_kpd_{args.dataset}.txt"),
+                "w",
+            ) as f:
+                f.write(result_str)
