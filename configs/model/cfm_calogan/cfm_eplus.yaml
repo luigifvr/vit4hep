@@ -1,7 +1,9 @@
 _target_: experiments.calogan.model.CaloGANCFM
 in_channels: 1
-shape: [84, 1, 6]
-patch_shape: [1, 1, 6]
+shape: [504]
+list_shape: [[1, 96, 3], [1, 12, 12], [1, 6, 12]]
+list_edges: [288, 144, 72]
+list_patch_shape: [[1, 6, 1], [1, 2, 3], [1, 2, 3]]
 
 time_distribution: uniform
 trajectory: linear
@@ -27,6 +29,6 @@ net:
     learn_pos_embed: true
     causal_attn: false
     checkpoint_grads: false
-    num_patches: [84,1,1]
+    num_patches: [[1, 16, 3], [1,6,4], [1,3,4]]
     patch_dim: 6
     use_torch_sdpa: false

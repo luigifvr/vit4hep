@@ -29,7 +29,7 @@ data:
                       -9,  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1]
     },
     ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
-    GlobalStandardizeFromFile: {model_dir: None},
+    GlobalStandardizeFromFile: {model_dir: null},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
@@ -37,9 +37,11 @@ data:
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_dataset: "2"
+  eval_p_label: ""
+  eval_labels: ["ViT-cINN"]
   eval_mode: all
   eval_cut: 0.01515
   eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5

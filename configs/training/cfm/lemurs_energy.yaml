@@ -1,0 +1,6 @@
+iterations: 2000000
+batchsize: 128
+scheduler: OneCycleLR
+
+defaults:
+ - default

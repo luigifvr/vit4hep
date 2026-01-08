@@ -102,7 +102,11 @@ finetuning: false
 load_sample: false
 evaluation:
   eval_labels: ["ViT-CFM"]
+  eval_p_label: ""
   eval_dataset: "2"
+  eval_energy_bin: [1e3, 1e5]
+  eval_theta_bin: [0.87,2.27]
+  eval_phi_bin: null
   eval_mode: all
   eval_cut: 0.015
   eval_hdf5_file: /gpfs/scratch/acad/hepml/lemurs/fast/LEMURS_Par04SiW_gamma_100kEvents_1GeV1TeV_GPSflat_part10.h5
@@ -120,6 +124,6 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/shape_lemurs
  - /model: cfm_lemurs/cfm_lemurs
  - _self_

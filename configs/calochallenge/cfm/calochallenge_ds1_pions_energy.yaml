@@ -48,5 +48,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/energy
  - /model: cfm/cfm_ds1_pions_energy

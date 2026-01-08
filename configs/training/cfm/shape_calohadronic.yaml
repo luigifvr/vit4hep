@@ -1,0 +1,6 @@
+iterations: 1200000
+batchsize: 32
+weight_decay: 1.e-5
+
+defaults:
+ - default

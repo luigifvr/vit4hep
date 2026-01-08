@@ -1,7 +1,7 @@
 _target_: experiments.calochallenge.calochallenge_cinn.model.CaloChallengeCINN
 in_channels: 1
 shape: [45, 16, 9]
-patch_shape: [3, 8, 1]
+patch_shape: [[3, 8, 1]]
 
 coupling_block: CaloRQSplineFrEIA
 nblocks: 20

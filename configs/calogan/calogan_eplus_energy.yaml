@@ -31,5 +31,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/energy
  - /model: cfm_calogan/cfm_eplus_energy

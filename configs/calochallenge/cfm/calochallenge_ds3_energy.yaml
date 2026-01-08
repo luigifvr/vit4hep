@@ -49,5 +49,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/energy
  - /model: cfm/cfm_ds3_energy

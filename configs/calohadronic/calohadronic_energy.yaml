@@ -54,5 +54,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/energy
  - /model: cfm_calohad/cfm_calohad_energy
