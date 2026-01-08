@@ -1,0 +1,16 @@
+[project]
+name = "vit4hep"
+version = "1.0.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E","F","I","B","UP"]
+ignore = [
+    "E501", # no complaints from line length
+    "F401", # allow importing unused modules (for __init__.py)
+    "B006", # allow mutable default function arguments
+]
