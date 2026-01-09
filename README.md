@@ -12,14 +12,18 @@ We modularize and extend the [CaloDREAM](https://github.com/luigifvr/calo_dreame
 
 Clone the repository:
 
- git clone git@github.com:luigifvr/vit4hep.git
- cd vit4hep
+```bash
+git clone git@github.com:luigifvr/vit4hep.git
+cd vit4hep
+```
 
 Set up a Python environment (recommended: Python 3.12+):
 
- python -m venv ~/venvs/vit
- source ~/venvs/vit/bin/activate
- pip install -r requirements.txt
+```bash
+python -m venv ~/venvs/vit
+source ~/venvs/vit/bin/activate
+pip install -r requirements.txt
+```
 
 Datasets have to be collected separately, and the various data paths in the provided config files should be changed to the directories containing those files.
 For instance, [GitHub CaloChallenge](https://calochallenge.github.io/homepage/) provides links to the CaloChallenge datasets.
