@@ -9,12 +9,15 @@ modified by L. Favaro, A. Ore, S. Palacios for CaloDREAM
 
 import os
 
-import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import cm
+import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 
-dup = lambda a: np.append(a, a[-1])
+
+def dup(a):
+    return np.append(a, a[-1])
+
+
 # settings for the various plots. These should be larger than the number of hlf files
 colors = ["#0000cc", "#b40000"]
 
@@ -31,9 +34,8 @@ def plot_layer_comparison(
 
     filename = os.path.join(
         arg.output_dir,
-        "Average_Layer_dataset_{}_{}.pdf".format(arg.dataset, input_name),
+        f"Average_Layer_dataset_{arg.dataset}_{input_name}.pdf",
     )
-    num_layer = len(reference_class.relevantLayers)
     vmax = np.max(reference_data)
     layer_boundaries = np.unique(reference_class.bin_edges)
     with PdfPages(filename) as pdf:
@@ -102,8 +104,7 @@ def plot_Etot_Einc_discrete(hlf_class, reference_class, arg):
             color=hlf_class.color,
         )
         counts_data, _, _ = ax.hist(
-            hlf_class.GetEtot()[which_showers_hlf]
-            / hlf_class.Einc.squeeze()[which_showers_hlf],
+            hlf_class.GetEtot()[which_showers_hlf] / hlf_class.Einc.squeeze()[which_showers_hlf],
             bins=bins,
             label="generated",
             histtype="step",
@@ -113,11 +114,11 @@ def plot_Etot_Einc_discrete(hlf_class, reference_class, arg):
             color=reference_class.color,
         )
         if i in [0, 1, 2]:
-            energy_label = "E = {:.0f} MeV".format(energy)
+            energy_label = f"E = {energy:.0f} MeV"
         elif i in np.arange(3, 12):
-            energy_label = "E = {:.1f} GeV".format(energy / 1e3)
+            energy_label = f"E = {energy / 1e3:.1f} GeV"
         else:
-            energy_label = "E = {:.1f} TeV".format(energy / 1e6)
+            energy_label = f"E = {energy / 1e6:.1f} TeV"
         ax.text(0.95, 0.95, energy_label, ha="right", va="top", transform=ax.transAxes)
         ax.set_xlabel(r"$E_{\text{tot}} / E_{\text{inc}}$")
         ax.xaxis.set_label_coords(1.0, -0.15)
@@ -125,25 +126,19 @@ def plot_Etot_Einc_discrete(hlf_class, reference_class, arg):
         ax.yaxis.set_ticklabels([])
         plt.subplots_adjust(wspace=0.3, hspace=0.3)
         seps = _separation_power(counts_ref, counts_data, bins)
-        print(
-            "Separation power of Etot / Einc at E = {} histogram: {}".format(
-                energy, seps
-            )
-        )
+        print(f"Separation power of Etot / Einc at E = {energy} histogram: {seps}")
         with open(
-            os.path.join(arg.output_dir, "histogram_chi2_{}.txt".format(arg.dataset)),
+            os.path.join(arg.output_dir, f"histogram_chi2_{arg.dataset}.txt"),
             "a",
         ) as f:
-            f.write("Etot / Einc at E = {}: \n".format(energy))
+            f.write(f"Etot / Einc at E = {energy}: \n")
             f.write(str(seps))
             f.write("\n\n")
-        h, l = ax.get_legend_handles_labels()
+        h, L = ax.get_legend_handles_labels()
     ax = plt.subplot(4, 4, 16)
-    ax.legend(h, l, loc="center", fontsize=16)
+    ax.legend(h, L, loc="center", fontsize=16)
     ax.axis("off")
-    filename = os.path.join(
-        arg.output_dir, "Etot_Einc_dataset_{}_E_i.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"Etot_Einc_dataset_{arg.dataset}_E_i.pdf")
     plt.savefig(filename, dpi=300, format="pdf")
     plt.close()
 
@@ -242,9 +237,7 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
         ratio_isnan = np.isnan(ratio)
         ratio[ratio_isnan] = 1.0
         ratio_err[ratio_isnan] = 0.0
-        ax[1].step(
-            bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post"
-        )
+        ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post")
         ax[1].fill_between(
             bins,
             dup(ratio - ratio_err),
@@ -268,11 +261,11 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
         )
 
         seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-        print("Separation power of Etot / Einc histogram: {}".format(seps))
+        print(f"Separation power of Etot / Einc histogram: {seps}")
         with open(
             os.path.join(
                 arg.output_dir,
-                "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
             ),
             "a",
         ) as f:
@@ -280,9 +273,7 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
             f.write(str(seps))
             f.write("\n\n")
 
-    ax[1].hlines(
-        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-    )
+    ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0], bins[-1])
@@ -334,9 +325,7 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
         title_fontsize=16,
     )
     fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
-    filename = os.path.join(
-        arg.output_dir, "Etot_Einc_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"Etot_Einc_dataset_{arg.dataset}.pdf")
     fig.savefig(filename, dpi=300, format="pdf")
     plt.close()
 
@@ -437,9 +426,7 @@ def plot_Etot_Einc_scaled(hlfs, reference_class, arg, labels, input_names, p_lab
         ratio_isnan = np.isnan(ratio)
         ratio[ratio_isnan] = 1.0
         ratio_err[ratio_isnan] = 0.0
-        ax[1].step(
-            bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post"
-        )
+        ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where="post")
         ax[1].fill_between(
             bins,
             dup(ratio - ratio_err),
@@ -463,11 +450,11 @@ def plot_Etot_Einc_scaled(hlfs, reference_class, arg, labels, input_names, p_lab
         )
 
         seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-        print("Separation power of Etot / Einc histogram: {}".format(seps))
+        print(f"Separation power of Etot / Einc histogram: {seps}")
         with open(
             os.path.join(
                 arg.output_dir,
-                "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
             ),
             "a",
         ) as f:
@@ -475,9 +462,7 @@ def plot_Etot_Einc_scaled(hlfs, reference_class, arg, labels, input_names, p_lab
             f.write(str(seps))
             f.write("\n\n")
 
-    ax[1].hlines(
-        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-    )
+    ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0], bins[-1])
@@ -529,18 +514,14 @@ def plot_Etot_Einc_scaled(hlfs, reference_class, arg, labels, input_names, p_lab
         title_fontsize=16,
     )
     fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
-    filename = os.path.join(
-        arg.output_dir, "Etot_Einc_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"Etot_Einc_dataset_{arg.dataset}.pdf")
     fig.savefig(filename, dpi=300, format="pdf")
     plt.close()
 
 
 def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots energy deposited in each layer"""
-    filename = os.path.join(
-        arg.output_dir, "E_layer_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"E_layer_dataset_{arg.dataset}.pdf")
     with PdfPages(filename) as pdf:
         for key in reference_class.GetElayers().keys():
             fig, ax = plt.subplots(
@@ -553,10 +534,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
             if arg.x_scale == "log":
                 bins = np.logspace(
                     np.log10(arg.min_energy),
-                    np.log10(
-                        2 * arg.min_energy
-                        + np.nanmax(reference_class.GetElayers()[key])
-                    ),
+                    np.log10(2 * arg.min_energy + np.nanmax(reference_class.GetElayers()[key])),
                     40,
                 )
             else:
@@ -609,9 +587,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetElayers()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetElayers()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(
                     hlfs[i].GetElayers()[key], bins=bins, density=False
                 )
@@ -673,15 +649,15 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print("Separation power of E layer {} histogram: {}".format(key, seps))
+                print(f"Separation power of E layer {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
-                        "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                        f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
                     ),
                     "a",
                 ) as f:
-                    f.write("E layer {}: \n".format(key))
+                    f.write(f"E layer {key}: \n")
                     f.write(str(seps))
                     f.write("\n\n")
 
@@ -745,18 +721,14 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
 
 
 def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots center of energy in eta"""
-    filename = os.path.join(
-        arg.output_dir, "ECEta_layer_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"ECEta_layer_dataset_{arg.dataset}.pdf")
     with PdfPages(filename) as pdf:
         for key in reference_class.GetECEtas().keys():
             if arg.dataset in ["2", "3"]:
@@ -825,12 +797,8 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetECEtas()[key], bins=bins, density=False
-                )
-                counts_data, bins = np.histogram(
-                    hlfs[i].GetECEtas()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetECEtas()[key], bins=bins, density=False)
+                counts_data, bins = np.histogram(hlfs[i].GetECEtas()[key], bins=bins, density=False)
 
                 counts_data_norm = counts_data / counts_data.sum()
                 ax[0].step(
@@ -891,19 +859,15 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
 
-                print(
-                    "Separation power of EC Eta layer {} histogram: {}".format(
-                        key, seps
-                    )
-                )
+                print(f"Separation power of EC Eta layer {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
-                        "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                        f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
                     ),
                     "a",
                 ) as f:
-                    f.write("EC Eta layer {}: \n".format(key))
+                    f.write(f"EC Eta layer {key}: \n")
                     f.write(str(seps))
                     f.write("\n\n")
 
@@ -967,9 +931,7 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 title_fontsize=16,
                 fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
@@ -977,9 +939,7 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
 
 def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots center of energy in phi"""
-    filename = os.path.join(
-        arg.output_dir, "ECPhi_layer_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"ECPhi_layer_dataset_{arg.dataset}.pdf")
     with PdfPages(filename) as pdf:
         for key in reference_class.GetECPhis().keys():
             if arg.dataset in ["2", "3"]:
@@ -1048,12 +1008,8 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetECPhis()[key], bins=bins, density=False
-                )
-                counts_data, bins = np.histogram(
-                    hlfs[i].GetECPhis()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetECPhis()[key], bins=bins, density=False)
+                counts_data, bins = np.histogram(hlfs[i].GetECPhis()[key], bins=bins, density=False)
 
                 counts_data_norm = counts_data / counts_data.sum()
                 ax[0].step(
@@ -1114,19 +1070,15 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print(
-                    "Separation power of EC Phi layer {} histogram: {}".format(
-                        key, seps
-                    )
-                )
+                print(f"Separation power of EC Phi layer {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
-                        "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                        f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
                     ),
                     "a",
                 ) as f:
-                    f.write("EC Phi layer {}: \n".format(key))
+                    f.write(f"EC Phi layer {key}: \n")
                     f.write(str(seps))
                     f.write("\n\n")
 
@@ -1190,9 +1142,7 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 title_fontsize=16,
                 fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
@@ -1200,9 +1150,7 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
 
 def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots width of center of energy in eta"""
-    filename = os.path.join(
-        arg.output_dir, "WidthEta_layer_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"WidthEta_layer_dataset_{arg.dataset}.pdf")
     with PdfPages(filename) as pdf:
         for key in reference_class.GetWidthEtas().keys():
             if arg.dataset in ["2", "3"]:
@@ -1271,9 +1219,7 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetWidthEtas()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetWidthEtas()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(
                     hlfs[i].GetWidthEtas()[key], bins=bins, density=False
                 )
@@ -1337,19 +1283,15 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print(
-                    "Separation power of Width Eta layer {} histogram: {}".format(
-                        key, seps
-                    )
-                )
+                print(f"Separation power of Width Eta layer {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
-                        "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                        f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
                     ),
                     "a",
                 ) as f:
-                    f.write("Width Eta layer {}: \n".format(key))
+                    f.write(f"Width Eta layer {key}: \n")
                     f.write(str(seps))
                     f.write("\n\n")
 
@@ -1413,9 +1355,7 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
@@ -1423,9 +1363,7 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
 
 def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots width of center of energy in phi"""
-    filename = os.path.join(
-        arg.output_dir, "WidthPhi_layer_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"WidthPhi_layer_dataset_{arg.dataset}.pdf")
     with PdfPages(filename) as pdf:
         for key in reference_class.GetWidthPhis().keys():
             if arg.dataset in ["2", "3"]:
@@ -1494,9 +1432,7 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    hlfs[i].GetWidthPhis()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(hlfs[i].GetWidthPhis()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(
                     hlfs[i].GetWidthPhis()[key], bins=bins, density=False
                 )
@@ -1560,19 +1496,15 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print(
-                    "Separation power of Width Phi layer {} histogram: {}".format(
-                        key, seps
-                    )
-                )
+                print(f"Separation power of Width Phi layer {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
-                        "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                        f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
                     ),
                     "a",
                 ) as f:
-                    f.write("Width Phi layer {}: \n".format(key))
+                    f.write(f"Width Phi layer {key}: \n")
                     f.write(str(seps))
                     f.write("\n\n")
 
@@ -1636,31 +1568,29 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format="pdf")
             plt.close()
 
 
-def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label, l=1):
+def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label, L=1):
     """Plot weighted depth"""
     filename = os.path.join(
         arg.output_dir,
-        "Weighted_Depth_slice_dataset_{}_groups_{}.pdf".format(arg.dataset, l),
+        f"Weighted_Depth_slice_dataset_{arg.dataset}_groups_{L}.pdf",
     )
     g = 0
     with PdfPages(filename) as pdf:
         func_ref = (
             reference_hlf.GetWeightedDepthR()
-            if l == 1
+            if L == 1
             else reference_hlf.GetGroupedWeightedDepthR()
         )
         for n, key in enumerate(func_ref.keys()):
             bins = np.linspace(
-                g * len(reference_hlf.relevantLayers) / l,
-                (g + 1) * len(reference_hlf.relevantLayers) / l,
+                g * len(reference_hlf.relevantLayers) / L,
+                (g + 1) * len(reference_hlf.relevantLayers) / L,
                 40,
             )
             fig, ax = plt.subplots(
@@ -1714,16 +1644,12 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
                 fmt=".",
                 capsize=2,
             )
-            for j, file in enumerate(hlfs):
+            for j in range(len(hlfs)):
                 func_hlf = (
-                    hlfs[j].GetWeightedDepthR()
-                    if l == 1
-                    else hlfs[j].GetGroupedWeightedDepthR()
+                    hlfs[j].GetWeightedDepthR() if L == 1 else hlfs[j].GetGroupedWeightedDepthR()
                 )
                 counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
-                counts_data, bins = np.histogram(
-                    func_hlf[key], bins=bins, density=False
-                )
+                counts_data, bins = np.histogram(func_hlf[key], bins=bins, density=False)
                 counts_data_norm = counts_data / counts_data.sum()
 
                 ax[0].step(
@@ -1784,19 +1710,15 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print(
-                    "Separation power of Weighted depth slice {} histogram: {}".format(
-                        key, seps
-                    )
-                )
+                print(f"Separation power of Weighted depth slice {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
-                        "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[j]),
+                        f"histogram_chi2_{arg.dataset}_{input_names[j]}.txt",
                     ),
                     "a",
                 ) as f:
-                    f.write("Weighted depth slice {}: \n".format(key))
+                    f.write(f"Weighted depth slice {key}: \n")
                     f.write(str(seps))
                     f.write("\n\n")
 
@@ -1859,35 +1781,31 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n + 1) % (reference_hlf.num_alpha[0]) == 0:
                 g += 1
             plt.savefig(pdf, format="pdf")
             plt.close()
 
 
-def plot_weighted_depth_a(
-    hlfs, reference_class, arg, labels, input_names, p_label, l=1
-):
+def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_label, L=1):
     """Plot weighted depth"""
     g = 0
     filename = os.path.join(
         arg.output_dir,
-        "Weighted_Depth_ring_dataset_{}_groups_{}.pdf".format(arg.dataset, l),
+        f"Weighted_Depth_ring_dataset_{arg.dataset}_groups_{L}.pdf",
     )
 
     with PdfPages(filename) as pdf:
         func_ref = (
             reference_class.GetWeightedDepthA()
-            if l == 1
+            if L == 1
             else reference_class.GetGroupedWeightedDepthA()
         )
         for n, key in enumerate(func_ref.keys()):
             bins = np.linspace(
-                g * len(reference_class.relevantLayers) / l,
-                (g + 1) * len(reference_class.relevantLayers) / l,
+                g * len(reference_class.relevantLayers) / L,
+                (g + 1) * len(reference_class.relevantLayers) / L,
                 40,
             )
             fig, ax = plt.subplots(
@@ -1941,16 +1859,12 @@ def plot_weighted_depth_a(
                 fmt=".",
                 capsize=2,
             )
-            for j, file in enumerate(hlfs):
+            for j in range(len(hlfs)):
                 func_hlf = (
-                    hlfs[j].GetWeightedDepthA()
-                    if l == 1
-                    else hlfs[j].GetGroupedWeightedDepthA()
+                    hlfs[j].GetWeightedDepthA() if L == 1 else hlfs[j].GetGroupedWeightedDepthA()
                 )
                 counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
-                counts_data, bins = np.histogram(
-                    func_hlf[key], bins=bins, density=False
-                )
+                counts_data, bins = np.histogram(func_hlf[key], bins=bins, density=False)
                 counts_data_norm = counts_data / counts_data.sum()
 
                 ax[0].step(
@@ -2011,19 +1925,15 @@ def plot_weighted_depth_a(
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print(
-                    "Separation power of Weighted depth ring {} histogram: {}".format(
-                        key, seps
-                    )
-                )
+                print(f"Separation power of Weighted depth ring {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
-                        "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[j]),
+                        f"histogram_chi2_{arg.dataset}_{input_names[j]}.txt",
                     ),
                     "a",
                 ) as f:
-                    f.write("Weighted depth ring {}: \n".format(key))
+                    f.write(f"Weighted depth ring {key}: \n")
                     f.write(str(seps))
                     f.write("\n\n")
 
@@ -2086,9 +1996,7 @@ def plot_weighted_depth_a(
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n + 1) % (len(reference_class.r_edges[0]) - 1) == 0:
                 g += 1
 
@@ -2098,9 +2006,7 @@ def plot_weighted_depth_a(
 
 def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
     """Plot sparsity of relevant layers"""
-    filename = os.path.join(
-        arg.output_dir, "Sparsity_layer_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"Sparsity_layer_dataset_{arg.dataset}.pdf")
     with PdfPages(filename) as pdf:
         for key in reference_class.GetSparsity().keys():
             lim = (0, 1)
@@ -2160,9 +2066,7 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                 capsize=2,
             )
             for i in range(len(hlfs)):
-                counts, _ = np.histogram(
-                    1 - hlfs[i].GetSparsity()[key], bins=bins, density=False
-                )
+                counts, _ = np.histogram(1 - hlfs[i].GetSparsity()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(
                     1 - hlfs[i].GetSparsity()[key], bins=bins, density=False
                 )
@@ -2226,19 +2130,15 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                 )
 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-                print(
-                    "Separation power of Sparsity layer {} histogram: {}".format(
-                        key, seps
-                    )
-                )
+                print(f"Separation power of Sparsity layer {key} histogram: {seps}")
                 with open(
                     os.path.join(
                         arg.output_dir,
-                        "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                        f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
                     ),
                     "a",
                 ) as f:
-                    f.write("Sparsity {}: \n".format(key))
+                    f.write(f"Sparsity {key}: \n")
                     f.write(str(seps))
                     f.write("\n\n")
 
@@ -2301,18 +2201,14 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                 fontsize=16,
                 title_fontsize=16,
             )
-            fig.tight_layout(
-                pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98)
-            )
+            fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             plt.savefig(pdf, format="pdf")
             plt.close()
 
 
 def plot_z_profile(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots energy profile in the z direction"""
-    filename = os.path.join(
-        arg.output_dir, "profile_energy_z_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"profile_energy_z_dataset_{arg.dataset}.pdf")
 
     ref_layer_energies = reference_class.GetElayers()
     ref_means = np.array([ref_layer_energies[key].mean() for key in ref_layer_energies])
@@ -2398,9 +2294,7 @@ def plot_z_profile(hlfs, reference_class, arg, labels, input_names, p_label):
 
             with np.errstate(divide="ignore", invalid="ignore"):
                 ratio = gen_means / ref_means
-                ratio_err = ratio * np.sqrt(
-                    (gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2
-                )
+                ratio_err = ratio * np.sqrt((gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2)
                 ratio[np.isnan(ratio)] = 1.0
                 ratio_err[np.isnan(ratio_err)] = 0.0
 
@@ -2426,7 +2320,7 @@ def plot_z_profile(hlfs, reference_class, arg, labels, input_names, p_label):
             with open(
                 os.path.join(
                     arg.output_dir,
-                    "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                    f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
                 ),
                 "a",
             ) as f:
@@ -2468,9 +2362,7 @@ def plot_z_profile(hlfs, reference_class, arg, labels, input_names, p_label):
 
 def plot_r_profile(hlfs, reference_class, arg, labels, input_names, p_label):
     """plots energy profile in the radial direction"""
-    filename = os.path.join(
-        arg.output_dir, "profile_energy_r_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"profile_energy_r_dataset_{arg.dataset}.pdf")
 
     ref_layer_energies = reference_class.GetEradial()
     ref_means = np.array([ref_layer_energies[key].mean() for key in ref_layer_energies])
@@ -2556,9 +2448,7 @@ def plot_r_profile(hlfs, reference_class, arg, labels, input_names, p_label):
 
             with np.errstate(divide="ignore", invalid="ignore"):
                 ratio = gen_means / ref_means
-                ratio_err = ratio * np.sqrt(
-                    (gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2
-                )
+                ratio_err = ratio * np.sqrt((gen_sem / gen_means) ** 2 + (ref_sem / ref_means) ** 2)
                 ratio[np.isnan(ratio)] = 1.0
                 ratio_err[np.isnan(ratio_err)] = 0.0
 
@@ -2579,15 +2469,12 @@ def plot_r_profile(hlfs, reference_class, arg, labels, input_names, p_label):
                 alpha=0.2,
             )
 
-            delta = np.fabs(ratio - 1) * 100
-            delta_err = ratio_err * 100
-
             seps = _separation_power(ref_means, gen_means, None)
             print(f"Separation power of r profile: {seps}")
             with open(
                 os.path.join(
                     arg.output_dir,
-                    "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                    f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
                 ),
                 "a",
             ) as f:
@@ -2688,9 +2575,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
     )
     for i in range(len(list_showers)):
         counts, _ = np.histogram(list_showers[i].flatten(), bins=bins, density=False)
-        counts_data, bins = np.histogram(
-            list_showers[i].flatten(), bins=bins, density=False
-        )
+        counts_data, bins = np.histogram(list_showers[i].flatten(), bins=bins, density=False)
 
         counts_data_norm = counts_data / counts_data.sum()
         ax[0].step(
@@ -2720,9 +2605,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
         ratio[ratio_isnan] = 1.0
         ratio_err[ratio_isnan] = 0.0
 
-        ax[1].step(
-            bins, dup(ratio), linewidth=1.5, alpha=1.0, color=colors[i], where="post"
-        )
+        ax[1].step(bins, dup(ratio), linewidth=1.5, alpha=1.0, color=colors[i], where="post")
         ax[1].fill_between(
             bins,
             dup(ratio - y_ref_err / counts_ref),
@@ -2746,11 +2629,11 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
         )
 
         seps = _separation_power(counts_ref_norm, counts_data_norm, bins=None)
-        print("Separation power of voxel distribution histogram: {}".format(seps))
+        print(f"Separation power of voxel distribution histogram: {seps}")
         with open(
             os.path.join(
                 arg.output_dir,
-                "histogram_chi2_{}_{}.txt".format(arg.dataset, input_names[i]),
+                f"histogram_chi2_{arg.dataset}_{input_names[i]}.txt",
             ),
             "a",
         ) as f:
@@ -2758,9 +2641,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
             f.write(str(seps))
             f.write("\n\n")
 
-    ax[1].hlines(
-        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-    )
+    ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0] + 2 * arg.min_energy, bins[-1])
@@ -2816,9 +2697,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
         title_fontsize=16,
     )
     fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
-    filename = os.path.join(
-        arg.output_dir, "voxel_energy_dataset_{}.pdf".format(arg.dataset)
-    )
+    filename = os.path.join(arg.output_dir, f"voxel_energy_dataset_{arg.dataset}.pdf")
     plt.savefig(filename, dpi=300, format="pdf")
     plt.close()
 

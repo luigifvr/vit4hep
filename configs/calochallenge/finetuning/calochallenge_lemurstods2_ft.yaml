@@ -79,5 +79,5 @@ evaluation:
 
 defaults:
  - default
- - training: default
+ - training: cfm/shape
  - model: cfm/cfm_ds2_electrons_ft

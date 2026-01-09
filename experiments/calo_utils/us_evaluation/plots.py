@@ -1,7 +1,8 @@
 import os
+
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib
 
 
 def plot_ui_dists(
@@ -20,8 +21,7 @@ def plot_ui_dists(
     """
 
     # iterate layers
-    for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T)):
-
+    for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T, strict=True)):
         # create figure and subaxes
         fig, ax = plt.subplots(
             3,
@@ -106,7 +106,7 @@ def plot_ui_dists(
         ax[0].semilogy()
         # ax[0].set_ylim(None, min(ax[0].get_ylim()[1], 200))
         ax[0].set_ylim(max(ax[0].get_ylim()[0], 1.1e-4), None)
-        ax[0].set_ylabel(f"Prob. density")
+        ax[0].set_ylabel("Prob. density")
 
         ## RATIO AXIS ##
         norm = ref_vals
@@ -177,9 +177,7 @@ def plot_ui_dists(
         ax[1].set_xlabel(f"$u_{{{i}}}$")
         ax[0].set_xticklabels([])
 
-        ax[1].hlines(
-            1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-        )
+        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
         ax[1].set_yticks((0.7, 1.0, 1.3))
         ax[1].set_ylim(0.5, 1.5)
         ax[0].set_xlim(bins[0], bins[-1])

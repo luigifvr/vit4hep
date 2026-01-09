@@ -1,5 +1,5 @@
-from einops import rearrange
 import torch
+from einops import rearrange
 from torchdiffeq import odeint
 
 from models.base_model import CFM
@@ -27,13 +27,13 @@ class LEMURSCFM(CFM):
         )
 
         self.patch_shape = patch_shape
-        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape)]
+        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape, strict=True)]
         self.in_channels = in_channels
 
-        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape)):
-            assert (
-                s % p == 0
-            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
+        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape, strict=True)):
+            assert s % p == 0, (
+                f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
+            )
 
         self.net = net
 
@@ -45,6 +45,7 @@ class LEMURSCFM(CFM):
                 zip(
                     ("l", "a", "r", "p1", "p2", "p3"),
                     self.num_patches + self.patch_shape,
+                    strict=True,
                 )
             ),
         )
@@ -54,7 +55,7 @@ class LEMURSCFM(CFM):
         x = rearrange(
             x,
             "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
-            **dict(zip(("p1", "p2", "p3"), self.patch_shape)),
+            **dict(zip(("p1", "p2", "p3"), self.patch_shape, strict=True)),
         )
         return x
 

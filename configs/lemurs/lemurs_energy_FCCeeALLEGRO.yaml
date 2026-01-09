@@ -61,6 +61,6 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/energy
  - /model: cfm_lemurs/cfm_lemurs_energy
  - _self_

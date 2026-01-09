@@ -1,24 +1,21 @@
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import h5py
-import torch
-from torch.utils.data import TensorDataset, DataLoader
 
-from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import *
-import experiments.calo_utils.ugr_evaluation.HighLevelFeatures as HLF
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+
 from experiments.calo_utils.ugr_evaluation.evaluate import (
     DNN,
-    ttv_split,
+    evaluate_cls,
     load_classifier,
     train_and_evaluate_cls,
-    evaluate_cls,
+    ttv_split,
 )
-from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import (
-    _separation_power,
-)
-from experiments.logger import LOGGER
+from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import _separation_power, dup
 from experiments.calohadronic.utils import load_data
+from experiments.logger import LOGGER
 
 torch.set_default_dtype(torch.float64)
 
@@ -201,9 +198,7 @@ def run_from_py(ecal, hcal, energy, cfg):
     n_hits_g4 = get_n_hits(ecal_g4, hcal_g4, threshold=min_energy)
     all_voxels_g4 = np.concatenate((ecal_g4.flatten(), hcal_g4.flatten()), axis=0)
 
-    features_gen = np.stack(
-        (cog_x_gen, cog_y_gen, cog_z_gen, energy_gen, n_hits_gen), axis=1
-    )
+    features_gen = np.stack((cog_x_gen, cog_y_gen, cog_z_gen, energy_gen, n_hits_gen), axis=1)
     features_g4 = np.stack((cog_x_g4, cog_y_g4, cog_z_g4, energy_g4, n_hits_g4), axis=1)
     plot_histograms(
         features_gen,
@@ -272,20 +267,12 @@ def run_from_py(ecal, hcal, energy, cfg):
     classifier = DNN(**DNN_kwargs)
     classifier.to(device)
     print(classifier)
-    total_parameters = sum(
-        p.numel() for p in classifier.parameters() if p.requires_grad
-    )
+    total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
 
-    print("Classifier has {} parameters".format(int(total_parameters)))
-    train_data = TensorDataset(
-        torch.tensor(train_data, dtype=torch.get_default_dtype()).to(device)
-    )
-    test_data = TensorDataset(
-        torch.tensor(test_data, dtype=torch.get_default_dtype()).to(device)
-    )
-    val_data = TensorDataset(
-        torch.tensor(val_data, dtype=torch.get_default_dtype()).to(device)
-    )
+    print(f"Classifier has {int(total_parameters)} parameters")
+    train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()).to(device))
+    test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()).to(device))
+    val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()).to(device))
     train_dataloader = DataLoader(
         train_data, batch_size=cfg.evaluation.eval_cls_batch_size, shuffle=True
     )
@@ -297,9 +284,7 @@ def run_from_py(ecal, hcal, energy, cfg):
     )
     optimizer = torch.optim.Adam(classifier.parameters(), lr=cfg.evaluation.eval_cls_lr)
 
-    train_and_evaluate_cls(
-        classifier, train_dataloader, test_dataloader, optimizer, args
-    )
+    train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
     classifier = load_classifier(classifier, args)
 
     with torch.inference_mode():
@@ -312,7 +297,7 @@ def run_from_py(ecal, hcal, energy, cfg):
             calibration_data=test_dataloader,
         )
     print("Final result of classifier test (AUC / JSD):")
-    print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+    print(f"{eval_auc:.4f} / {eval_JSD:.4f}")
     with open(
         os.path.join(
             output_dir,
@@ -322,13 +307,11 @@ def run_from_py(ecal, hcal, energy, cfg):
     ) as f:
         f.write(
             "Final result of classifier test (AUC / JSD):\n"
-            + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
+            + f"{eval_auc:.4f} / {eval_JSD:.4f}\n\n"
         )
 
 
-def plot_feature(
-    feature_gen, feature_g4, arg, title="", label="", title_label="", output_dir=""
-):
+def plot_feature(feature_gen, feature_g4, arg, title="", label="", title_label="", output_dir=""):
     gen_label = arg.evaluation.label
     g4_min = np.nanmin(feature_g4[np.isfinite(feature_g4)])
     g4_max = np.nanmax(feature_g4[np.isfinite(feature_g4)])
@@ -418,9 +401,7 @@ def plot_feature(
     ratio_isnan = np.isnan(ratio)
     ratio[ratio_isnan] = 1.0
     ratio_err[ratio_isnan] = 0.0
-    ax[1].step(
-        bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[0], where="post"
-    )
+    ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[0], where="post")
     ax[1].fill_between(
         bins,
         dup(ratio - ratio_err),
@@ -444,7 +425,7 @@ def plot_feature(
     )
 
     seps = _separation_power(counts_ref_norm, counts_data_norm, None)
-    print("Separation power of {} histogram: {}".format(title, seps))
+    print(f"Separation power of {title} histogram: {seps}")
     with open(
         os.path.join(
             output_dir,
@@ -456,9 +437,7 @@ def plot_feature(
         f.write(str(seps))
         f.write("\n\n")
 
-    ax[1].hlines(
-        1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-    )
+    ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0], bins[-1])
@@ -510,6 +489,6 @@ def plot_feature(
         title_fontsize=18,
     )
     fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
-    filename = os.path.join(output_dir, "{}.pdf".format(title))
+    filename = os.path.join(output_dir, f"{title}.pdf")
     fig.savefig(filename, dpi=300, format="pdf")
     plt.close()

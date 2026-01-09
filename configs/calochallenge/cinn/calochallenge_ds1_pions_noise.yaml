@@ -22,6 +22,7 @@ data:
         ptype: /gpfs/projects/acad/hepml/datasets/calo_challenge/binning_dataset_1_pions.xml,
         xml_filename: pion,
         num_bins: [1, 10, 10, 1, 10, 10, 1],
+        add_bins: [10, 10, 10, 10, 10, 10, 10],
     },
     SelectiveUniformNoise: {
         a: 1.e-7,
@@ -30,7 +31,7 @@ data:
         exclusions: [-7,  -6,  -5,  -4,  -3,  -2,  -1]
     },
     ExclusiveLogitTransform: {delta: 1.0e-6, rescale: True},
-    GlobalStandardizeFromFile: {model_dir: None},
+    GlobalStandardizeFromFile: {model_dir: null},
     LogEnergy: {},
     ScaleEnergy: {e_min: 5.5452, e_max: 15.2492},
     AddFeaturesToCond: {split_index: 740},
@@ -38,10 +39,12 @@ data:
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_dataset: "1-pions"
   eval_mode: all
+  eval_p_label: ""
+  eval_labels: ["ViT-cINN"]
   eval_cut: 0.01515
   eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_2.hdf5
   eval_cls_n_layer: 2

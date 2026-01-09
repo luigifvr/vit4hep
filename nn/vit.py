@@ -1,11 +1,11 @@
 """Modified from github.com/facebookresearch/DiT/blob/main/models.py"""
 
 import math
+
 import torch
 import torch.nn as nn
-
-from torch.utils.checkpoint import checkpoint
 from timm.models.vision_transformer import Mlp
+from torch.utils.checkpoint import checkpoint
 from xformers.ops import memory_efficient_attention
 
 
@@ -47,8 +47,7 @@ class ViT(nn.Module):
     """
 
     def __init__(self, param):
-
-        super(ViT, self).__init__()
+        super().__init__()
 
         defaults = {
             "dim": 3,
@@ -105,14 +104,11 @@ class ViT(nn.Module):
 
         # compute layer-causal attention mask
         if self.causal_attn:
-            l, a, r = self.num_patches
-            assert (
-                self.dim == 3
-            ), "A layer-causal attention mask should only be used in 3d"
-            patch_idcs = torch.arange(l * a * r)
+            L, A, R = self.num_patches
+            assert self.dim == 3, "A layer-causal attention mask should only be used in 3d"
+            patch_idcs = torch.arange(L * A * R)
             self.attn_mask = nn.Parameter(
-                patch_idcs[:, None] // (a * r)
-                >= patch_idcs[None, :] // (a * r),  # tril (causal)
+                patch_idcs[:, None] // (A * R) >= patch_idcs[None, :] // (A * R),  # tril (causal)
                 requires_grad=False,
             )
 
@@ -133,9 +129,7 @@ class ViT(nn.Module):
         )
 
         # initialize output layer
-        self.final_layer = FinalLayer(
-            self.hidden_dim, self.patch_dim, self.out_channels, x_out=1
-        )
+        self.final_layer = FinalLayer(self.hidden_dim, self.patch_dim, self.out_channels, x_out=1)
 
         # custom weight initialization
         self.initialize_weights()
@@ -145,17 +139,15 @@ class ViT(nn.Module):
         sum_l = sum([num_patches_elem[0] for num_patches_elem in self.num_patches])
         sum_lgrid = torch.arange(sum_l) / sum_l
         for n, num_patches_elem in enumerate(self.num_patches):
-            _, a, r = num_patches_elem
+            _, A, R = num_patches_elem
             lgrid = sum_lgrid[
                 sum([self.num_patches[i][0] for i in range(n)]) : sum(
                     [self.num_patches[i][0] for i in range(n + 1)]
                 )
             ]
-            agrid = torch.arange(a) / a
-            rgrid = torch.arange(r) / r
-            z, y, x = torch.meshgrid(
-                lgrid, agrid, rgrid, indexing="ij"
-            )  # shape (l, a, r)
+            agrid = torch.arange(A) / A
+            rgrid = torch.arange(R) / R
+            z, y, x = torch.meshgrid(lgrid, agrid, rgrid, indexing="ij")  # shape (L, A, R)
             pos_z.append(z.flatten())
             pos_y.append(y.flatten())
             pos_x.append(x.flatten())
@@ -200,9 +192,7 @@ class ViT(nn.Module):
         if self.learn_pos_embed:
             x = self.x_embedder(x) + self.learnable_pos_embedding()
         else:
-            x = (
-                self.x_embedder(x) + self.pos_embed
-            )  # (B, T, D), where T = (L*A*R)/prod(patch_size)
+            x = self.x_embedder(x) + self.pos_embed  # (B, T, D), where T = (L*A*R)/prod(patch_size)
 
         t = self.t_embedder(t)  # (B, D)
         c = self.c_embedder(c)  # (B, D)
@@ -229,7 +219,6 @@ class ViT1D(ViT):
     """
 
     def __init__(self, param):
-
         super().__init__(param)
         defaults = {
             "prod_num_patches": 15 * 4 * 9,
@@ -298,9 +287,7 @@ class ViT1D(ViT):
         if self.learn_pos_embed:
             x = self.x_embedder(x) + self.learnable_pos_embedding()
         else:
-            x = (
-                self.x_embedder(x) + self.pos_embed
-            )  # (B, T, D), where T = (L*A*R)/prod(patch_size)
+            x = self.x_embedder(x) + self.pos_embed  # (B, T, D), where T = (L*A*R)/prod(patch_size)
 
         c = self.c_embedder(c)  # (B, D)
         for block in self.blocks:
@@ -320,12 +307,13 @@ class DiTBlock(nn.Module):
     def __init__(self, hidden_size, num_heads, mlp_ratio=4.0, **block_kwargs):
         super().__init__()
         self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
-        self.attn = Attention(
-            hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs
-        )
+        self.attn = Attention(hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs)
         self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
-        approx_gelu = lambda: nn.GELU(approximate="tanh")
+
+        def approx_gelu():
+            return nn.GELU(approximate="tanh")
+
         self.mlp = Mlp(
             in_features=hidden_size,
             hidden_features=mlp_hidden_dim,
@@ -337,15 +325,11 @@ class DiTBlock(nn.Module):
         )
 
     def forward(self, x, c):
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
-            self.adaLN_modulation(c).chunk(6, dim=1)
-        )
-        x = x + gate_msa.unsqueeze(1) * self.attn(
-            modulate(self.norm1(x), shift_msa, scale_msa)
-        )
-        x = x + gate_mlp.unsqueeze(1) * self.mlp(
-            modulate(self.norm2(x), shift_mlp, scale_mlp)
-        )
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(
+            c
+        ).chunk(6, dim=1)
+        x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa))
+        x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
 
 
@@ -358,9 +342,7 @@ class FinalLayer(nn.Module):
         super().__init__()
         self.norm_final = nn.LayerNorm(hidden_dim, elementwise_affine=False, eps=1e-6)
         self.linear = nn.Linear(hidden_dim, out_channels * x_out * patch_dim)
-        self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(), nn.Linear(hidden_dim, 2 * hidden_dim)
-        )
+        self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_dim, 2 * hidden_dim))
 
     def forward(self, x, c):
         shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
@@ -403,9 +385,7 @@ class TimestepEmbedder(nn.Module):
         args = t.float() * freqs[None]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
         if dim % 2:
-            embedding = torch.cat(
-                [embedding, torch.zeros_like(embedding[:, :1])], dim=-1
-            )
+            embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
         return embedding
 
     def forward(self, t):
@@ -415,7 +395,6 @@ class TimestepEmbedder(nn.Module):
 
 
 class Attention(nn.Module):
-
     def __init__(
         self,
         dim: int,
@@ -445,11 +424,7 @@ class Attention(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, N, C = x.shape
-        qkv = (
-            self.qkv(x)
-            .reshape(B, N, 3, self.num_heads, self.head_dim)
-            .permute(2, 0, 3, 1, 4)
-        )
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv.unbind(0)
         q, k = self.q_norm(q), self.k_norm(k)
 
@@ -483,9 +458,7 @@ def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
 
-def get_sincos_pos_embed(
-    pos_embedding_coords, num_patches, hidden_dim, dim, temperature=10000
-):
+def get_sincos_pos_embed(pos_embedding_coords, num_patches, hidden_dim, dim, temperature=10000):
     if pos_embedding_coords == "cylindrical" and dim == 3:
         pe = get_3d_cylindrical_sincos_pos_embed(num_patches, hidden_dim, temperature)
     elif pos_embedding_coords == "cartesian" and dim == 3:

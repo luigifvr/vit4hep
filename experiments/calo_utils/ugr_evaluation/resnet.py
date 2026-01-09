@@ -14,9 +14,7 @@ def get_inplanes():
 
 
 def conv3x3x3(in_planes, out_planes, stride=1):
-    return nn.Conv3d(
-        in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
-    )
+    return nn.Conv3d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
 
 
 def conv1x1x1(in_planes, out_planes, stride=1):
@@ -96,7 +94,6 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-
     def __init__(
         self,
         block,
@@ -130,18 +127,10 @@ class ResNet(nn.Module):
         self.bn1 = nn.BatchNorm3d(self.in_planes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(
-            block, block_inplanes[0], layers[0], shortcut_type
-        )
-        self.layer2 = self._make_layer(
-            block, block_inplanes[1], layers[1], shortcut_type, stride=2
-        )
-        self.layer3 = self._make_layer(
-            block, block_inplanes[2], layers[2], shortcut_type, stride=2
-        )
-        self.layer4 = self._make_layer(
-            block, block_inplanes[3], layers[3], shortcut_type, stride=2
-        )
+        self.layer1 = self._make_layer(block, block_inplanes[0], layers[0], shortcut_type)
+        self.layer2 = self._make_layer(block, block_inplanes[1], layers[1], shortcut_type, stride=2)
+        self.layer3 = self._make_layer(block, block_inplanes[2], layers[2], shortcut_type, stride=2)
+        self.layer4 = self._make_layer(block, block_inplanes[3], layers[3], shortcut_type, stride=2)
 
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
         self.fc = nn.Linear(block_inplanes[3] * block.expansion + 1, n_classes)
@@ -192,7 +181,7 @@ class ResNet(nn.Module):
             )
         )
         self.in_planes = planes * block.expansion
-        for i in range(1, blocks):
+        for _ in range(1, blocks):
             layers.append(block(self.in_planes, planes))
 
         return nn.Sequential(*layers)

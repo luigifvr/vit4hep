@@ -31,7 +31,6 @@ def sine2_cosine2_trajectory(x_0, x_1, t):
 
 
 def vp_trajectory(x_0, x_1, t, a=19.9, b=0.1):
-
     e = -1.0 / 4.0 * a * (1 - t) ** 2 - 1.0 / 2.0 * b * (1 - t)
     alpha_t = torch.exp(e)
     beta_t = torch.sqrt(1 - alpha_t**2)

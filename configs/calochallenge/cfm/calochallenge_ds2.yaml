@@ -33,7 +33,7 @@ evaluation:
   eval_dataset: "2"
   eval_mode: all
   eval_cut: 0.015
-  eval_labels: ["Vit-CFM"]
+  eval_labels: ["ViT-CFM"]
   eval_p_label: ""
   eval_hdf5_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/dataset_2_2.hdf5
   eval_cls_n_layer: 2
@@ -50,5 +50,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/shape
  - /model: cfm/cfm_ds2_electrons

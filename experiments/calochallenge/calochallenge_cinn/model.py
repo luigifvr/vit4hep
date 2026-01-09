@@ -1,16 +1,17 @@
 import math
-from einops import rearrange
+
 import torch
+from einops import rearrange
+from FrEIA.framework import ConditionNode, GraphINN, InputNode, Node, OutputNode
 from torchdiffeq import odeint
 
-from FrEIA.framework import InputNode, Node, OutputNode, GraphINN, ConditionNode
-from models.base_model import CINN
 from experiments.calochallenge.calochallenge_cinn.freia_utils import (
+    get_block_kwargs,
     get_coupling_block,
     get_permutation_block,
     get_vit_block_kwargs,
-    get_block_kwargs,
 )
+from models.base_model import CINN
 
 
 class CaloChallengeCINN(CINN):
@@ -28,14 +29,14 @@ class CaloChallengeCINN(CINN):
     ):
         super().__init__(*args, **kwargs)
 
-        self.patch_shape = patch_shape
-        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape)]
+        self.patch_shape = patch_shape[0]
+        self.num_patches = [s // p for s, p in zip(self.shape, self.patch_shape, strict=True)]
         self.in_channels = in_channels
 
-        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape)):
-            assert (
-                s % p == 0
-            ), f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
+        for i, (s, p) in enumerate(zip(self.shape, self.patch_shape, strict=True)):
+            assert s % p == 0, (
+                f"Input size ({s}) should be divisible by patch size ({p}) in axis {i}."
+            )
 
         self.nblocks = nblocks
         self.CouplingBlock = get_coupling_block(coupling_block)
@@ -63,6 +64,7 @@ class CaloChallengeCINN(CINN):
                     zip(
                         ("l", "a", "r", "p1", "p2", "p3"),
                         self.num_patches + self.patch_shape,
+                        strict=True,
                     )
                 ),
             )
@@ -71,7 +73,7 @@ class CaloChallengeCINN(CINN):
                 x,
                 "b (a r) (p1 p2 c) -> b c (a p1) (r p2)",
                 **dict(
-                    zip(("a", "r", "p1", "p2"), self.num_patches + self.patch_shape)
+                    zip(("a", "r", "p1", "p2"), self.num_patches + self.patch_shape, strict=True)
                 ),
             )
         else:
@@ -83,13 +85,13 @@ class CaloChallengeCINN(CINN):
             x = rearrange(
                 x,
                 "b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)",
-                **dict(zip(("p1", "p2", "p3"), self.patch_shape)),
+                **dict(zip(("p1", "p2", "p3"), self.patch_shape, strict=True)),
             )
         elif dim == 2:
             x = rearrange(
                 x,
                 "b c (a p1) (r p2) -> b (a r) (p1 p2 c)",
-                **dict(zip(("p1", "p2"), self.patch_shape)),
+                **dict(zip(("p1", "p2"), self.patch_shape, strict=True)),
             )
         else:
             raise ValueError(dim)
@@ -153,7 +155,6 @@ class CaloChallengeEnergyCINN(CINN):
         self.net = self.build_net()
 
     def build_net(self):
-
         nodes = [InputNode(*self.shape, name="Input")]
         cond_node = ConditionNode(1, name="cond")
         for i in range(self.nblocks):

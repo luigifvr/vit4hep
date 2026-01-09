@@ -1,15 +1,16 @@
 import os
-from omegaconf import OmegaConf, open_dict
+import time
+
+import numpy as np
 import torch
 import torch.nn as nn
-from torch_ema import ExponentialMovingAverage
-import time
-import numpy as np
+from omegaconf import OmegaConf, open_dict
 from torch.utils.data import DataLoader
+from torch_ema import ExponentialMovingAverage
 
-from experiments.calohadronic.datasets import CaloHadDataset, CaloHadCollator
-from experiments.logger import LOGGER
+from experiments.calohadronic.datasets import CaloHadCollator, CaloHadDataset
 from experiments.calohadronic.experiment import CaloHadronic
+from experiments.logger import LOGGER
 from experiments.misc import remove_module_from_state_dict
 from nn.vit import FinalLayer, get_sincos_pos_embed
 
@@ -49,11 +50,9 @@ class CaloHadronicFT(CaloHadronic):
             f"model_run{self.backbone_cfg.run_idx}.pt",
         )
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
-        except FileNotFoundError:
-            raise ValueError(f"Cannot load model from {model_path}")
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot load model from {model_path}") from err
         LOGGER.info(f"Loading pretrained model from {model_path}")
         state_dict = remove_module_from_state_dict(state_dict)
         self.model.load_state_dict(state_dict)
@@ -63,7 +62,7 @@ class CaloHadronicFT(CaloHadronic):
         self.add_embedding_layers()
 
         if self.cfg.ema:
-            LOGGER.info(f"Re-initializing EMA")
+            LOGGER.info("Re-initializing EMA")
             self.ema = ExponentialMovingAverage(
                 self.model.parameters(), decay=self.cfg.training.ema_decay
             ).to(self.device)
@@ -84,10 +83,8 @@ class CaloHadronicFT(CaloHadronic):
                 self.model_patch_dim, self.backbone_cfg.model.net.param.patch_dim
             ).to(self.device, dtype=self.dtype)
             LOGGER.info(
-                (
-                    f"Mapping embedding from {self.model_patch_dim} "
-                    f"to {self.backbone_cfg.model.net.param.patch_dim}"
-                )
+                f"Mapping embedding from {self.model_patch_dim} "
+                f"to {self.backbone_cfg.model.net.param.patch_dim}"
             )
             self.model.net.x_embedder = nn.Sequential(
                 self.embedding_mapper, nn.SiLU(), self.embedding
@@ -114,10 +111,8 @@ class CaloHadronicFT(CaloHadronic):
                 self.backbone_cfg.model.net.param.condition_dim,
             ).to(self.device, dtype=self.dtype)
             LOGGER.info(
-                (
-                    f"Mapping condition embedding from {self.model_condition_dim} "
-                    f"to {self.backbone_cfg.model.net.param.condition_dim}"
-                )
+                f"Mapping condition embedding from {self.model_condition_dim} "
+                f"to {self.backbone_cfg.model.net.param.condition_dim}"
             )
             self.model.net.c_embedder = nn.Sequential(
                 self.c_embedding_mapper, nn.SiLU(), self.c_embedding
@@ -173,18 +168,17 @@ class CaloHadronicFT(CaloHadronic):
     def _init_optimizer(self):
         # collect parameter lists
         if self.world_size > 1:
-            params_embedder = list(
-                self.model.net.module.x_embedder.parameters()
-            ) + list(self.model.net.module.c_embedder.parameters())
-            +(
-                +[self.model.net.module.pos_embed_freqs]
+            params_embedder = (
+                list(self.model.net.module.x_embedder.parameters())
+                + list(self.model.net.module.c_embedder.parameters())
+                + [self.model.net.module.pos_embed_freqs]
                 if self.model.net.module.learn_pos_embed
                 else []
             )
 
-            params_backbone = list(
-                self.model.net.module.t_embedder.parameters()
-            ) + list(self.model.net.module.blocks.parameters())
+            params_backbone = list(self.model.net.module.t_embedder.parameters()) + list(
+                self.model.net.module.blocks.parameters()
+            )
 
             params_head = self.model.net.module.final_layer.parameters()
         else:
@@ -242,7 +236,6 @@ class CaloHadronicFT(CaloHadronic):
 
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
-
             if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([u_samples, transformed_cond], dim=1)
@@ -250,9 +243,7 @@ class CaloHadronicFT(CaloHadronic):
                 # Add LEMURS conditions
                 theta = self.cfg.gen_theta
                 phi = self.cfg.gen_phi
-                label = torch.tensor(self.cfg.gen_label, dtype=self.dtype).to(
-                    self.device
-                )
+                label = torch.tensor(self.cfg.gen_label, dtype=self.dtype).to(self.device)
                 theta_tensor = torch.full(
                     (transformed_cond.shape[0], 1),
                     theta,
@@ -313,17 +304,11 @@ class CaloHadronicFT(CaloHadronic):
                 )
         else:
             sample = torch.vstack(
-                [
-                    self.model.sample_batch(c.to(self.device)).cpu()
-                    for c in transformed_cond_loader
-                ]
+                [self.model.sample_batch(c.to(self.device)).cpu() for c in transformed_cond_loader]
             )
             conditions = transformed_cond
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
-        LOGGER.info(
-            f"sample_n: Finished generating {len(sample)} samples "
-            f"after {sampling_time} s."
-        )
+        LOGGER.info(f"sample_n: Finished generating {len(sample)} samples after {sampling_time} s.")
         return sample.detach().cpu(), conditions.detach().cpu()

@@ -56,5 +56,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/shape
  - /model: cfm/cfm_ds1_photons

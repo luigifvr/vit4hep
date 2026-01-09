@@ -3,13 +3,14 @@
 Class that handles the specific binning geometry based on the provided file
 and computes all relevant high-level features
 """
+
 import os
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import cm
 from matplotlib.colors import LogNorm as LN
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-
 
 from experiments.calo_utils.ugr_evaluation.XMLHandler import XMLHandler
 
@@ -72,9 +73,7 @@ class HighLevelFeatures:
     def GetECandWidths(self, eta_layer, phi_layer, energy_layer):
         """Computes center of energy in eta and phi as well as their widths"""
         eta_EC, phi_EC = self._calculate_EC(eta_layer, phi_layer, energy_layer)
-        eta_width, phi_width = self._calculate_Widths(
-            eta_layer, phi_layer, energy_layer
-        )
+        eta_width, phi_width = self._calculate_Widths(eta_layer, phi_layer, energy_layer)
         # The following checks are needed to assure a positive argument to the sqrt,
         # if there is very little energy things can go wrong
         eta_width = np.sqrt((eta_width - eta_EC**2).clip(min=0.0))
@@ -95,11 +94,11 @@ class HighLevelFeatures:
         total_energy = 0.0
         n_layers = len(self.relevantLayers)
         fraction = int(n_layers / ngroups)
-        for l in self.relevantLayers[k * fraction : (k + 1) * fraction]:
-            data_l = energy_calo[:, self.bin_edges[l] : self.bin_edges[l + 1]]
+        for L in self.relevantLayers[k * fraction : (k + 1) * fraction]:
+            data_l = energy_calo[:, self.bin_edges[L] : self.bin_edges[L + 1]]
             energy_sum = data_l[:, edge_idx :: (len(self.r_edges[0]) - 1)].sum(axis=-1)
             total_energy += energy_sum
-            weighted_s += self._calculate_WeightedDepth(energy_sum, l)
+            weighted_s += self._calculate_WeightedDepth(energy_sum, L)
         return weighted_s / (total_energy + 1.0e-8)
 
     def CalculateWeightedDepthR(self, energy_calo, edge_idx, ngroups=1, k=0):
@@ -108,17 +107,14 @@ class HighLevelFeatures:
         total_energy_r = 0.0
         n_layers = len(self.relevantLayers)
         fraction = int(n_layers / ngroups)
-        for l in self.relevantLayers[k * fraction : (k + 1) * fraction]:
-            data_l = energy_calo[:, self.bin_edges[l] : self.bin_edges[l + 1]]
+        for L in self.relevantLayers[k * fraction : (k + 1) * fraction]:
+            data_l = energy_calo[:, self.bin_edges[L] : self.bin_edges[L + 1]]
             energy_sum = data_l[
                 :,
-                edge_idx
-                * (len(self.r_edges[0]) - 1) : (edge_idx + 1)
-                * len(self.r_edges[0])
-                - 1,
+                edge_idx * (len(self.r_edges[0]) - 1) : (edge_idx + 1) * len(self.r_edges[0]) - 1,
             ].sum(axis=-1)
             total_energy_r += energy_sum
-            weighted_r += self._calculate_WeightedDepth(energy_sum, l)
+            weighted_r += self._calculate_WeightedDepth(energy_sum, L)
         return weighted_r / (total_energy_r + 1.0e-8)
 
     def _calculate_Eradial(self, energy_calo, n):
@@ -130,11 +126,11 @@ class HighLevelFeatures:
             layer_sum += angular_sum
         return layer_sum
 
-    def GetGroupedWeightedDepths(self, energy_calo, l=5):
-        n_groups = len(self.relevantLayers) / l
+    def GetGroupedWeightedDepths(self, energy_calo, L=5):
+        n_groups = len(self.relevantLayers) / L
         j = 0
         for k in range(int(n_groups)):
-            for n in range((len(self.r_edges[0]) - 1)):
+            for n in range(len(self.r_edges[0]) - 1):
                 self.weighted_depth_ga[j] = self.CalculateWeightedDepthA(
                     energy_calo, n, n_groups, k
                 )
@@ -142,7 +138,7 @@ class HighLevelFeatures:
 
         j = 0
         for k in range(int(n_groups)):
-            for n in range((self.num_alpha[0])):
+            for n in range(self.num_alpha[0]):
                 self.weighted_depth_gr[j] = self.CalculateWeightedDepthR(
                     energy_calo, n, n_groups, k
                 )
@@ -163,30 +159,29 @@ class HighLevelFeatures:
         """Computes all high-level features for the given data"""
         self.E_tot = data.sum(axis=-1)
 
-        for l in self.relevantLayers:
-            E_layer = data[:, self.bin_edges[l] : self.bin_edges[l + 1]].sum(axis=-1)
-            self.E_layers[l] = E_layer
+        for L in self.relevantLayers:
+            E_layer = data[:, self.bin_edges[L] : self.bin_edges[L + 1]].sum(axis=-1)
+            self.E_layers[L] = E_layer
 
-            self.sparsity[l] = self._calculate_sparsity(
-                data[:, self.bin_edges[l] : self.bin_edges[l + 1]]
+            self.sparsity[L] = self._calculate_sparsity(
+                data[:, self.bin_edges[L] : self.bin_edges[L + 1]]
             )
 
-        for l in self.relevantLayers:
-
-            if l in self.layersBinnedInAlpha:
+        for L in self.relevantLayers:
+            if L in self.layersBinnedInAlpha:
                 (
-                    self.EC_etas[l],
-                    self.EC_phis[l],
-                    self.width_etas[l],
-                    self.width_phis[l],
+                    self.EC_etas[L],
+                    self.EC_phis[L],
+                    self.width_etas[L],
+                    self.width_phis[L],
                 ) = self.GetECandWidths(
-                    self.eta_all_layers[l],
-                    self.phi_all_layers[l],
-                    data[:, self.bin_edges[l] : self.bin_edges[l + 1]],
+                    self.eta_all_layers[L],
+                    self.phi_all_layers[L],
+                    data[:, self.bin_edges[L] : self.bin_edges[L + 1]],
                 )
 
-                self.sparsity[l] = self._calculate_sparsity(
-                    data[:, self.bin_edges[l] : self.bin_edges[l + 1]]
+                self.sparsity[L] = self._calculate_sparsity(
+                    data[:, self.bin_edges[L] : self.bin_edges[L + 1]]
                 )
         self.GetWeightedDepths(data)
         self.GetGroupedWeightedDepths(data)
@@ -214,9 +209,7 @@ class HighLevelFeatures:
         radii = np.array(self.r_edges[layer_nr])
         if self.particle != "electron":
             radii[1:] = np.log(radii[1:])
-        theta, rad = np.meshgrid(
-            2.0 * np.pi * np.arange(num_splits + 1) / num_splits, radii
-        )
+        theta, rad = np.meshgrid(2.0 * np.pi * np.arange(num_splits + 1) / num_splits, radii)
         pts_per_angular_bin = int(num_splits / self.num_alpha[layer_nr])
         data_reshaped = data.reshape(int(self.num_alpha[layer_nr]), -1)
         data_repeated = np.repeat(data_reshaped, (pts_per_angular_bin), axis=0)
@@ -224,9 +217,7 @@ class HighLevelFeatures:
         ax.grid(False)
         if vmax is None:
             vmax = data.max()
-        pcm = ax.pcolormesh(
-            theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax)
-        )
+        pcm = ax.pcolormesh(theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax))
         pcm.set_edgecolor("face")
         ax.axes.get_xaxis().set_visible(False)
         ax.axes.get_yaxis().set_visible(False)
@@ -288,22 +279,18 @@ class HighLevelFeatures:
             radii = np.array(self.r_edges[idx])
             if self.particle != "electron":
                 radii[1:] = np.log(radii[1:])
-            theta, rad = np.meshgrid(
-                2.0 * np.pi * np.arange(num_splits + 1) / num_splits, radii
-            )
+            theta, rad = np.meshgrid(2.0 * np.pi * np.arange(num_splits + 1) / num_splits, radii)
             pts_per_angular_bin = int(num_splits / self.num_alpha[idx])
-            data_reshaped = data[
-                layer_boundaries[idx] : layer_boundaries[idx + 1]
-            ].reshape(int(self.num_alpha[idx]), -1)
+            data_reshaped = data[layer_boundaries[idx] : layer_boundaries[idx + 1]].reshape(
+                int(self.num_alpha[idx]), -1
+            )
             data_repeated = np.repeat(data_reshaped, (pts_per_angular_bin), axis=0)
             if self.particle == "electron":
                 ax = plt.subplot(9, 5, idx + 1, polar=True)
             else:
                 ax = plt.subplot(1, len(self.r_edges), idx + 1, polar=True)
             ax.grid(False)
-            pcm = ax.pcolormesh(
-                theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax)
-            )
+            pcm = ax.pcolormesh(theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax))
             pcm.set_edgecolor("face")
             ax.axes.get_xaxis().set_visible(False)
             ax.axes.get_yaxis().set_visible(False)
@@ -391,13 +378,12 @@ class HighLevelFeatures:
 
     def DrawSingleShower(self, data, filename=None, title=None):
         """plots all provided showers after each other"""
-        ret = []
         if len(data.shape) == 1:
             data = data.reshape(1, -1)
         for num, shower in enumerate(data):
             if filename is not None:
                 local_name, local_ext = os.path.splitext(filename)
-                local_name += "_{}".format(num) + local_ext
+                local_name += f"_{num}" + local_ext
             else:
                 local_name = None
             self._DrawShower(shower, filename=local_name, title=title)

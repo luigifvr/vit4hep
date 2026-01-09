@@ -1,19 +1,11 @@
-import torch
-import torch.nn.functional as F
-import numpy as np
 import os
-import torch.distributions as dist
-
-from experiments.calo_utils.ugr_evaluation import *
-from experiments.calo_utils.ugr_evaluation import XMLHandler
 from itertools import pairwise
 
+import numpy as np
+import torch
+import torch.nn.functional as F
 
-class LogUniform(dist.TransformedDistribution):
-    def __init__(self, lb, ub):
-        super(LogUniform, self).__init__(
-            dist.Uniform(lb.log(), ub.log()), dist.ExpTransform()
-        )
+from experiments.calo_utils.ugr_evaluation import XMLHandler
 
 
 def logit(array, alpha=1.0e-6, inv=False):
@@ -26,7 +18,7 @@ def logit(array, alpha=1.0e-6, inv=False):
     return z
 
 
-class GlobalStandardizeFromFile(object):
+class GlobalStandardizeFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -35,7 +27,6 @@ class GlobalStandardizeFromFile(object):
     """
 
     def __init__(self, model_dir, exclude_zeros=True, eps=1.0e-6):
-
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
@@ -58,9 +49,7 @@ class GlobalStandardizeFromFile(object):
 
     def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
-            transformed = shower * self.std.to(shower.device) + self.mean.to(
-                shower.device
-            )
+            transformed = shower * self.std.to(shower.device) + self.mean.to(shower.device)
         else:
             if not self.written:
                 nonzero_mask = (shower > self.eps) & (shower < -self.eps)
@@ -71,63 +60,11 @@ class GlobalStandardizeFromFile(object):
                 if rank == 0:
                     self.write()
                 self.written = True
-            transformed = (shower - self.mean.to(shower.device)) / self.std.to(
-                shower.device
-            )
+            transformed = (shower - self.mean.to(shower.device)) / self.std.to(shower.device)
         return transformed, energy
 
 
-class StandardizeVoxelsFromFile(object):
-    """
-    Standardize features
-        mean_path: path to `.npy` file containing means of the features
-        std_path: path to `.npy` file containing standard deviations of the features
-        create: whether or not to calculate and save mean/std based on first call
-    """
-
-    def __init__(self, n_voxels, model_dir):
-
-        self.model_dir = model_dir
-        self.mean_path = os.path.join(model_dir, "means.npy")
-        self.std_path = os.path.join(model_dir, "stds.npy")
-
-        self.dtype = torch.get_default_dtype()
-        self.n_voxels = n_voxels
-        try:
-            # load from file
-            self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
-            self.std = torch.from_numpy(np.load(self.std_path)).to(self.dtype)
-            self.written = True
-        except FileNotFoundError:
-            self.written = False
-
-    def write(self):
-        np.save(self.mean_path, self.mean.detach().cpu().numpy())
-        np.save(self.std_path, self.std.detach().cpu().numpy())
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        voxels = shower[:, : self.n_voxels]
-        us = shower[:, self.n_voxels :]
-        if rev:
-            trafo_voxels = voxels * self.std.to(shower.device) + self.mean.to(
-                shower.device
-            )
-            transformed = torch.cat((trafo_voxels, us), dim=1)
-        else:
-            if not self.written:
-                self.mean = voxels.mean(0)
-                self.std = voxels.std(0)
-                if rank == 0:
-                    self.write()
-                self.written = True
-            trafo_voxels = (voxels - self.mean.to(shower.device)) / self.std.to(
-                shower.device
-            )
-            transformed = torch.cat((trafo_voxels, us), dim=1)
-        return transformed, energy
-
-
-class StandardizeUsFromFile(object):
+class StandardizeUsFromFile:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -136,7 +73,6 @@ class StandardizeUsFromFile(object):
     """
 
     def __init__(self, n_us, model_dir):
-
         self.model_dir = model_dir
         self.mean_us_path = os.path.join(model_dir, "means_u.npy")
         self.std_us_path = os.path.join(model_dir, "stds_u.npy")
@@ -169,14 +105,12 @@ class StandardizeUsFromFile(object):
                 if rank == 0:
                     self.write()
                 self.written = True
-            trafo_us = (us - self.mean_u.to(shower.device)) / self.std_u.to(
-                shower.device
-            )
+            trafo_us = (us - self.mean_u.to(shower.device)) / self.std_u.to(shower.device)
             transformed = torch.cat((voxels, trafo_us), dim=1)
         return transformed, energy
 
 
-class SelectDims(object):
+class SelectDims:
     """
     Selects a subset of the features
         start: start of range of indices to keep
@@ -193,7 +127,7 @@ class SelectDims(object):
         return transformed, energy
 
 
-class AddFeaturesToCond(object):
+class AddFeaturesToCond:
     """
     Transfers a subset of the input features to the condition
         split_index: Index at which to split input. Features past the index will be moved
@@ -203,7 +137,6 @@ class AddFeaturesToCond(object):
         self.split_index = split_index
 
     def __call__(self, x, c, rev=False, rank=0):
-
         if rev:
             c_, split = c[:, -1:], c[:, :-1]
             x_ = torch.cat([x, split], dim=1)
@@ -213,7 +146,7 @@ class AddFeaturesToCond(object):
         return x_, c_
 
 
-class LogEnergy(object):
+class LogEnergy:
     """
     Log transform incident energies
         alpha: Optional regularization for the log
@@ -231,7 +164,7 @@ class LogEnergy(object):
         return shower, transformed
 
 
-class ScaleVoxels(object):
+class ScaleVoxels:
     """
     Apply a multiplicative factor to the voxels.
         factor: Number to multiply voxels
@@ -248,7 +181,7 @@ class ScaleVoxels(object):
         return transformed, energy
 
 
-class ScaleTotalEnergy(object):
+class ScaleTotalEnergy:
     """
     Scale only E_tot/E_inc by a factor f.
     The effect is the same of ScaleVoxels but
@@ -269,7 +202,7 @@ class ScaleTotalEnergy(object):
         return shower, energy
 
 
-class ScaleEnergy(object):
+class ScaleEnergy:
     """
     Scale incident energies to lie in the range [0, 1]
         e_min: Expected minimum value of the energy
@@ -291,7 +224,7 @@ class ScaleEnergy(object):
         return shower, transformed
 
 
-class ExclusiveLogitTransform(object):
+class ExclusiveLogitTransform:
     """
     Take log of input data
         delta: regularization
@@ -321,36 +254,7 @@ class ExclusiveLogitTransform(object):
         return transformed, energy
 
 
-class RegularizeLargeLogit(object):
-    def __init__(self, a, b, exclusions=None, cut=False):
-        self.a = a
-        self.b = b
-        self.func = torch.distributions.Uniform(
-            torch.tensor(self.a), torch.tensor(self.b)
-        )
-        self.exclusions = exclusions
-        self.cut = cut
-        self.u_transform = True
-
-    def __call__(self, shower, energy, rev=False, rank=0):
-        if rev:
-            mask = shower > 1 - self.b
-            if self.exclusions:
-                mask[:, self.exclusions] = False
-            transformed = shower
-            if self.cut:
-                transformed[mask] = 1.0
-        else:
-            transformed = shower
-            mask = shower >= 1.0
-            noise = self.func.sample(shower.shape).to(shower.dtype)
-            if self.exclusions:
-                noise[:, self.exclusions] = 0.0
-            transformed[mask] = (shower - noise.to(shower.device))[mask]
-        return transformed, energy
-
-
-class SelectiveUniformNoise(object):
+class SelectiveUniformNoise:
     """
     Add noise to input data with the option to exlude some features
         func: torch distribution used to sample from
@@ -362,9 +266,7 @@ class SelectiveUniformNoise(object):
         # self.func = func
         self.a = a
         self.b = b
-        self.func = torch.distributions.Uniform(
-            torch.tensor(self.a), torch.tensor(self.b)
-        )
+        self.func = torch.distributions.Uniform(torch.tensor(self.a), torch.tensor(self.b))
         self.exclusions = exclusions
         self.cut = cut  # apply cut if True
 
@@ -386,7 +288,7 @@ class SelectiveUniformNoise(object):
         return transformed, energy
 
 
-class CutValues(object):
+class CutValues:
     """
     Cut in Normalized space
         cut: threshold value for the cut
@@ -409,7 +311,7 @@ class CutValues(object):
         return transformed, energy
 
 
-class Reshape(object):
+class Reshape:
     """
     Reshape the shower as specified. Flattens batch in the reverse transformation.
         shape -- Tuple representing the desired shape of a single example
@@ -426,7 +328,7 @@ class Reshape(object):
         return shower, energy
 
 
-class NormalizeByElayer(object):
+class NormalizeByElayer:
     """
     Normalize each shower by the layer energy
     This will change the shower shape to N_voxels+N_layers
@@ -441,7 +343,6 @@ class NormalizeByElayer(object):
 
     def __call__(self, shower, energy, rev=False, rank=0):
         if rev:
-
             # select u features
             us = shower[:, -self.n_layers :]
 
@@ -468,14 +369,12 @@ class NormalizeByElayer(object):
 
             # Normalize each layer and multiply it with its original energy
             transformed = torch.zeros_like(shower)
-            for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
+            for L, (start, end) in enumerate(pairwise(self.layer_boundaries)):
                 layer = shower[:, start:end]  # select layer
                 layer /= layer.sum(-1, keepdims=True) + self.eps  # normalize to unity
                 mask = layer <= self.cut
                 layer[mask] = 0.0  # apply normalized cut
-                transformed[:, start:end] = (
-                    layer * layer_Es[:, [l]]
-                )  # scale to layer energy
+                transformed[:, start:end] = layer * layer_Es[:, [L]]  # scale to layer energy
 
         else:
             # compute layer energies
@@ -488,9 +387,9 @@ class NormalizeByElayer(object):
 
             # compute generalized extra dimensions
             extra_dims = [torch.sum(layer_Es, dim=1, keepdim=True) / energy]
-            for l in range(layer_Es.shape[1] - 1):
-                remaining_E = torch.sum(layer_Es[:, l:], dim=1, keepdim=True)
-                extra_dim = layer_Es[:, [l]] / (remaining_E + self.eps)
+            for L in range(layer_Es.shape[1] - 1):
+                remaining_E = torch.sum(layer_Es[:, L:], dim=1, keepdim=True)
+                extra_dim = layer_Es[:, [L]] / (remaining_E + self.eps)
                 extra_dims.append(extra_dim)
             extra_dims = torch.cat(extra_dims, dim=1)
 
@@ -498,7 +397,7 @@ class NormalizeByElayer(object):
         return transformed, energy
 
 
-class AddAngularBins(object):
+class AddAngularBins:
     """
     Add angular bins given an XML file. After the transformation the shower
     will have a regular geometry. The inverse step takes the maximum over the
@@ -518,18 +417,15 @@ class AddAngularBins(object):
         self.n_voxels = self.layer_boundaries[-1]
 
     def __call__(self, shower, energy, rev=False, rank=0):
-
         if rev:
             new_n_voxels = self.new_layer_boundaries[-1]
             shower, us = shower[:, :new_n_voxels], shower[:, new_n_voxels:]
             transformed = []
-            for l, (start, end) in enumerate(pairwise(self.new_layer_boundaries)):
-                alpha_bins = self.num_bins[l]
-                add_alpha_bins = self.add_bins[l] // alpha_bins
+            for L, (start, end) in enumerate(pairwise(self.new_layer_boundaries)):
+                alpha_bins = self.num_bins[L]
+                add_alpha_bins = self.add_bins[L] // alpha_bins
                 layer = shower[:, start:end]
-                layer, _ = layer.reshape(
-                    shower.shape[0], -1, alpha_bins, add_alpha_bins
-                ).max(-1)
+                layer, _ = layer.reshape(shower.shape[0], -1, alpha_bins, add_alpha_bins).max(-1)
                 transformed.append(layer.reshape(layer.shape[0], -1))
             transformed = torch.cat(transformed, dim=-1).to(
                 dtype=shower.dtype, device=shower.device
@@ -541,9 +437,9 @@ class AddAngularBins(object):
             self.new_layer_boundaries = [
                 0,
             ]
-            for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
-                alpha_bins = self.num_bins[l]
-                add_alpha_bins = self.add_bins[l] // alpha_bins - 1
+            for L, (start, end) in enumerate(pairwise(self.layer_boundaries)):
+                alpha_bins = self.num_bins[L]
+                add_alpha_bins = self.add_bins[L] // alpha_bins - 1
                 layer = shower[:, start:end].reshape(shower.shape[0], -1, alpha_bins)
                 pad_left = add_alpha_bins // 2
                 pad_right = add_alpha_bins - add_alpha_bins // 2
@@ -552,9 +448,7 @@ class AddAngularBins(object):
                 )
 
                 transformed.append(layer)
-                self.new_layer_boundaries.append(
-                    self.new_layer_boundaries[l] + layer.shape[-1]
-                )
+                self.new_layer_boundaries.append(self.new_layer_boundaries[L] + layer.shape[-1])
             transformed = torch.cat(transformed, dim=-1).to(
                 dtype=shower.dtype, device=shower.device
             )
@@ -562,7 +456,7 @@ class AddAngularBins(object):
         return transformed, energy
 
 
-class AddLEMURSConditions(object):
+class AddLEMURSConditions:
     """
     Add global variables to match the LEMURS conditions.
     """

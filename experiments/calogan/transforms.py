@@ -1,11 +1,12 @@
-import torch
-import numpy as np
 import os
+
+import numpy as np
+import torch
 
 from experiments.calochallenge.transforms import logit
 
 
-class GlobalStandardizeFromFileGAN(object):
+class GlobalStandardizeFromFileGAN:
     """
     Standardize features
         mean_path: path to `.npy` file containing means of the features
@@ -13,8 +14,7 @@ class GlobalStandardizeFromFileGAN(object):
         create: whether or not to calculate and save mean/std based on first call
     """
 
-    def __init__(self, model_dir):
-
+    def __init__(self, model_dir, eps=1.0e-6):
         self.model_dir = model_dir
         self.mean_path = os.path.join(model_dir, "means.npy")
         self.std_path = os.path.join(model_dir, "stds.npy")
@@ -22,6 +22,7 @@ class GlobalStandardizeFromFileGAN(object):
         self.dtype = torch.get_default_dtype()
         self.u_transform = True
         self.layer_keys = ["layer_0", "layer_1", "layer_2", "extra_dims"]
+        self.eps = torch.logit(torch.tensor(eps))
         try:
             # load from file
             self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
@@ -41,8 +42,9 @@ class GlobalStandardizeFromFileGAN(object):
         else:
             if not self.written:
                 shower = torch.cat([data_dict[key] for key in self.layer_keys], dim=1)
-                self.mean = shower.mean()
-                self.std = shower.std()
+                nonzero_mask = (shower > self.eps) & (shower < -self.eps)
+                self.mean = (shower[nonzero_mask]).mean()
+                self.std = (shower[nonzero_mask]).std()
                 if rank == 0:
                     self.write()
                 self.written = True
@@ -51,7 +53,7 @@ class GlobalStandardizeFromFileGAN(object):
         return data_dict
 
 
-class LogEnergyGAN(object):
+class LogEnergyGAN:
     """
     Log transform incident energies
         alpha: Optional regularization for the log
@@ -71,7 +73,7 @@ class LogEnergyGAN(object):
         return data_dict
 
 
-class ScaleEnergyGAN(object):
+class ScaleEnergyGAN:
     """
     Scale incident energies to lie in the range [0, 1]
         e_min: Expected minimum value of the energy
@@ -97,7 +99,7 @@ class ScaleEnergyGAN(object):
         return data_dict
 
 
-class ExclusiveLogitTransformGAN(object):
+class ExclusiveLogitTransformGAN:
     """
     Take log of input data
         delta: regularization
@@ -127,7 +129,7 @@ class ExclusiveLogitTransformGAN(object):
         return data_dict
 
 
-class NormalizeLayerEnergyGAN(object):
+class NormalizeLayerEnergyGAN:
     """
     Normalize each shower by the layer energy
     This will change the shower shape to N_voxels+N_layers
@@ -145,7 +147,6 @@ class NormalizeLayerEnergyGAN(object):
     def __call__(self, data_dict, rev=False, rank=0):
         energy = data_dict["energy"]
         if rev:
-
             # select u features
             us = data_dict["extra_dims"]
 
@@ -167,12 +168,12 @@ class NormalizeLayerEnergyGAN(object):
             layer_Es.append(total_E - cum_sum)
             layer_Es = torch.vstack(layer_Es).T
 
-            for l, key in enumerate(self.layer_keys):
+            for L, key in enumerate(self.layer_keys):
                 layer = data_dict[key].clone()  # select layer
                 layer /= layer.sum(-1, keepdims=True) + self.eps  # normalize to unity
                 mask = layer <= self.cut
                 layer[mask] = 0.0  # apply normalized cut
-                data_dict[key] = layer * layer_Es[:, [l]]  # scale to layer energy
+                data_dict[key] = layer * layer_Es[:, [L]]  # scale to layer energy
         else:
             # compute layer energies
             layer_Es = []
@@ -184,9 +185,9 @@ class NormalizeLayerEnergyGAN(object):
 
             # compute generalized extra dimensions
             extra_dims = [torch.sum(layer_Es, dim=1, keepdim=True) / energy]
-            for l in range(layer_Es.shape[1] - 1):
-                remaining_E = torch.sum(layer_Es[:, l:], dim=1, keepdim=True)
-                extra_dim = layer_Es[:, [l]] / (remaining_E + self.eps)
+            for L in range(layer_Es.shape[1] - 1):
+                remaining_E = torch.sum(layer_Es[:, L:], dim=1, keepdim=True)
+                extra_dim = layer_Es[:, [L]] / (remaining_E + self.eps)
                 extra_dims.append(extra_dim)
             extra_dims = torch.cat(extra_dims, dim=1)
             data_dict["extra_dims"] = extra_dims

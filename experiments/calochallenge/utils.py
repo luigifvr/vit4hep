@@ -1,6 +1,6 @@
-import torch.utils.data
-import numpy as np
 import h5py
+import numpy as np
+import torch.utils.data
 
 from experiments.calo_utils.ugr_evaluation.XMLHandler import XMLHandler
 
@@ -22,7 +22,7 @@ def load_data(filename, particle_type, xml_filename, threshold=1e-5):
 
     data["energy"] = data_file["incident_energies"][:].reshape(-1, 1)
     for layer_index, (layer_start, layer_end) in enumerate(
-        zip(layer_boundaries[:-1], layer_boundaries[1:])
+        zip(layer_boundaries[:-1], layer_boundaries[1:], strict=False)
     ):
         data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end]
     data_file.close()

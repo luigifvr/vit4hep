@@ -1,11 +1,12 @@
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.base_coupling import BaseCouplingBlock, OneSidedBaseCouplingBlock
 from FrEIA.modules import InvertibleModule
+
+from models.base_coupling import BaseCouplingBlock, OneSidedBaseCouplingBlock
 
 
 class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):
@@ -19,7 +20,7 @@ class CaloRationalQuadraticSplineBlock(BaseCouplingBlock):
         tails="linear",
         bounds_type="SOFTPLUS",
         spatial=False,
-        *args
+        *args,
     ):
         super().__init__(dims_in, dims_c, *args)
 
@@ -125,7 +126,7 @@ class OneSidedCaloRationalQuadraticSplineBlock(OneSidedBaseCouplingBlock):
         tails="linear",
         bounds_type="SOFTPLUS",
         spatial=False,
-        *args
+        *args,
     ):
         super().__init__(dims_in, dims_c, *args)
 
@@ -215,7 +216,7 @@ class SimpleRationalQuadraticSplineBlock(BaseCouplingBlock):
         tails="linear",
         bounds_type="SOFTPLUS",
         spatial=False,
-        *args
+        *args,
     ):
         super().__init__(dims_in, dims_c, *args)
 
@@ -230,8 +231,7 @@ class SimpleRationalQuadraticSplineBlock(BaseCouplingBlock):
         # self.indices2 = [int(2 * k + 1) for k in range(self.channels // 2)]
         self.indices1 = [int(k) for k in range(self.channels // 2)]
         self.indices2 = [
-            int(k + self.channels // 2)
-            for k in range(self.channels - self.channels // 2)
+            int(k + self.channels // 2) for k in range(self.channels - self.channels // 2)
         ]
         len_splits = [len(self.indices1), len(self.indices2)]
 
@@ -301,7 +301,6 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
         bounds_type="SOFTPLUS",
         spatial=False,
     ):
-
         super().__init__(dims_in, dims_c)
 
         self.spatial = spatial
@@ -341,9 +340,7 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
             bounds = bounds_init
             self.bounds_activation = lambda a: a
         else:
-            raise ValueError(
-                'Global affine activation must be "SIGMOID", "SOFTPLUS" or "EXP"'
-            )
+            raise ValueError('Global affine activation must be "SIGMOID", "SOFTPLUS" or "EXP"')
 
         self.in_channels = channels
         self.bounds = self.bounds_activation(torch.tensor(bounds))
@@ -351,8 +348,7 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
 
         if subnet_constructor is None:
             raise ValueError(
-                "Please supply a callable subnet_constructor"
-                "function or object (see docstring)"
+                "Please supply a callable subnet_constructorfunction or object (see docstring)"
             )
         self.subnet = subnet_constructor(
             self.splits[0] + self.condition_channels,
@@ -360,16 +356,11 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
         )
 
     def _unconstrained_rational_quadratic_spline(self, inputs, theta, rev=False):
-
-        inside_interval_mask = torch.all(
-            (inputs >= -self.bounds) & (inputs <= self.bounds), dim=-1
-        )
+        inside_interval_mask = torch.all((inputs >= -self.bounds) & (inputs <= self.bounds), dim=-1)
         outside_interval_mask = ~inside_interval_mask
 
         masked_outputs = torch.zeros_like(inputs)
-        masked_logabsdet = torch.zeros(inputs.shape[0], dtype=inputs.dtype).to(
-            inputs.device
-        )
+        masked_logabsdet = torch.zeros(inputs.shape[0], dtype=inputs.dtype).to(inputs.device)
         # masked_logabsdet = torch.zeros_like(inputs)
 
         min_bin_width = self.DEFAULT_MIN_BIN_WIDTH
@@ -381,7 +372,7 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
             masked_logabsdet[outside_interval_mask] = 0
 
         else:
-            raise RuntimeError("{} tails are not implemented.".format(self.tails))
+            raise RuntimeError(f"{self.tails} tails are not implemented.")
         inputs = inputs[inside_interval_mask]
         theta = theta[inside_interval_mask, :]
         bound = torch.min(self.bounds)
@@ -526,14 +517,10 @@ class SimpleRationalQuadraticSpline(InvertibleModule):
 
         x1c = torch.cat([x1, *c], 1)
         if not rev:
-            theta = self.subnet(x1c).reshape(
-                x1c.shape[0], self.splits[1], 3 * self.num_bins - 1
-            )
+            theta = self.subnet(x1c).reshape(x1c.shape[0], self.splits[1], 3 * self.num_bins - 1)
             x2, j2 = self._unconstrained_rational_quadratic_spline(x2, theta, rev=False)
         else:
-            theta = self.subnet(x1c).reshape(
-                x1c.shape[0], self.splits[1], 3 * self.num_bins - 1
-            )
+            theta = self.subnet(x1c).reshape(x1c.shape[0], self.splits[1], 3 * self.num_bins - 1)
             x2, j2 = self._unconstrained_rational_quadratic_spline(x2, theta, rev=True)
 
         log_jac_det = j2
@@ -558,7 +545,6 @@ class CaloRationalQuadraticSpline(SimpleRationalQuadraticSpline):
         bounds_type="SOFTPLUS",
         spatial=False,
     ):
-
         super().__init__(
             dims_in,
             dims_c,

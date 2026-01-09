@@ -15,7 +15,7 @@ data:
   transforms: {
     NormalizeLayerEnergyGAN: {},
     ExclusiveLogitTransformGAN: {delta: 1.0e-6, rescale: False},
-    GlobalStandardizeFromFileGAN: {model_dir: None},
+    GlobalStandardizeFromFileGAN: {model_dir: None, eps: 1.e-10},
     LogEnergyGAN: {},
     ScaleEnergyGAN: {e_min: 6.907755, e_max: 13.815510},
   }
@@ -36,5 +36,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/shape
  - /model: cfm_calogan/cfm_eplus

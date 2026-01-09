@@ -1,12 +1,11 @@
-from FrEIA.modules import InvertibleModule
-
 import warnings
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from FrEIA.modules import InvertibleModule
 from scipy.stats import special_ortho_group
 
 
@@ -96,9 +95,9 @@ class AllInOneBlock(InvertibleModule):
             self.conditional = False
             self.condition_channels = 0
         else:
-            assert tuple(dims_c[0][1:]) == tuple(
-                dims_in[0][1:]
-            ), f"Dimensions of input and condition don't agree: {dims_c} vs {dims_in}."
+            assert tuple(dims_c[0][1:]) == tuple(dims_in[0][1:]), (
+                f"Dimensions of input and condition don't agree: {dims_c} vs {dims_in}."
+            )
             self.conditional = True
             self.condition_channels = sum(dc[0] for dc in dims_c)
 
@@ -113,8 +112,8 @@ class AllInOneBlock(InvertibleModule):
                 2: F.conv2d,
                 3: F.conv3d,
             }[self.input_rank]
-        except KeyError:
-            raise ValueError(f"Data is {1 + self.input_rank}D. Must be 1D-4D.")
+        except KeyError as err:
+            raise ValueError(f"Data is {1 + self.input_rank}D. Must be 1D-4D.") from err
 
         self.in_channels = channels
         self.clamp = affine_clamping
@@ -124,10 +123,9 @@ class AllInOneBlock(InvertibleModule):
 
         if permute_soft and channels > 512:
             warnings.warn(
-                (
-                    "Soft permutation will take a very long time to initialize "
-                    f"with {channels} feature channels. Consider using hard permutation instead."
-                )
+                "Soft permutation will take a very long time to initialize "
+                f"with {channels} feature channels. Consider using hard permutation instead.",
+                stacklevel=2,
             )
 
         # global_scale is used as the initial value for the global affine scale
@@ -146,18 +144,14 @@ class AllInOneBlock(InvertibleModule):
             global_scale = np.log(global_affine_init)
             self.global_scale_activation = lambda a: torch.exp(a)
         else:
-            raise ValueError(
-                'Global affine activation must be "SIGMOID", "SOFTPLUS" or "EXP"'
-            )
+            raise ValueError('Global affine activation must be "SIGMOID", "SOFTPLUS" or "EXP"')
 
         self.global_scale = nn.Parameter(
             torch.ones(1, self.in_channels, *([1] * self.input_rank), dtype=torch.float)
             * float(global_scale)
         )
         self.global_offset = nn.Parameter(
-            torch.zeros(
-                1, self.in_channels, *([1] * self.input_rank), dtype=torch.float
-            )
+            torch.zeros(1, self.in_channels, *([1] * self.input_rank), dtype=torch.float)
         )
 
         if permute_soft:
@@ -183,16 +177,13 @@ class AllInOneBlock(InvertibleModule):
                 requires_grad=False,
             )
             self.w_perm_inv = nn.Parameter(
-                torch.FloatTensor(w.T).view(
-                    channels, channels, *([1] * self.input_rank)
-                ),
+                torch.FloatTensor(w.T).view(channels, channels, *([1] * self.input_rank)),
                 requires_grad=False,
             )
 
         if subnet_constructor is None:
             raise ValueError(
-                "Please supply a callable subnet_constructor"
-                "function or object (see docstring)"
+                "Please supply a callable subnet_constructorfunction or object (see docstring)"
             )
         self.subnet = subnet_constructor(
             self.splits[0] + self.condition_channels, 2 * self.splits[1]
@@ -210,7 +201,7 @@ class AllInOneBlock(InvertibleModule):
                 - 2 * torch.ger(vk, vk) / torch.dot(vk, vk),
             )
 
-        for i in range(self.input_rank):
+        for _ in range(self.input_rank):
             w = w.unsqueeze(-1)
         return w
 
@@ -226,8 +217,7 @@ class AllInOneBlock(InvertibleModule):
 
         if rev:
             return (
-                (self.permute_function(x, self.w_perm_inv) - self.global_offset)
-                / scale,
+                (self.permute_function(x, self.w_perm_inv) - self.global_offset) / scale,
                 perm_log_jac,
             )
         else:

@@ -4,7 +4,7 @@ dtype: float32
 
 model_type: shape
 sample_us: true
-energy_model: ./runs/CaloChallenge_energy/calochallenge_50541/
+energy_model: ./runs/CaloChallenge_energy/calochallenge_ds1_pions_energy/
 n_samples: 100000
 data:
   training_file: /gpfs/projects/acad/hepml/datasets/calo_challenge/piplus_data_1.hdf5
@@ -56,5 +56,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/shape
  - /model: cfm/cfm_ds1_pions

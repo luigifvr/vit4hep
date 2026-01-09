@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 from nn.vit import ViT1D
 
 
@@ -12,7 +13,7 @@ class SubnetViT(nn.Module):
         patch_dim=24,
         num_patches=[15, 2, 9],
         prod_num_patches=15 * 2 * 9,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
 
@@ -56,9 +57,7 @@ class SubnetMLP(nn.Module):
         self.layers.append(nn.Linear(self.x_in, self.hidden_channels[0]))
         self.layers.append(nn.ReLU())
         for n in range(self.n_layers - 1):
-            self.layers.append(
-                nn.Linear(self.hidden_channels[n], self.hidden_channels[n + 1])
-            )
+            self.layers.append(nn.Linear(self.hidden_channels[n], self.hidden_channels[n + 1]))
             if self.dropout > 0:
                 self.layers.append(nn.Dropout(p=self.dropout))
             self.layers.append(nn.ReLU())

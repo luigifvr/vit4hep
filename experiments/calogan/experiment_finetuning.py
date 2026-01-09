@@ -1,11 +1,12 @@
 import os
-from omegaconf import OmegaConf, open_dict
+
 import torch
 import torch.nn as nn
+from omegaconf import OmegaConf, open_dict
 from torch_ema import ExponentialMovingAverage
 
-from experiments.logger import LOGGER
 from experiments.calogan.experiment import CaloGAN
+from experiments.logger import LOGGER
 from experiments.misc import remove_module_from_state_dict
 from nn.vit import FinalLayer, get_sincos_pos_embed
 
@@ -41,11 +42,9 @@ class CaloGANFTCFM(CaloGAN):
             f"model_run{self.backbone_cfg.run_idx}.pt",
         )
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
-        except FileNotFoundError:
-            raise ValueError(f"Cannot load model from {model_path}")
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot load model from {model_path}") from err
         LOGGER.info(f"Loading pretrained model from {model_path}")
         state_dict = remove_module_from_state_dict(state_dict)
         self.model.load_state_dict(state_dict)
@@ -55,7 +54,7 @@ class CaloGANFTCFM(CaloGAN):
         self.add_embedding_layers()
 
         if self.cfg.ema:
-            LOGGER.info(f"Re-initializing EMA")
+            LOGGER.info("Re-initializing EMA")
             self.ema = ExponentialMovingAverage(
                 self.model.parameters(), decay=self.cfg.training.ema_decay
             ).to(self.device)
@@ -76,10 +75,8 @@ class CaloGANFTCFM(CaloGAN):
                 self.model_patch_dim, self.backbone_cfg.model.net.param.patch_dim
             ).to(self.device, dtype=self.dtype)
             LOGGER.info(
-                (
-                    f"Mapping embedding from {self.model_patch_dim} "
-                    f"to {self.backbone_cfg.model.net.param.patch_dim}"
-                )
+                f"Mapping embedding from {self.model_patch_dim} "
+                f"to {self.backbone_cfg.model.net.param.patch_dim}"
             )
             self.model.net.x_embedder = nn.Sequential(
                 self.embedding_mapper, nn.SiLU(), self.embedding
@@ -107,10 +104,8 @@ class CaloGANFTCFM(CaloGAN):
                 self.backbone_cfg.model.net.param.condition_dim,
             ).to(self.device, dtype=self.dtype)
             LOGGER.info(
-                (
-                    f"Mapping condition embedding from {self.model_condition_dim} "
-                    f"to {self.backbone_cfg.model.net.param.condition_dim}"
-                )
+                f"Mapping condition embedding from {self.model_condition_dim} "
+                f"to {self.backbone_cfg.model.net.param.condition_dim}"
             )
             self.model.net.c_embedder = nn.Sequential(
                 self.c_embedding_mapper, nn.SiLU(), self.c_embedding
@@ -142,16 +137,10 @@ class CaloGANFTCFM(CaloGAN):
         # define the positional embedding
         if self.model.net.learn_pos_embed:
             if self.cfg.finetuning.reinitialize_pos_embedding:
-                l, a, r = self.model_num_patches
-                self.model.net.lgrid = (
-                    torch.arange(l, device=self.device, dtype=self.dtype) / l
-                )
-                self.model.net.agrid = (
-                    torch.arange(a, device=self.device, dtype=self.dtype) / a
-                )
-                self.model.net.rgrid = (
-                    torch.arange(r, device=self.device, dtype=self.dtype) / r
-                )
+                L, a, r = self.model_num_patches
+                self.model.net.lgrid = torch.arange(L, device=self.device, dtype=self.dtype) / L
+                self.model.net.agrid = torch.arange(a, device=self.device, dtype=self.dtype) / a
+                self.model.net.rgrid = torch.arange(r, device=self.device, dtype=self.dtype) / r
             else:
                 pass
         else:
@@ -173,18 +162,17 @@ class CaloGANFTCFM(CaloGAN):
     def _init_optimizer(self):
         # collect parameter lists
         if self.world_size > 1:
-            params_embedder = list(
-                self.model.net.module.x_embedder.parameters()
-            ) + list(self.model.net.module.c_embedder.parameters())
-            +(
-                +[self.model.net.module.pos_embed_freqs]
+            params_embedder = (
+                list(self.model.net.module.x_embedder.parameters())
+                + list(self.model.net.module.c_embedder.parameters())
+                + [self.model.net.module.pos_embed_freqs]
                 if self.model.net.module.learn_pos_embed
                 else []
             )
 
-            params_backbone = list(
-                self.model.net.module.t_embedder.parameters()
-            ) + list(self.model.net.module.blocks.parameters())
+            params_backbone = list(self.model.net.module.t_embedder.parameters()) + list(
+                self.model.net.module.blocks.parameters()
+            )
 
             params_head = self.model.net.module.final_layer.parameters()
         else:

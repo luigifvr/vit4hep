@@ -1,9 +1,9 @@
 import torch
-
 from torch.utils.data import Dataset
+
+from experiments.calochallenge.transforms import *  # noqa: F403
+from experiments.calochallenge.utils import get_energy_and_sorted_layers, load_data
 from experiments.logger import LOGGER
-from experiments.calochallenge.transforms import *
-from experiments.calochallenge.utils import load_data, get_energy_and_sorted_layers
 
 
 class CaloChallengeDataset(Dataset):
@@ -30,9 +30,7 @@ class CaloChallengeDataset(Dataset):
         """
         assert split == "full" or train_val_frac[0] + train_val_frac[1] <= 1.0
 
-        self.voxels, self.layer_boundaries = load_data(
-            hdf5_file, particle_type, xml_filename
-        )
+        self.voxels, self.layer_boundaries = load_data(hdf5_file, particle_type, xml_filename)
         self.energy, self.layers = get_energy_and_sorted_layers(self.voxels)
         del self.voxels
 
@@ -67,10 +65,8 @@ class CaloChallengeDataset(Dataset):
         self.min_bounds = self.layers.min()
         self.max_bounds = self.layers.max()
 
-        LOGGER.info(f"datasets: loaded {split} data with shape {*self.layers.shape,}")
-        LOGGER.info(
-            f"datasets: boundaries of dataset are ({self.min_bounds}, {self.max_bounds})"
-        )
+        LOGGER.info(f"datasets: loaded {split} data with shape {(*self.layers.shape,)}")
+        LOGGER.info(f"datasets: boundaries of dataset are ({self.min_bounds}, {self.max_bounds})")
 
     def __len__(self):
         return len(self.energy)

@@ -1,9 +1,9 @@
-import torch
 import numpy as np
-
+import torch
 from torch.utils.data import Dataset
-from experiments.logger import LOGGER
+
 from experiments.calogan.utils import load_data
+from experiments.logger import LOGGER
 
 
 class CaloGANDataset(Dataset):
@@ -66,10 +66,8 @@ class CaloGANDataset(Dataset):
         self.min_bounds = self.layers.min()
         self.max_bounds = self.layers.max()
 
-        LOGGER.info(f"datasets: loaded data with shape {*self.layers.shape,}")
-        LOGGER.info(
-            f"datasets: boundaries of dataset are ({self.min_bounds}, {self.max_bounds})"
-        )
+        LOGGER.info(f"datasets: loaded data with shape {(*self.layers.shape,)}")
+        LOGGER.info(f"datasets: boundaries of dataset are ({self.min_bounds}, {self.max_bounds})")
 
     def __len__(self):
         return len(self.energy)

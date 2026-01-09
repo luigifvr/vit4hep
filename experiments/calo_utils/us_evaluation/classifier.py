@@ -1,16 +1,17 @@
 import os
+
 import numpy as np
 import torch
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
-from experiments.logger import LOGGER
 from experiments.calo_utils.ugr_evaluation.evaluate import (
     DNN,
-    ttv_split,
-    train_and_evaluate_cls,
     evaluate_cls,
     load_classifier,
+    train_and_evaluate_cls,
+    ttv_split,
 )
+from experiments.logger import LOGGER
 
 
 class args_class:
@@ -52,7 +53,7 @@ def eval_ui_dists(source_array, reference_array, cfg):
     args.device = torch.device(
         "cuda:" + str(args.which_cuda) if torch.cuda.is_available() else "cpu"
     )
-    print("Using {}".format(args.device))
+    print(f"Using {args.device}")
 
     # set up DNN classifier
     input_dim = train_data.shape[1] - 1
@@ -65,11 +66,9 @@ def eval_ui_dists(source_array, reference_array, cfg):
     classifier = DNN(**DNN_kwargs)
     classifier.to(args.device)
     print(classifier)
-    total_parameters = sum(
-        p.numel() for p in classifier.parameters() if p.requires_grad
-    )
+    total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
 
-    print("{} has {} parameters".format(args.mode, int(total_parameters)))
+    print(f"{args.mode} has {int(total_parameters)} parameters")
 
     optimizer = torch.optim.Adam(classifier.parameters(), lr=args.cls_lr)
 
@@ -83,17 +82,11 @@ def eval_ui_dists(source_array, reference_array, cfg):
         torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device)
     )
 
-    train_dataloader = DataLoader(
-        train_data, batch_size=args.cls_batch_size, shuffle=True
-    )
-    test_dataloader = DataLoader(
-        test_data, batch_size=args.cls_batch_size, shuffle=False
-    )
+    train_dataloader = DataLoader(train_data, batch_size=args.cls_batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=args.cls_batch_size, shuffle=False)
     val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
 
-    train_and_evaluate_cls(
-        classifier, train_dataloader, test_dataloader, optimizer, args
-    )
+    train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
     classifier = load_classifier(classifier, args)
 
     with torch.inference_mode():
@@ -106,14 +99,12 @@ def eval_ui_dists(source_array, reference_array, cfg):
             calibration_data=test_dataloader,
         )
     LOGGER.info("Final result of classifier test (AUC / JSD):")
-    LOGGER.info("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+    LOGGER.info(f"{eval_auc:.4f} / {eval_JSD:.4f}")
     with open(
-        os.path.join(
-            args.output_dir, "classifier_{}_{}.txt".format(args.mode, args.dataset)
-        ),
+        os.path.join(args.output_dir, f"classifier_{args.mode}_{args.dataset}.txt"),
         "a",
     ) as f:
         f.write(
             "Final result of classifier test (AUC / JSD):\n"
-            + "{:.4f} / {:.4f}\n\n".format(eval_auc, eval_JSD)
+            + f"{eval_auc:.4f} / {eval_JSD:.4f}\n\n"
         )

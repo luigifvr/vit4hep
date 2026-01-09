@@ -80,5 +80,5 @@ evaluation:
 
 defaults:
  - /default
- - /training: default
+ - /training: cfm/shape_calohadronic
  - /model: cfm_calohad/cfm_calohad

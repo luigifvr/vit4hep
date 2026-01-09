@@ -1,22 +1,24 @@
 # standard python libraries
-import torch
-import os, time
-import warnings
-from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
 import os
+import time
+import warnings
+
 import h5py
+import torch
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
+from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
+
+import experiments.calogan.transforms as transforms
+from experiments.base_experiment import BaseExperiment
+from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
+from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
+from experiments.calogan.datasets import CaloGANDataset
+from experiments.calogan.evaluate import eval_calogan_lowlevel
 
 # Other functions of project
 from experiments.logger import LOGGER
-from experiments.base_experiment import BaseExperiment
-from experiments.calogan.datasets import CaloGANDataset
-import experiments.calogan.transforms as transforms
-from experiments.calogan.evaluate import eval_calogan_lowlevel
-from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
-from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
 
 
 class CaloGAN(BaseExperiment):
@@ -50,7 +52,7 @@ class CaloGAN(BaseExperiment):
                 kwargs["model_dir"] = self.cfg.run_dir
             self.transforms.append(getattr(transforms, name)(**kwargs))
         LOGGER.info("init_data: list of preprocessing steps:")
-        for idx, transform in enumerate(self.transforms):
+        for _, transform in enumerate(self.transforms):
             LOGGER.info(f"{transform.__class__.__name__}")
 
         self.train_dataset = CaloGANDataset(
@@ -134,7 +136,6 @@ class CaloGAN(BaseExperiment):
 
     @torch.inference_mode()
     def sample_n(self):
-
         self.model.eval()
 
         t_0 = time.time()
@@ -157,7 +158,6 @@ class CaloGAN(BaseExperiment):
 
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
-
             if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
                 transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
@@ -174,16 +174,11 @@ class CaloGAN(BaseExperiment):
                 dataset=transformed_cond, batch_size=batchsize_sample, shuffle=False
             )
 
-        sample = torch.vstack(
-            [self.model.sample_batch(c).cpu() for c in transformed_cond_loader]
-        )
+        sample = torch.vstack([self.model.sample_batch(c).cpu() for c in transformed_cond_loader])
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
-        LOGGER.info(
-            f"sample_n: Finished generating {len(sample)} samples "
-            f"after {sampling_time} s."
-        )
+        LOGGER.info(f"sample_n: Finished generating {len(sample)} samples after {sampling_time} s.")
         return sample, transformed_cond.cpu()
 
     def sample_us(self, transformed_cond_loader):
@@ -198,8 +193,7 @@ class CaloGAN(BaseExperiment):
         )
         t_1 = time.time()
         LOGGER.info(
-            f"sample_us: Finished generating {len(u_samples)} energy samples "
-            f"after {t_1 - t_0} s."
+            f"sample_us: Finished generating {len(u_samples)} energy samples after {t_1 - t_0} s."
         )
 
         u_samples_dict = {}
@@ -307,20 +301,16 @@ class CaloGAN(BaseExperiment):
             self.energy_model_transforms.append(getattr(transforms, name)(**kwargs))
 
         self.energy_model = instantiate(energy_model_cfg.model)
-        num_parameters = sum(
-            p.numel() for p in self.energy_model.parameters() if p.requires_grad
-        )
+        num_parameters = sum(p.numel() for p in self.energy_model.parameters() if p.requires_grad)
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
-        model_path = os.path.join(energy_model_cfg.run_dir, "models", f"model_run0.pt")
+        model_path = os.path.join(energy_model_cfg.run_dir, "models", "model_run0.pt")
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
             LOGGER.info(f"Loading energy model from {model_path}")
             self.energy_model.load_state_dict(state_dict)
-        except FileNotFoundError:
-            raise ValueError(f"Cannot load model from {model_path}")
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot load model from {model_path}") from err
 
         self.energy_model.to(self.device, dtype=self.dtype)

@@ -1,7 +1,8 @@
 import os
+
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib
 
 
 def plot_ui_dists(
@@ -20,8 +21,7 @@ def plot_ui_dists(
     """
 
     # iterate layers
-    for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T)):
-
+    for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T, strict=True)):
         # create figure and subaxes
         fig, ax = plt.subplots(
             3,
@@ -37,11 +37,7 @@ def plot_ui_dists(
             quantiles = np.linspace(0, 1, num_bins + 1)
             bins = np.quantile(
                 total,
-                (
-                    quantiles[skip_quantiles:-skip_quantiles]
-                    if skip_quantiles
-                    else quantiles
-                ),
+                (quantiles[skip_quantiles:-skip_quantiles] if skip_quantiles else quantiles),
             )
         else:
             if xlim == "auto":
@@ -96,7 +92,7 @@ def plot_ui_dists(
         ax[0].semilogy()
         # ax[0].set_ylim(None, min(ax[0].get_ylim()[1], 200))
         ax[0].set_ylim(max(ax[0].get_ylim()[0], 1.1e-4), None)
-        ax[0].set_ylabel(f"Prob. density")
+        ax[0].set_ylabel("Prob. density")
 
         ## RATIO AXIS ##
         norm = ref_vals
@@ -167,9 +163,7 @@ def plot_ui_dists(
         ax[1].set_xlabel(f"$u_{{{i}}}$")
         ax[0].set_xticklabels([])
 
-        ax[1].hlines(
-            1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k"
-        )
+        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle="-", color="k")
         ax[1].set_yticks((0.7, 1.0, 1.3))
         ax[1].set_ylim(0.5, 1.5)
         ax[0].set_xlim(bins[0], bins[-1])
@@ -227,12 +221,10 @@ def plot_ui_dists(
         fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
         if cfg is not None:
-            if not os.path.isdir(cfg.run_dir + f"/eval/"):
-                os.makedirs(cfg.run_dir + f"/eval/")
+            if not os.path.isdir(cfg.run_dir + "/eval/"):
+                os.makedirs(cfg.run_dir + "/eval/")
 
-            fig.savefig(
-                cfg.run_dir + "/eval/" + f"u{i}_dist.pdf", dpi=200, bbox_inches="tight"
-            )
+            fig.savefig(cfg.run_dir + "/eval/" + f"u{i}_dist.pdf", dpi=200, bbox_inches="tight")
         else:
             plt.show()
 

@@ -37,7 +37,6 @@ def prepare_low_data_for_classifier(
     """takes hdf5_file, extracts Einc and voxel energies, appends label, returns array"""
     voxel = voxel_orig.copy()
     E_inc = E_inc_orig.copy()
-    angles = angles_orig.copy()
     if normed:
         E_norm_rep = []
         E_norm = []
@@ -81,8 +80,6 @@ def prepare_high_data_for_classifier(
 ):
     """takes hdf5_file, extracts high-level features, appends label, returns array"""
     E_inc = E_inc_orig.copy()
-    E_tot = hlf_class.GetEtot()
-    angles = angles_orig.copy()
     E_layer = []
     for layer_id in hlf_class.GetElayers():
         E_layer.append(hlf_class.GetElayers()[layer_id].reshape(-1, 1))

@@ -1,7 +1,7 @@
 import hydra
 import torch
-import torch.multiprocessing as mp
 import torch.distributed as dist
+import torch.multiprocessing as mp
 
 
 @hydra.main(config_path="configs", config_name="default", version_base=None)
@@ -60,6 +60,10 @@ def experiment(rank, world_size, cfg):
         from experiments.calohadronic.experiment_finetuning import CaloHadronicFT
 
         exp = CaloHadronicFT(cfg, rank, world_size)
+    elif cfg.exp_type == "cmshgcal":
+        from experiments.cmshgcal.experiment import CMSHGCalExperiment
+
+        exp = CMSHGCalExperiment(cfg, rank, world_size)
     else:
         raise ValueError(f"exp_type {cfg.exp_type} not implemented")
 

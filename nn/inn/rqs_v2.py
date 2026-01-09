@@ -1,24 +1,20 @@
-from typing import Dict, Tuple, Callable, Iterable, List
+from collections.abc import Callable, Iterable
 
-import torch
-from torch import nn
-import torch.nn.functional as F
 import numpy as np
+import torch
+import torch.nn.functional as F
+from torch import nn
 
-from .binned import BinnedSplineBase, BinnedSpline
+from .binned import BinnedSpline, BinnedSplineBase
 
 
 class RationalQuadraticSpline(BinnedSpline):
     def __init__(self, *args, bins: int = 10, **kwargs):
         #       parameter                                       constraints             count
         # 1.    the derivative at the edge of each inner bin    positive                #bins - 1
-        super().__init__(
-            *args, bins=bins, parameter_counts={"deltas": bins - 1}, **kwargs
-        )
+        super().__init__(*args, bins=bins, parameter_counts={"deltas": bins - 1}, **kwargs)
 
-    def constrain_parameters(
-        self, parameters: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def constrain_parameters(self, parameters: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         parameters = super().constrain_parameters(parameters)
         # we additionally want positive derivatives to preserve monotonicity
         # the derivative must also match the tails at the spline boundaries
@@ -41,8 +37,8 @@ class RationalQuadraticSpline(BinnedSpline):
         return parameters
 
     def _spline1(
-        self, x: torch.Tensor, parameters: Dict[str, torch.Tensor], rev: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, x: torch.Tensor, parameters: dict[str, torch.Tensor], rev: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         left, right, bottom, top = (
             parameters["left"],
             parameters["right"],
@@ -58,8 +54,8 @@ class RationalQuadraticSpline(BinnedSpline):
         )
 
     def _spline2(
-        self, x: torch.Tensor, parameters: Dict[str, torch.Tensor], rev: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, x: torch.Tensor, parameters: dict[str, torch.Tensor], rev: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         left, right, bottom, top = (
             parameters["left"],
             parameters["right"],
@@ -95,17 +91,13 @@ class ElementwiseRationalQuadraticSpline(BinnedSplineBase):
         num_params = sum(self.parameter_counts.values())
 
         if self.conditional:
-            self.subnet = subnet_constructor(
-                self.condition_length, self.channels * num_params
-            )
+            self.subnet = subnet_constructor(self.condition_length, self.channels * num_params)
         else:
             self.spline_parameters = nn.Parameter(
                 torch.zeros(self.channels * num_params, *dims_in[0][1:])
             )
 
-    def constrain_parameters(
-        self, parameters: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def constrain_parameters(self, parameters: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         parameters = super().constrain_parameters(parameters)
         # we additionally want positive derivatives to preserve monotonicity
         # the derivative must also match the tails at the spline boundaries
@@ -127,7 +119,7 @@ class ElementwiseRationalQuadraticSpline(BinnedSplineBase):
 
         return parameters
 
-    def output_dims(self, input_dims: List[Tuple[int]]) -> List[Tuple[int]]:
+    def output_dims(self, input_dims: list[tuple[int]]) -> list[tuple[int]]:
         return input_dims
 
     def forward(
@@ -136,7 +128,7 @@ class ElementwiseRationalQuadraticSpline(BinnedSplineBase):
         c: Iterable[torch.Tensor] = None,
         rev: bool = False,
         jac: bool = True,
-    ) -> Tuple[Tuple[torch.Tensor], torch.Tensor]:
+    ) -> tuple[tuple[torch.Tensor], torch.Tensor]:
         if self.conditional:
             parameters = self.subnet(torch.cat(c, dim=1).float())
         else:
@@ -146,14 +138,12 @@ class ElementwiseRationalQuadraticSpline(BinnedSplineBase):
         parameters = self.split_parameters(parameters, self.channels)
         parameters = self.constrain_parameters(parameters)
 
-        y, jac = self.binned_spline(
-            x=x_or_z[0], parameters=parameters, spline=self.spline, rev=rev
-        )
+        y, jac = self.binned_spline(x=x_or_z[0], parameters=parameters, spline=self.spline, rev=rev)
         return (y,), jac
 
     def spline(
-        self, x: torch.Tensor, parameters: Dict[str, torch.Tensor], rev: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, x: torch.Tensor, parameters: dict[str, torch.Tensor], rev: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         left, right, bottom, top = (
             parameters["left"],
             parameters["right"],
@@ -179,7 +169,7 @@ def rational_quadratic_spline(
     deltas_right: torch.Tensor,
     rev: bool = False,
     use_float64: bool = True,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Compute the rational-quadratic spline with the algorithm described in arXiv:1906.04032
     Forward output is defined for each bin by the fraction

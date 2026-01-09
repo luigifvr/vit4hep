@@ -1,25 +1,26 @@
 # standard python libraries
+import os
+import time
+import warnings
+
+import h5py
 import numpy as np
 import torch
-import os, time
-import warnings
-from torch.utils.data import DataLoader
-
-from torch.utils.data.distributed import DistributedSampler
-import os
-import h5py
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
+from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
+
+import experiments.lemurs.transforms as transforms
+from experiments.base_experiment import BaseExperiment
+from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
+from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
+from experiments.lemurs.datasets import LEMURSCollator, LEMURSDataset
+from experiments.lemurs.evaluate import run_from_py
+from experiments.lemurs.utils import load_data
 
 # Other functions of project
 from experiments.logger import LOGGER
-from experiments.base_experiment import BaseExperiment
-from experiments.lemurs.datasets import LEMURSDataset, LEMURSCollator
-import experiments.lemurs.transforms as transforms
-from experiments.lemurs.utils import load_data
-from experiments.lemurs.evaluate import run_from_py
-from experiments.calo_utils.us_evaluation.plots import plot_ui_dists
-from experiments.calo_utils.us_evaluation.classifier import eval_ui_dists
 
 
 class LEMURS(BaseExperiment):
@@ -196,15 +197,12 @@ class LEMURS(BaseExperiment):
 
     @torch.inference_mode()
     def sample_n(self):
-
         self.model.eval()
 
         t_0 = time.time()
 
         Einc, phi, theta = self.sample_initial_conds()
-        gen_label_vector = (
-            self.cfg.data.gen_label_vector
-        )  # one-hot encoded vector, e.g. [0,1,0,0]
+        gen_label_vector = self.cfg.data.gen_label_vector  # one-hot encoded vector, e.g. [0,1,0,0]
         labels = torch.tensor(
             np.tile(gen_label_vector, (self.cfg.n_samples, 1)),
             dtype=self.dtype,
@@ -238,12 +236,9 @@ class LEMURS(BaseExperiment):
 
         # sample u_i's if self is a shape model
         if self.cfg.model_type == "shape":
-
             if self.cfg.sample_us:
                 u_samples = self.sample_us(transformed_cond_loader)
-                transformed_cond = torch.cat(
-                    [u_samples, transformed_cond, labels], dim=1
-                )
+                transformed_cond = torch.cat([u_samples, transformed_cond, labels], dim=1)
                 # concatenate with Einc
                 transformed_cond_loader = DataLoader(
                     dataset=transformed_cond,
@@ -290,19 +285,13 @@ class LEMURS(BaseExperiment):
                 )
         else:
             sample = torch.vstack(
-                [
-                    self.model.sample_batch(c.to(self.device)).cpu()
-                    for c in transformed_cond_loader
-                ]
+                [self.model.sample_batch(c.to(self.device)).cpu() for c in transformed_cond_loader]
             )
             conditions = transformed_cond
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
-        LOGGER.info(
-            f"sample_n: Finished generating {len(sample)} samples "
-            f"after {sampling_time} s."
-        )
+        LOGGER.info(f"sample_n: Finished generating {len(sample)} samples after {sampling_time} s.")
 
         return sample.detach().cpu(), conditions.detach().cpu()
 
@@ -318,8 +307,7 @@ class LEMURS(BaseExperiment):
         )
         t_1 = time.time()
         LOGGER.info(
-            f"sample_us: Finished generating {len(u_samples)} energy samples "
-            f"after {t_1 - t_0} s."
+            f"sample_us: Finished generating {len(u_samples)} energy samples after {t_1 - t_0} s."
         )
 
         u_samples_dict = {}
@@ -360,9 +348,7 @@ class LEMURS(BaseExperiment):
                 shuffle=False,
                 collate_fn=test_collator,
             )
-            reference_energy_ratios = torch.vstack(
-                [b[0] for b in reference_loader]
-            ).cpu()
+            reference_energy_ratios = torch.vstack([b[0] for b in reference_loader]).cpu()
             reference_conditions = torch.vstack([b[1] for b in reference_loader]).cpu()
 
             samples_dict = {}
@@ -407,9 +393,7 @@ class LEMURS(BaseExperiment):
                 )
                 # include additional theta and phi conditions to classifier
                 samples = np.concatenate((samples, conditions[:, :3]), axis=1)
-                reference = np.concatenate(
-                    (reference, reference_conditions[:, :3]), axis=1
-                )
+                reference = np.concatenate((reference, reference_conditions[:, :3]), axis=1)
                 eval_ui_dists(
                     samples,
                     reference,
@@ -423,15 +407,9 @@ class LEMURS(BaseExperiment):
             samples_dict = {}
             samples_dict["showers"] = samples
             samples_dict["extra_dims"] = conditions[:, : samples.shape[-1]]
-            samples_dict["incident_energy"] = conditions[
-                :, samples.shape[-1]
-            ].unsqueeze(1)
-            samples_dict["incident_theta"] = conditions[
-                :, samples.shape[-1] + 1
-            ].unsqueeze(1)
-            samples_dict["incident_phi"] = conditions[
-                :, samples.shape[-1] + 2
-            ].unsqueeze(1)
+            samples_dict["incident_energy"] = conditions[:, samples.shape[-1]].unsqueeze(1)
+            samples_dict["incident_theta"] = conditions[:, samples.shape[-1] + 1].unsqueeze(1)
+            samples_dict["incident_phi"] = conditions[:, samples.shape[-1] + 2].unsqueeze(1)
             samples_dict["label"] = conditions[:, samples.shape[-1] + 3 :]
             for key in samples_dict.keys():
                 samples_dict[key] = samples_dict[key].clone()
@@ -496,20 +474,16 @@ class LEMURS(BaseExperiment):
         del dummy_data
 
         self.energy_model = instantiate(energy_model_cfg.model)
-        num_parameters = sum(
-            p.numel() for p in self.energy_model.parameters() if p.requires_grad
-        )
+        num_parameters = sum(p.numel() for p in self.energy_model.parameters() if p.requires_grad)
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
-        model_path = os.path.join(energy_model_cfg.run_dir, "models", f"model_run0.pt")
+        model_path = os.path.join(energy_model_cfg.run_dir, "models", "model_run0.pt")
         try:
-            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)[
-                "model"
-            ]
+            state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
             LOGGER.info(f"Loading energy model from {model_path}")
             self.energy_model.load_state_dict(state_dict)
-        except FileNotFoundError:
-            raise ValueError(f"Cannot load model from {model_path}")
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot load model from {model_path}") from err
 
         self.energy_model.to(self.device, dtype=self.dtype)

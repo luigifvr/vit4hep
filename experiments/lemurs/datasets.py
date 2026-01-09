@@ -1,11 +1,12 @@
-import torch
-import h5py
 from collections import OrderedDict
 
+import h5py
+import torch
 from torch.utils.data import Dataset
-from experiments.logger import LOGGER
-from experiments.lemurs.transforms import *
+
+from experiments.lemurs.transforms import *  # noqa: F403
 from experiments.lemurs.utils import load_data
+from experiments.logger import LOGGER
 
 
 class LEMURSDataset(Dataset):
@@ -39,7 +40,7 @@ class LEMURSDataset(Dataset):
                         num_samples = len(f["events"])
                         for local_idx in range(num_samples):
                             index_map.append((file_path, local_idx, class_idx))
-                except (IOError, KeyError) as e:
+                except (OSError, KeyError) as e:
                     LOGGER.error(f"Could not read {file_path} for class {label}: {e}")
         return index_map
 

@@ -1,18 +1,15 @@
-from FrEIA.modules import InvertibleModule
-
-from typing import Union, Iterable, Tuple
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from FrEIA.modules import InvertibleModule
 
 
 class PermuteRandomS1(InvertibleModule):
     """Constructs a random permutation, that stays fixed during training.
     Permutes along the first (channel-) dimension for multi-dimenional tensors."""
 
-    def __init__(self, dims_in, dims_c=None, seed: Union[int, None] = None):
+    def __init__(self, dims_in, dims_c=None, seed: int | None = None):
         """Additional args in docstring of base class FrEIA.modules.InvertibleModule.
 
         Args:
@@ -32,9 +29,7 @@ class PermuteRandomS1(InvertibleModule):
             self.perm_inv[p] = i
 
         self.perm = nn.Parameter(torch.LongTensor(self.perm), requires_grad=False)
-        self.perm_inv = nn.Parameter(
-            torch.LongTensor(self.perm_inv), requires_grad=False
-        )
+        self.perm_inv = nn.Parameter(torch.LongTensor(self.perm_inv), requires_grad=False)
 
     def forward(self, x, rev=False, jac=True):
         if not rev:
@@ -52,7 +47,7 @@ class PermuteRandomS2(InvertibleModule):
     """Constructs a random permutation, that stays fixed during training.
     Permutes along the first (channel-) dimension for multi-dimenional tensors."""
 
-    def __init__(self, dims_in, dims_c=None, seed: Union[int, None] = None):
+    def __init__(self, dims_in, dims_c=None, seed: int | None = None):
         """Additional args in docstring of base class FrEIA.modules.InvertibleModule.
 
         Args:
@@ -72,9 +67,7 @@ class PermuteRandomS2(InvertibleModule):
             self.perm_inv[p] = i
 
         self.perm = nn.Parameter(torch.LongTensor(self.perm), requires_grad=False)
-        self.perm_inv = nn.Parameter(
-            torch.LongTensor(self.perm_inv), requires_grad=False
-        )
+        self.perm_inv = nn.Parameter(torch.LongTensor(self.perm_inv), requires_grad=False)
 
     def forward(self, x, rev=False, jac=True):
         if not rev:
