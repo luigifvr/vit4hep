@@ -1,8 +1,13 @@
+<div align="center">
+
 # VisionTransformers4HEP
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![pytorch](https://img.shields.io/badge/PyTorch_2.7-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org/get-started/locally/)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 [![hydra](https://img.shields.io/badge/Config-Hydra_1.3-89b8cd)](https://hydra.cc/)
+
+[![U-ViT](http://img.shields.io/badge/paper-arxiv.2601.05289-B31B1B.svg)](https://arxiv.org/abs/2601.05289)
+</div>
 
 A codebase for applying Vision Transformers (ViTs) to calorimeter data in high-energy physics (HEP). It supports training, evaluation, and fine-tuning of transformer-based models on calorimeter simulation datasets.
 
@@ -101,17 +106,15 @@ Other keys that are expected to be always relevant are outside the `data` key. T
 If you use this codebase in your research, please consider citing:
 
 ```
-@article{Favaro:2024rle,
- author = "Favaro, Luigi and Ore, Ayodele and Schweitzer, Sofia Palacios and Plehn, Tilman",
- title = "{CaloDREAM -- Detector Response Emulation via Attentive flow Matching}",
- eprint = "2405.09629",
- archivePrefix = "arXiv",
- primaryClass = "hep-ph",
- doi = "10.21468/SciPostPhys.18.3.088",
- journal = "SciPost Phys.",
- volume = "18",
- pages = "088",
- year = "2025"
+@article{Favaro:2026awn,
+    author = "Favaro, Luigi and Giammanco, Andrea and Krause, Claudius",
+    title = "{A universal vision transformer for fast calorimeter simulations}",
+    eprint = "2601.05289",
+    archivePrefix = "arXiv",
+    primaryClass = "hep-ph",
+    reportNumber = "IRMP-CP3-26-01, MBI-ML-26-01",
+    month = "1",
+    year = "2026"
 }
 
 @inproceedings{Favaro:2025ift,
@@ -123,6 +126,19 @@ If you use this codebase in your research, please consider citing:
  primaryClass = "hep-ph",
  reportNumber = "IRMP-CP3-25-33",
  month = "9",
+ year = "2025"
+}
+
+@article{Favaro:2024rle,
+ author = "Favaro, Luigi and Ore, Ayodele and Schweitzer, Sofia Palacios and Plehn, Tilman",
+ title = "{CaloDREAM -- Detector Response Emulation via Attentive flow Matching}",
+ eprint = "2405.09629",
+ archivePrefix = "arXiv",
+ primaryClass = "hep-ph",
+ doi = "10.21468/SciPostPhys.18.3.088",
+ journal = "SciPost Phys.",
+ volume = "18",
+ pages = "088",
  year = "2025"
 }
 ```
