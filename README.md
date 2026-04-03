@@ -13,6 +13,8 @@ A codebase for applying Vision Transformers (ViTs) to calorimeter data in high-e
 
 We modularize and extend the [CaloDREAM](https://github.com/luigifvr/calo_dreamer) package for easier training on different datasets for calorimeter shower generation and beyond.
 
+The code supports conditional flow-matching (CFM) and normalizing flows (NFs).
+
 ## Installation
 
 Clone the repository:
@@ -75,10 +77,10 @@ The warm_start_idx specifies which model in the models folder should be loaded a
 It is also possible to rerun the evaluation of a saved sample by passing the file path to `load_sample`, following the previous example:
 
 ```bash
-python main.py -cn config -cp runs/calo_test/calo_0000 train=false warm_start_idx=0 plot=false load_sample=<file_path>
+python main.py -cn config -cp runs/calo_test/calo_0000 train=false warm_start_idx=0 sample=false load_sample=<file_path>
 ```
 
-The option `plot=false` skips the sampling function (soon will be changed to a more intuitive name).
+The option `sample=false` skips the sampling function. Instead, you can skip the evaluation altogether by passing `evaluate=false`.
 
 ## Structure
 
