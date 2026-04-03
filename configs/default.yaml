@@ -19,7 +19,7 @@ evaluate: true
 evaluation:
  batchsize: 1024
 
-plot: true
+sample: true
 plotting:
  loss: true
 
