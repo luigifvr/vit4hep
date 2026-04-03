@@ -446,11 +446,10 @@ class LEMURS(BaseExperiment):
             dirname = self.cfg.run_dir + f"/samples_{self.cfg.run_idx}.hdf5"
         LOGGER.info(f"load_sample: loading samples from {dirname}")
         load_file = h5py.File(dirname, "r")
-        file = load_file["events"][:]
-        samples = file["showers"]
-        energies = file["incident_energy"]
-        theta = file["incident_theta"]
-        phi = file["incident_phi"]
+        samples = load_file["showers"][:]
+        energies = load_file["incident_energy"][:]
+        theta = load_file["incident_theta"][:]
+        phi = load_file["incident_phi"][:]
         load_file.close()
         return samples, energies, theta, phi
 
