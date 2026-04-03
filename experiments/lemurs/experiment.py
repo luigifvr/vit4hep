@@ -477,7 +477,15 @@ class LEMURS(BaseExperiment):
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
-        model_path = os.path.join(energy_model_cfg.run_dir, "models", "model_run0.pt")
+
+        if hasattr(self.cfg, "energy_model_idx"):
+            energy_model_idx = self.cfg.energy_model_idx
+        else:
+            energy_model_idx = 0
+        model_path = os.path.join(
+            energy_model_cfg.run_dir, "models", f"model_run{energy_model_idx}.pt"
+        )
+
         try:
             state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
             LOGGER.info(f"Loading energy model from {model_path}")
