@@ -94,12 +94,6 @@ class BaseExperiment:
         if self.cfg.evaluate:
             self.evaluate()
 
-        if self.cfg.plot and self.cfg.save:
-            self.plot()
-
-        if self.cfg.load_sample:
-            self.eval_sample(self.cfg.load_sample)
-
         if self.device == torch.device("cuda"):
             max_used = torch.cuda.max_memory_allocated()
             max_total = torch.cuda.mem_get_info()[1]
@@ -676,16 +670,20 @@ class BaseExperiment:
             model_path,
         )
 
+    def evaluate(self):
+        if self.cfg.sample:
+            self.sample()
+
+        if self.cfg.load_sample:
+            self.eval_sample(self.cfg.load_sample)
+
     def init_physics(self):
         raise NotImplementedError()
 
     def init_data(self):
         raise NotImplementedError()
 
-    def evaluate(self):
-        raise NotImplementedError()
-
-    def plot(self):
+    def sample(self):
         raise NotImplementedError()
 
     def eval_sample(self):

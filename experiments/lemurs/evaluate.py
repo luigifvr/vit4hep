@@ -14,6 +14,8 @@ from experiments.calo_utils.ugr_evaluation.evaluate import (
     load_classifier,
     train_and_evaluate_cls,
     ttv_split,
+    prepare_high_data_for_classifier,
+    prepare_low_data_for_classifier,
 )
 from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import (
     dup,
@@ -32,10 +34,6 @@ from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import (
     plot_z_profile,
 )
 from experiments.calo_utils.ugr_evaluation.resnet import generate_model
-from experiments.lemurs.utils import (
-    prepare_high_data_for_classifier,
-    prepare_low_data_for_classifier,
-)
 from experiments.logger import LOGGER
 
 torch.set_default_dtype(torch.float64)
@@ -530,11 +528,10 @@ def run_from_py(sample, energy, theta, phi, cfg):
         print("Calculating high-level features for FPD/KPD: DONE.\n")
 
         # get high level features and remove class label
-        source_array = prepare_high_data_for_classifier(sample, energy, angles, hlf, 0.0, cut=cut)
+        source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0.0, cut=cut)
         reference_array = prepare_high_data_for_classifier(
             reference_shower,
             reference_energy,
-            reference_angles,
             reference_hlf,
             1.0,
             cut=cut,
@@ -584,12 +581,11 @@ def run_from_py(sample, energy, theta, phi, cfg):
         for key in list_cls:
             if (args.mode in ["cls-low", "cls-resnet"]) or (key in ["cls-low", "cls-resnet"]):
                 source_array = prepare_low_data_for_classifier(
-                    sample, energy, angles, hlf, 0.0, cut=cut, normed=False
+                    sample, energy, hlf, 0.0, cut=cut, normed=False
                 )
                 reference_array = prepare_low_data_for_classifier(
                     reference_shower,
                     reference_energy,
-                    reference_angles,
                     reference_hlf,
                     1.0,
                     cut=cut,
@@ -597,25 +593,21 @@ def run_from_py(sample, energy, theta, phi, cfg):
                 )
             elif (args.mode in ["cls-low-normed"]) or (key in ["cls_low_normed"]):
                 source_array = prepare_low_data_for_classifier(
-                    sample, energy, angles, hlf, 0.0, cut=cut, normed=True
+                    sample, energy, hlf, 0.0, cut=cut, normed=True
                 )
                 reference_array = prepare_low_data_for_classifier(
                     reference_shower,
                     reference_energy,
-                    reference_angles,
                     reference_hlf,
                     1.0,
                     cut=cut,
                     normed=True,
                 )
             elif (args.mode in ["cls-high"]) or (key in ["cls-high"]):
-                source_array = prepare_high_data_for_classifier(
-                    sample, energy, angles, hlf, 0.0, cut=cut
-                )
+                source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0.0, cut=cut)
                 reference_array = prepare_high_data_for_classifier(
                     reference_shower,
                     reference_energy,
-                    reference_angles,
                     reference_hlf,
                     1.0,
                     cut=cut,

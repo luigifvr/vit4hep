@@ -107,6 +107,7 @@ def prepare_high_data_for_classifier(
 ):
     """takes hdf5_file, extracts high-level features, appends label, returns array"""
     E_inc = E_inc_orig.copy()
+    E_tot = hlf_class.GetEtot().reshape(-1, 1)
     E_layer = []
     for layer_id in hlf_class.GetElayers():
         E_layer.append(hlf_class.GetElayers()[layer_id].reshape(-1, 1))
@@ -119,11 +120,22 @@ def prepare_high_data_for_classifier(
         EC_phis.append(hlf_class.GetECPhis()[layer_id].reshape(-1, 1))
         Width_etas.append(hlf_class.GetWidthEtas()[layer_id].reshape(-1, 1))
         Width_phis.append(hlf_class.GetWidthPhis()[layer_id].reshape(-1, 1))
+    Sparsity = []
+    for layer_id in hlf_class.GetSparsity():
+        Sparsity.append(hlf_class.GetSparsity()[layer_id].reshape(-1, 1))
+    EC_R = []
+    Width_EC_R = []
+    for layer_id in hlf_class.GetECR():
+        EC_R.append(hlf_class.GetECR()[layer_id].reshape(-1, 1))
+        Width_EC_R.append(hlf_class.GetWidthR()[layer_id].reshape(-1, 1))
     E_layer = np.concatenate(E_layer, axis=1)
     EC_etas = np.concatenate(EC_etas, axis=1)
     EC_phis = np.concatenate(EC_phis, axis=1)
     Width_etas = np.concatenate(Width_etas, axis=1)
     Width_phis = np.concatenate(Width_phis, axis=1)
+    Sparsity = np.concatenate(Sparsity, axis=1)
+    EC_R = np.concatenate(EC_R, axis=1)
+    Width_EC_R = np.concatenate(Width_EC_R, axis=1)
     ret = np.concatenate(
         [
             np.log10(E_inc),
@@ -132,6 +144,10 @@ def prepare_high_data_for_classifier(
             EC_phis / 1e2,
             Width_etas / 1e2,
             Width_phis / 1e2,
+            np.log10(E_tot + 1e-8),
+            Sparsity,
+            EC_R / 1e2,
+            Width_EC_R / 1e2,
             label * np.ones_like(E_inc),
         ],
         axis=1,
@@ -755,41 +771,36 @@ def run_from_py(sample, energy, cfg):
                     + f"{eval_auc:.4f} / {eval_JSD:.4f}\n\n"
                 )
 
-        if args.mode in ["all", "fpd", "kpd"]:
-            import jetnet
+    if args.mode in ["all", "fpd", "kpd"]:
+        import jetnet
 
-            print("Calculating high-level features for FPD/KPD ...")
-            hlf.CalculateFeatures(sample)
-            hlf.Einc = energy
+        print("Calculating high-level features for FPD/KPD ...")
+        hlf.CalculateFeatures(sample)
+        hlf.Einc = energy
+        cut = args.cut
 
-            if reference_hlf.E_tot is None:
-                reference_hlf.CalculateFeatures(reference_shower)
+        if reference_hlf.E_tot is None:
+            reference_hlf.CalculateFeatures(reference_shower)
 
-            print("Calculating high-level features for FPD/KPD: DONE.\n")
+        print("Calculating high-level features for FPD/KPD: DONE.\n")
 
-            # get high level features and remove class label
-            source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0.0, cut=cut)[
-                :, :-1
-            ]
-            reference_array = prepare_high_data_for_classifier(
-                reference_shower, reference_energy, reference_hlf, 1.0, cut=cut
-            )[:, :-1]
+        # get high level features and remove class label
+        source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0.0, cut=cut)[:, :-1]
+        reference_array = prepare_high_data_for_classifier(
+            reference_shower, reference_energy, reference_hlf, 1.0, cut=cut
+        )[:, :-1]
 
-            fpd_val, fpd_err = jetnet.evaluation.fpd(
-                reference_array, source_array, min_samples=10000
-            )
-            kpd_val, kpd_err = jetnet.evaluation.kpd(
-                reference_array, source_array, batch_size=10000
-            )
+        fpd_val, fpd_err = jetnet.evaluation.fpd(reference_array, source_array, min_samples=10000)
+        kpd_val, kpd_err = jetnet.evaluation.kpd(reference_array, source_array, batch_size=10000)
 
-            result_str = (
-                f"FPD (x10^3): {fpd_val * 1e3:.4f} ± {fpd_err * 1e3:.4f}\n"
-                f"KPD (x10^3): {kpd_val * 1e3:.4f} ± {kpd_err * 1e3:.4f}"
-            )
+        result_str = (
+            f"FPD (x10^3): {fpd_val * 1e3:.4f} ± {fpd_err * 1e3:.4f}\n"
+            f"KPD (x10^3): {kpd_val * 1e3:.4f} ± {kpd_err * 1e3:.4f}"
+        )
 
-            print(result_str)
-            with open(
-                os.path.join(args.output_dir, f"fpd_kpd_{args.dataset}.txt"),
-                "w",
-            ) as f:
-                f.write(result_str)
+        print(result_str)
+        with open(
+            os.path.join(args.output_dir, f"fpd_kpd_{args.dataset}.txt"),
+            "w",
+        ) as f:
+            f.write(result_str)

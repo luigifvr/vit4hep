@@ -242,6 +242,3 @@ class CFM(BaseModel):
         )[-1]
 
         return sample
-
-    def build_net(self):
-        raise NotImplementedError

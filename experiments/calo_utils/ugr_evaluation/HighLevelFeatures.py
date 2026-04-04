@@ -4,11 +4,11 @@ Class that handles the specific binning geometry based on the provided file
 and computes all relevant high-level features
 """
 
+import math
 import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
 from matplotlib.colors import LogNorm as LN
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
@@ -42,23 +42,23 @@ class HighLevelFeatures:
         self.width_etas = {}
         self.width_phis = {}
         self.sparsity = {}
+        self.EC_r = {}
+        self.width_r = {}
         self.weighted_depth_a = {}
         self.weighted_depth_r = {}
         self.weighted_depth_ga = {}
         self.weighted_depth_gr = {}
         self.Eradial = {}
         self.particle = particle
-        self.colors = cm.gnuplot2(np.linspace(0.2, 0.8, 3))
-        if self.particle == "photon":
-            self.color = self.colors[1]
-        elif self.particle == "pion":
-            self.color = self.colors[2]
-        else:
-            self.color = self.colors[0]
 
         self.num_voxel = []
+        self.radial_center_mult = {}
         for idx, r_values in enumerate(self.r_edges):
             self.num_voxel.append((len(r_values) - 1) * self.num_alpha[idx])
+            self.radial_center_mult[self.relevantLayers[idx]] = np.array(
+                self.num_alpha[idx]
+                * [(r_values[i] + r_values[i + 1]) * 0.5 for i in range(len(r_values) - 1)]
+            )
 
     def _calculate_EC(self, eta, phi, energy):
         eta_EC = (eta * energy).sum(axis=-1) / (energy.sum(axis=-1) + 1e-16)
@@ -70,19 +70,19 @@ class HighLevelFeatures:
         phi_width = (phi * phi * energy).sum(axis=-1) / (energy.sum(axis=-1) + 1e-16)
         return eta_width, phi_width
 
-    def GetECandWidths(self, eta_layer, phi_layer, energy_layer):
-        """Computes center of energy in eta and phi as well as their widths"""
-        eta_EC, phi_EC = self._calculate_EC(eta_layer, phi_layer, energy_layer)
-        eta_width, phi_width = self._calculate_Widths(eta_layer, phi_layer, energy_layer)
-        # The following checks are needed to assure a positive argument to the sqrt,
-        # if there is very little energy things can go wrong
-        eta_width = np.sqrt((eta_width - eta_EC**2).clip(min=0.0))
-        phi_width = np.sqrt((phi_width - phi_EC**2).clip(min=0.0))
-        return eta_EC, phi_EC, eta_width, phi_width
-
-    def _calculate_sparsity(self, layer_data):
+    def _calculate_sparsity(self, layer_data, threshold=0):
         """Computes the sparsity of the given layer"""
-        return (layer_data > 0).mean(axis=1)
+        return 1.0 - (layer_data > threshold).mean(axis=-1)
+
+    def _calculate_EC_r(self, radial_center, energy):
+        r_EC = (radial_center * energy).sum(axis=-1) / (energy.sum(axis=-1) + 1e-16)
+        return r_EC
+
+    def _calculate_Width_r(self, radial_center, energy):
+        r_width = (radial_center * radial_center * energy).sum(axis=-1) / (
+            energy.sum(axis=-1) + 1e-16
+        )
+        return r_width
 
     def _calculate_WeightedDepth(self, energy_layer, layer):
         """Calculate the energy sum weighted by the layer index"""
@@ -155,33 +155,43 @@ class HighLevelFeatures:
         for n in range(len(self.r_edges[0]) - 1):
             self.Eradial[n] = self._calculate_Eradial(energy_calo, n)
 
-    def CalculateFeatures(self, data):
+    def GetECandWidths(self, eta_layer, phi_layer, energy_layer):
+        """Computes center of energy in eta and phi as well as their widths"""
+        eta_EC, phi_EC = self._calculate_EC(eta_layer, phi_layer, energy_layer)
+        eta_width, phi_width = self._calculate_Widths(eta_layer, phi_layer, energy_layer)
+        # The following checks are needed to assure a positive argument to the sqrt,
+        # if there is very little energy things can go wrong
+        eta_width = np.sqrt((eta_width - eta_EC**2).clip(min=0.0))
+        phi_width = np.sqrt((phi_width - phi_EC**2).clip(min=0.0))
+        return eta_EC, phi_EC, eta_width, phi_width
+
+    def GetECandWidthR(self, r_layer, energy_layer):
+        """Computes center of energy in r as well as its with per layer"""
+        r_EC = self._calculate_EC_r(r_layer, energy_layer)
+        r_width = self._calculate_Width_r(r_layer, energy_layer)
+        r_width = np.sqrt((r_width - r_EC**2).clip(min=0.0))
+        return r_EC, r_width
+
+    def CalculateFeatures(self, data, threshold=0.0):
         """Computes all high-level features for the given data"""
         self.E_tot = data.sum(axis=-1)
 
         for L in self.relevantLayers:
-            E_layer = data[:, self.bin_edges[L] : self.bin_edges[L + 1]].sum(axis=-1)
-            self.E_layers[L] = E_layer
-
-            self.sparsity[L] = self._calculate_sparsity(
-                data[:, self.bin_edges[L] : self.bin_edges[L + 1]]
-            )
+            E_layer = data[:, self.bin_edges[L] : self.bin_edges[L + 1]]
+            self.E_layers[L] = E_layer.sum(axis=-1)
+            self.sparsity[L] = self._calculate_sparsity(E_layer, threshold=threshold)
 
         for L in self.relevantLayers:
+            self.EC_r[L], self.width_r[L] = self.GetECandWidthR(
+                self.radial_center_mult[L], data[:, self.bin_edges[L] : self.bin_edges[L + 1]]
+            )
             if L in self.layersBinnedInAlpha:
-                (
-                    self.EC_etas[L],
-                    self.EC_phis[L],
-                    self.width_etas[L],
-                    self.width_phis[L],
-                ) = self.GetECandWidths(
-                    self.eta_all_layers[L],
-                    self.phi_all_layers[L],
-                    data[:, self.bin_edges[L] : self.bin_edges[L + 1]],
-                )
-
-                self.sparsity[L] = self._calculate_sparsity(
-                    data[:, self.bin_edges[L] : self.bin_edges[L + 1]]
+                self.EC_etas[L], self.EC_phis[L], self.width_etas[L], self.width_phis[L] = (
+                    self.GetECandWidths(
+                        self.eta_all_layers[L],
+                        self.phi_all_layers[L],
+                        data[:, self.bin_edges[L] : self.bin_edges[L + 1]],
+                    )
                 )
         self.GetWeightedDepths(data)
         self.GetGroupedWeightedDepths(data)
@@ -218,7 +228,6 @@ class HighLevelFeatures:
         if vmax is None:
             vmax = data.max()
         pcm = ax.pcolormesh(theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax))
-        pcm.set_edgecolor("face")
         ax.axes.get_xaxis().set_visible(False)
         ax.axes.get_yaxis().set_visible(False)
         if self.particle == "electron":
@@ -274,7 +283,7 @@ class HighLevelFeatures:
         for radii in self.r_edges:
             if radii[-1] > max_r:
                 max_r = radii[-1]
-        vmax = data.max() if data.max() > 1e-2 else 1e-2
+        vmax = data.max()
         for idx, layer in enumerate(self.relevantLayers):
             radii = np.array(self.r_edges[idx])
             if self.particle != "electron":
@@ -291,7 +300,6 @@ class HighLevelFeatures:
                 ax = plt.subplot(1, len(self.r_edges), idx + 1, polar=True)
             ax.grid(False)
             pcm = ax.pcolormesh(theta, rad, data_repeated.T + 1e-16, norm=LN(vmin=1e-2, vmax=vmax))
-            pcm.set_edgecolor("face")
             ax.axes.get_xaxis().set_visible(False)
             ax.axes.get_yaxis().set_visible(False)
             if self.particle == "electron":
@@ -355,7 +363,16 @@ class HighLevelFeatures:
         return self.width_phis
 
     def GetSparsity(self):
+        """returns dictionary of sparsity for each layer"""
         return self.sparsity
+
+    def GetECR(self):
+        """returns dictionary of centers of energy in r for each layer"""
+        return self.EC_r
+
+    def GetWidthR(self):
+        """returns dictionary of widths of centers of energy in r for each layer"""
+        return self.width_r
 
     def GetWeightedDepthA(self):
         return self.weighted_depth_a

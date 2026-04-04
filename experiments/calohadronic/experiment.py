@@ -37,7 +37,7 @@ class CaloHadronic(BaseExperiment):
     generate_Einc_ds1()  : Generate the incident energy distribution of CaloChallenge as in the training data
     sample_us()          : Sample energy ratios from the energy model
     sample_n()           : Generate n_samples from the trained model, either energy ratios or full normalized showers
-    plot()               : First generate full shower, then make plots and evaluate
+    sample()             : First generate full shower, then make plots and evaluate
     save_sample()        : Save generated samples in the correct format
     load_energy_model()  : Load an external energy model if sample_us
     """
@@ -153,9 +153,6 @@ class CaloHadronic(BaseExperiment):
 
     def _batch_loss(self, data):
         return self.model._batch_loss(data)
-
-    def evaluate(self):
-        pass
 
     @torch.inference_mode()
     def sample_n(self):
@@ -279,8 +276,8 @@ class CaloHadronic(BaseExperiment):
                 u_samples_dict = fn(u_samples_dict)
         return u_samples_dict["extra_dims"].to(self.dtype)
 
-    def plot(self):
-        LOGGER.info("plot: generating samples")
+    def sample(self):
+        LOGGER.info("sample: generating samples")
         samples, conditions = self.sample_n()
 
         if self.cfg.model_type == "energy":
@@ -418,7 +415,15 @@ class CaloHadronic(BaseExperiment):
         LOGGER.info(
             f"Instantiated energy model {type(self.energy_model.net).__name__} with {num_parameters} learnable parameters"
         )
-        model_path = os.path.join(energy_model_cfg.run_dir, "models", "model_run0.pt")
+
+        if hasattr(self.cfg, "energy_model_idx"):
+            energy_model_idx = self.cfg.energy_model_idx
+        else:
+            energy_model_idx = 0
+        model_path = os.path.join(
+            energy_model_cfg.run_dir, "models", f"model_run{energy_model_idx}.pt"
+        )
+
         try:
             state_dict = torch.load(model_path, map_location="cpu", weights_only=False)["model"]
             LOGGER.info(f"Loading energy model from {model_path}")
