@@ -17,7 +17,8 @@ data:
     LogEnergyGAN: {},
     ScaleEnergyGAN: {e_min: 6.907755, e_max: 13.815510},
   }
-
+finetuning: false
+load_sample: false
 evaluation:
   eval_dataset: "CaloGAN"
   eval_mode: "energy-ratios"
