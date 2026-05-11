@@ -14,16 +14,16 @@ class CaloGANDataset(Dataset):
         hdf5_file,
         transform=None,
         return_us=False,
-        device="cpu",
         dtype=torch.float32,
         rank=0,
     ):
         """
         Arguments:
             hdf5_file: path to hdf5 file
-            particle_type: photon, pion or electron
-            xml_filename: path to XML filename
-            transform: list of transformations
+            transform: list of transformations applied as preprocessing
+            return_us: whether to return the extra layer energy conditions (used for the energy network)
+            dtype: data type for the voxels and conditions
+            rank: rank of the process
         """
 
         self.data_dict = load_data(hdf5_file)
@@ -34,7 +34,6 @@ class CaloGANDataset(Dataset):
 
         self.return_us = return_us
         self.transform = transform
-        self.device = device
         self.dtype = dtype
 
         # apply preprocessing
@@ -48,6 +47,9 @@ class CaloGANDataset(Dataset):
             self.layers = self.data_dict["extra_dims"]
             self.energy = self.data_dict["energy"]
         else:
+            # store data as 2d array with flattened layers: (dataset size, # of voxels)
+            # geometric information is recovered from the bin edges
+            # and the model config file
             self.layers = torch.hstack(
                 (
                     self.data_dict["layer_0"],
