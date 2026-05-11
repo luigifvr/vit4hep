@@ -259,16 +259,36 @@ class CaloGAN(BaseExperiment):
                 .numpy()
             )
 
+            if self.cfg.save:
+                self.save_sample(samples, conditions, name=f"_{self.cfg.run_idx}")
+
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 eval_calogan_lowlevel(samples, self.cfg)
 
+    def eval_sample(self, dirname=""):
+        samples, energies = self.load_sample(dirname=dirname)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            eval_calogan_lowlevel(samples, self.cfg)
+
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
-        save_file = h5py.File(self.cfg.base_dir + f"samples{name}.hdf5", "w")
+        save_file = h5py.File(self.cfg.run_dir + f"/samples{name}.hdf5", "w")
         save_file.create_dataset("incident_energies", data=energies, compression="gzip")
         save_file.create_dataset("showers", data=sample, compression="gzip")
         save_file.close()
+
+    def load_sample(self, dirname=""):
+        """Load sample from the correct format"""
+        if dirname == "":
+            dirname = self.cfg.run_dir + f"/samples_{self.cfg.run_idx}.hdf5"
+        LOGGER.info(f"load_sample: loading samples from {dirname}")
+        load_file = h5py.File(dirname, "r")
+        energies = load_file["incident_energies"][:]
+        sample = load_file["showers"][:]
+        load_file.close()
+        return sample, energies
 
     def load_energy_model(self):
         # initialize model
