@@ -55,7 +55,6 @@ class CaloGAN(BaseExperiment):
             self.hdf5_train,
             transform=self.transforms,
             return_us=self.return_us,
-            device=self.device,
             dtype=self.dtype,
             rank=self.rank,
         )
@@ -64,7 +63,6 @@ class CaloGAN(BaseExperiment):
             self.hdf5_train,
             transform=self.transforms,
             return_us=self.return_us,
-            device=self.device,
             dtype=self.dtype,
             rank=self.rank,
         )
@@ -150,7 +148,6 @@ class CaloGAN(BaseExperiment):
                     self.hdf5_test,
                     transform=self.transforms,
                     return_us=self.return_us,
-                    device=self.device,
                 ).energy.to(self.device)
 
             # concatenate with Einc
@@ -202,7 +199,6 @@ class CaloGAN(BaseExperiment):
                 self.hdf5_test,
                 transform=self.transforms,  # TODO: Or, apply NormalizeEByLayer popped from model transforms
                 return_us=self.return_us,
-                device=self.device,
             )
             samples_dict = {}
             samples_dict["extra_dims"] = samples
