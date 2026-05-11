@@ -12,10 +12,10 @@ from experiments.calo_utils.ugr_evaluation.evaluate import (
     DNN,
     evaluate_cls,
     load_classifier,
-    train_and_evaluate_cls,
-    ttv_split,
     prepare_high_data_for_classifier,
     prepare_low_data_for_classifier,
+    train_and_evaluate_cls,
+    ttv_split,
 )
 from experiments.calo_utils.ugr_evaluation.evaluate_plotting_helper import (
     dup,
@@ -518,8 +518,6 @@ def run_from_py(sample, energy, theta, phi, cfg):
         hlf.CalculateFeatures(sample)
         hlf.Einc = energy
 
-        reference_angles = np.concatenate((reference_theta, reference_phi), axis=1)
-        angles = np.concatenate((theta, phi), axis=1)
         cut = args.cut
 
         if reference_hlf.E_tot is None:
@@ -557,9 +555,6 @@ def run_from_py(sample, energy, theta, phi, cfg):
         "cls-low-normed",
         "cls-resnet",
     ]:
-        # TODO: angles are not currenlty used!!!
-        reference_angles = np.concatenate((reference_theta, reference_phi), axis=1)
-        angles = np.concatenate((theta, phi), axis=1)
         if args.mode in ["all", "all-cls"]:
             list_cls = ["cls-low", "cls-high", "cls-resnet"]
         else:
