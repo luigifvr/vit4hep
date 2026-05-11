@@ -32,7 +32,9 @@ class CaloGAN(BaseExperiment):
     sample_us()          : Sample energy ratios from the energy model
     sample_n()           : Generate n_samples from the trained model, either energy ratios or full normalized showers
     sample()             : First generate full shower, then make plots and evaluate
+    eval_sample()        : Evaluate saved samples without re-generating them
     save_sample()        : Save generated samples in the correct format
+    load_sample()        : Load generated samples from the saved format
     load_energy_model()  : Load an external energy model, used if sample_us==True
     """
 
