@@ -613,7 +613,6 @@ class BaseExperiment:
 
     def _validate(self, step):
         losses = []
-        self._init_metrics()
 
         self.model.eval()
         with torch.no_grad():
@@ -688,7 +687,4 @@ class BaseExperiment:
         raise NotImplementedError()
 
     def _batch_loss(self, data):
-        raise NotImplementedError()
-
-    def _init_metrics(self):
         raise NotImplementedError()

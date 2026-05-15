@@ -30,7 +30,6 @@ class LEMURS(BaseExperiment):
 
     init_data()          : Read in data parameters and prepare the datasets
     _init_dataloader()   : Create the dataloaders for training and validation
-    _init_metrics()      : Metrics to be tracjked during training (pass)
     _batch_loss()        : Calls the model's batch_loss function
     generate_Einc_ds1()  : Generate the incident energy distribution of CaloChallenge as in the training data
     sample_us()          : Sample energy ratios from the energy model
@@ -136,9 +135,6 @@ class LEMURS(BaseExperiment):
         LOGGER.info(
             f"init_dataloader: created validation dataloader with {len(self.val_loader)} batches"
         )
-
-    def _init_metrics(self):
-        pass
 
     def _batch_loss(self, data):
         return self.model._batch_loss(data)
