@@ -3,15 +3,7 @@ import os
 import numpy as np
 import torch
 
-
-def logit(array, alpha=1.0e-6, inv=False):
-    if inv:
-        array = torch.sigmoid(array)
-        array = (array - alpha) / (1 - 2 * alpha)
-    else:
-        array = array * (1 - 2 * alpha) + alpha
-        array = torch.logit(array)
-    return array
+from experiments.calo_utils.transform_utils import logit
 
 
 class CaloHadGlobalStandardizeFromFile:

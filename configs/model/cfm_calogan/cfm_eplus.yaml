@@ -1,9 +1,9 @@
 _target_: experiments.calogan.model.CaloGANCFM
 in_channels: 1
-shape: [504]
-list_shape: [[1, 96, 3], [1, 12, 12], [1, 6, 12]]
-list_edges: [288, 144, 72]
-list_patch_shape: [[1, 6, 1], [1, 2, 3], [1, 2, 3]]
+shape: [504]    # total number of input voxels
+list_shape: [[1, 96, 3], [1, 12, 12], [1, 6, 12]]   # shape of each layer
+list_edges: [288, 144, 72]                          # edges used to reconstruct the detector from a flat vector
+list_patch_shape: [[1, 6, 1], [1, 2, 3], [1, 2, 3]] # patch shape for each layer
 
 time_distribution: uniform
 trajectory: linear

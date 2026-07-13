@@ -4,8 +4,8 @@ dtype: float32
 
 model_type: shape
 sample_us: false
-energy_model: ./runs/CaloChallenge_energy/calochallenge_ds2_energy/
-n_samples: 100000
+energy_model: /path/to/trained/energy-model  # used if sample_us==true
+n_samples: 100000   # used if sample_us==true
 
 data:
   training_file: /gpfs/home/acad/ucl-cp3/favaro/datasets/calogan_training/train_eplus.hdf5
@@ -21,7 +21,7 @@ data:
   }
 
 finetuning: false
-
+load_sample: false
 evaluation:
   eval_dataset: "CaloGAN"
   eval_mode: low-level

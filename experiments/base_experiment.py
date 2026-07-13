@@ -72,12 +72,10 @@ class BaseExperiment:
         # implement all ml boilerplate as private methods (_name)
         t0 = time.time()
 
-        self.init_physics()
         self.init_model()
         self._init_ddp()
         self.init_data()
         self._init_dataloader()
-        self._init_loss()
 
         if self.rank == 0:
             # save config
@@ -615,7 +613,6 @@ class BaseExperiment:
 
     def _validate(self, step):
         losses = []
-        self._init_metrics()
 
         self.model.eval()
         with torch.no_grad():
@@ -677,9 +674,6 @@ class BaseExperiment:
         if self.cfg.load_sample:
             self.eval_sample(self.cfg.load_sample)
 
-    def init_physics(self):
-        raise NotImplementedError()
-
     def init_data(self):
         raise NotImplementedError()
 
@@ -692,11 +686,5 @@ class BaseExperiment:
     def _init_dataloader(self):
         raise NotImplementedError()
 
-    def _init_loss(self):
-        raise NotImplementedError()
-
     def _batch_loss(self, data):
-        raise NotImplementedError()
-
-    def _init_metrics(self):
         raise NotImplementedError()

@@ -3,12 +3,12 @@ import os
 import numpy as np
 import torch
 
-from experiments.calochallenge.transforms import logit
+from experiments.calo_utils.transform_utils import logit
 
 
 class GlobalStandardizeFromFileGAN:
     """
-    Standardize features
+    Standardize features (recommended)
         mean_path: path to `.npy` file containing means of the features
         std_path: path to `.npy` file containing standard deviations of the features
         create: whether or not to calculate and save mean/std based on first call
@@ -101,9 +101,10 @@ class ScaleEnergyGAN:
 
 class ExclusiveLogitTransformGAN:
     """
-    Take log of input data
+    Take the logit of input data (recommended)
         delta: regularization
         exclusions: list of indices for features that should not be transformed
+        rescale: rescale instead of cutting at the edges. Scale set by delta
     """
 
     def __init__(self, delta, exclusions=None, rescale=False):
@@ -131,10 +132,10 @@ class ExclusiveLogitTransformGAN:
 
 class NormalizeLayerEnergyGAN:
     """
-    Normalize each shower by the layer energy
-    This will change the shower shape to N_voxels+N_layers
-       layer_boundaries: ''
-       eps: numerical epsilon
+    Normalize each shower by the layer energy (recommended)
+    and add a new key with the extra energy ratio dimensions
+       cut: to apply a normalized cut in the inverse step
+       eps: avoid dividing by zero in ratios
     """
 
     def __init__(self, cut=0.0, eps=1.0e-10):

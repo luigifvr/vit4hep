@@ -33,7 +33,8 @@ class ViT(nn.Module):
     proj_drop: int
         Dropout after MLP layer
     pos_embedding_coords: str
-        Type of positional embedding: cartesian or cylindrical
+        Type of positional embedding: cartesian or cylindrical.
+        Not used if learn_pos_embed is True.
     temperature: int
         Temperature parameter in positional embedding
     checkpoint_grad: bool
