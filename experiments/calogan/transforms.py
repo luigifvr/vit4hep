@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 
-from experiments.calochallenge.transforms import logit
+from experiments.calo_utils.transform_utils import logit
 
 
 class GlobalStandardizeFromFileGAN:
